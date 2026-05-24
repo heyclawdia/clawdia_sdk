@@ -54,3 +54,20 @@ Product channel UI, remote credentials, notification copy, offline retry product
 - Missing required sink is typed `HostConfigurationNeeded`.
 - Default delivery uses content refs or redacted summaries.
 - No channel-specific run path exists.
+
+## Validation Evidence
+
+- Worker agent: Pascal (`019e586a-dd56-76d3-8636-457dad9a5a0b`).
+- Changed file: `docs/contracts/output-delivery-contract.md`.
+- `git diff --check -- docs/contracts/output-delivery-contract.md` passed.
+- Scope/no-code audit confirmed only the allowed contract file changed and no Rust source, package manifests, executable tests, or fixtures were created.
+- Product-neutrality/no-TODO audit found no product-specific terms, `TODO`, or `FIXME` in the edited contract.
+- No Markdown links were introduced by the worker.
+- Cross-cutting proposals: none blocking.
+
+## Review Packet
+
+- Primitive decision: reuse `DestinationRef`, `OutputSink`, `PolicyRef`, `EffectIntent`, `EffectResult`, `RunJournal`, `AgentEvent`, content refs, and dedupe keys; no `CapabilitySpec` variant.
+- SDK-owned boundaries preserved: delivery policy, intent/result/dedupe/reconciliation records, typed sink absence, privacy checks, and replay rules.
+- Host-owned boundaries preserved: channel UI, credentials, notification copy, durable channel stores, ack lookup, and offline scheduling.
+- Reviewer checklist: PASS for simplicity, product-neutrality, event/journal durability, privacy/redaction, replay/idempotency, and capability fingerprint impact.

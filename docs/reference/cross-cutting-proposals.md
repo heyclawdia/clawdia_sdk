@@ -95,6 +95,41 @@ Validation needed:
 
 Whole-packet link/path audit, workstream ownership audit, product-neutrality audit, no-code audit, review-matrix audit, text audits for removed hazards, and independent implementation review.
 
+### 2026-05-24 Phase 04 Side-Effect Policy Alignment
+
+Status: accepted
+Proposed by: Phase 04 side-effect workers and stitching checkpoint
+Date: 2026-05-24
+Affected workstreams: 01, 02, 04, 09, 11
+Affected files: `docs/contracts/runtime-package-schema.md`, `docs/contracts/event-schema.md`, `docs/contracts/review-matrix.md`, `docs/reference/feature-to-primitive-matrix.md`, `docs/reference/open-questions-and-ambiguities.md`, `docs/workstreams/04-side-effects-policy/_phase/phase-exit-report.md`
+Decision owner: 00-integration-stitching
+
+Problem:
+
+Phase 04 workers independently tightened tools, output delivery, telemetry, and hooks around the shared side-effect spine. Their handoffs raised three cross-cutting decisions: whether tool/approval event names need shared taxonomy changes, which tool-pack fields must affect runtime-package fingerprints, and whether telemetry overflow needs its own event kind.
+
+Proposed change:
+
+Accepted decisions:
+
+- Keep existing tool, approval, output-delivery, hook, and telemetry-cost event names from `event-schema.md`; no new Phase 04 event family or rename is needed.
+- Treat host/user approval dispatcher calls as `EffectKind::ApprovalDispatch` records wrapped by `ApprovalRecord { dispatch_intent }` and `ApprovalRecord { dispatch_result }` before any dispatcher access can release a tool execution.
+- Include active tool-pack sidecar version/source, executor refs, policy refs, isolation/detach policy, redaction refs, and reconciliation requirements in runtime-package fingerprint inputs when those features are active.
+- Keep telemetry overflow represented as `TelemetrySinkFailed` with `failure_kind = overflow` for the first slice. A future separate `TelemetryOverflowed` event kind would require an event-schema update and emitted-kind fixture.
+- Defer Phase 05 OTel mappings for stream/realtime, isolation/child-lifecycle, subagent, and extension families to their respective Phase 05 owners; those owners must provide emitted-kind fixtures and redaction cases before activation.
+
+Why this is cross-cutting:
+
+These decisions affect shared event taxonomy, runtime-package fingerprint determinism, side-effect journal/event alignment, and telemetry projection ownership across multiple contracts.
+
+Compatibility impact:
+
+Documentation-only alignment before Rust code exists. Existing event names stay stable. Fingerprint tests gain more explicit active-feature inputs instead of relying on implicit tool-pack or sink state.
+
+Validation needed:
+
+Phase 04 exit report must prove every side-effecting feature maps to `EffectIntent` / `EffectResult`, approval dispatch is not a parallel side-effect path, missing required policy/dispatcher/adapter/sink/journal append fails closed, telemetry remains derived, product-specific host UX stays outside contracts, and Phase 05 deferrals name their owners.
+
 ## Open Proposals
 
 None yet.

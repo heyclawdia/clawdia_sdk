@@ -2,6 +2,18 @@
 
 The SDK should export OTel-compatible telemetry without making OTel conventions the internal source of truth.
 
+## Projection Authority
+
+OTel spans, metrics, and logs are projections from SDK-owned facts. The exporter reads `AgentEvent` envelopes, `RunJournal` records, usage/cost records, and `PolicyRef` / `PolicyDecisionRef` values. It must not introduce run facts, infer terminal state from exporter delivery, or become a second event stream or ledger.
+
+Rules:
+
+- `RunJournal` remains the durable source of truth for replay, resume, repair, terminal state, and side-effect audit.
+- `AgentEvent` remains the canonical live event vocabulary and filter surface.
+- `TelemetryRecord` may persist usage, cost, sink health, correction, and export-cursor facts needed to repair derived telemetry, but it cannot mutate run outcome or side-effect status.
+- OTel IDs, trace-store IDs, and collector acknowledgements are linked back to SDK IDs; they never replace `RunId`, `EventId`, `JournalCursor`, `EffectId`, or `PolicyRef`.
+- Missing or failing telemetry sinks can emit sink-health telemetry and repair records, but they cannot block provider streaming, tool execution, cancellation, journal append, or terminal sealing.
+
 ## Stability Posture
 
 OpenTelemetry GenAI semantic conventions are still evolving. The first exporter contract pins semantic conventions `1.41.0` in `gen_ai_latest_experimental` mode, verified against the OpenTelemetry docs on 2026-05-23.
@@ -34,9 +46,43 @@ flowchart TD
   B --> E["tool call span"]
   E --> F["MCP span if not already represented"]
   E --> G["approval event/span"]
-  B --> H["subagent span"]
+  B --> J["hook invocation span/event"]
+  B --> K["output delivery span/event"]
+  B --> H["subagent span<br/>deferred Phase 05c"]
   A --> I["journal/replay events"]
 ```
+
+## Phase 04 Emitted-Kind Mapping
+
+This table maps event kinds available through Phase 04 to OTel projections. It is not permission to emit a kind before that kind has the event payload fixture required by [event-schema.md](event-schema.md). Exporters must route from envelope fields and journal/index projections, not raw payload content.
+
+| SDK event family or kinds | OTel projection | Mapping rules |
+| --- | --- | --- |
+| `RunStarted`, `RunCompleted`, `RunFailed`, `RunCancelled` | root `invoke_agent` span | Start/end the span from journal-backed run lifecycle facts. Terminal status comes from journal-backed terminal events or replay, not collector success. |
+| `RunCheckpointed`, `RunCancelRequested`, `RunResumeRequested`, `RunResumeFailed` | root span events or logs | Include `agent_sdk.journal.cursor` when available. Resume/cancel signals do not create a new root span unless a future compatibility note says so. |
+| `TurnStarted`, `ContextAssembled`, `ProviderRequestProjected`, `TurnCompleted`, `TurnFailed` | child turn span plus span events | `ContextAssembled` and `ProviderRequestProjected` export context projection IDs, counts, policy refs, and redaction summaries only. |
+| `MessageAccepted`, `MessagePartAdded`, `MessageCommitted`, `MessageRedacted`, `MessageProjected`, `MessageDropped` | span events or logs | Message content is represented by part kinds, `ContentRef`, hashes, sizes, redacted summaries, privacy, and retention. Raw content is opt-in only. |
+| `ModelAttemptStarted`, `ModelMessageCompleted`, `ModelAttemptRetried`, `ModelAttemptFailed`, `ModelAttemptCancelled` | `chat` model attempt span | One span per attempt. Retries create linked attempts rather than overwriting history. |
+| `ModelStreamDelta` | coalesced span events or dropped progress metric | Deltas are progress data. Exporters may coalesce or drop them under fanout policy and must preserve terminal model usage/status. |
+| `ModelUsageRecorded` | model usage metrics and span attributes | Usage joins to `ModelAttemptRecord` and `TelemetryRecord`; estimates and provider-reported corrections stay distinguishable. |
+| `StructuredOutputRequested`, `StructuredOutputValidationStarted`, `StructuredOutputValidationFailed`, `StructuredOutputRepairRequested`, `StructuredOutputValidated`, `StructuredOutputFailed` | validation span events under the model/turn span | Export schema ID/version, attempt IDs, validation status, repair count, and redacted error summaries. Do not export raw invalid output by default. |
+| `ToolRequested`, `ToolApprovalRequired`, `ToolStarted`, `ToolProgress`, `ToolCompleted`, `ToolFailed`, `ToolRetried`, `ToolCancelled`, `ToolInterrupted` | `execute_tool` span | Tool spans link to `EffectIntent` / `EffectResult`, `ToolRecord`, approval refs, idempotency/dedupe keys, and redacted result refs. `ToolProgress` may be coalesced. |
+| `ApprovalRequested`, `ApprovalDispatched`, `ApprovalDispatchUnavailable`, `ApprovalResponded`, `ApprovalTimedOut`, `ApprovalDenied`, `ApprovalCancelled` | approval span events under tool/output/hook span or a short approval span | Approval events export broker lifecycle, dispatcher kind, finite decision, actor refs, policy refs, timeout, and denial reason. Approval UI remains host-owned. |
+| `HookRegistered`, `HookInvoked`, `HookCompleted`, `HookFailed`, `HookTimedOut`, `HookCancelled`, `HookResponseApplied`, `HookResponseRejected` | hook invocation span/events | Hook telemetry links to package sidecar refs, hook policy refs, mutation rights, timeout/failure policy, and any journaled domain operation produced by the hook. |
+| `MemoryRetrieved`, `ContextContributionReceived`, `ContextContributionSelected`, `ContextContributionOmitted`, `MemoryStored`, `ContextItemInjected`, `ContextCompactionStarted`, `ContextCompactionCompleted`, `ContextProjectionAudited` | context/memory span events | Export selection/omission decisions, projection IDs, privacy, retention, and content refs. Memory bodies are not exported by default. |
+| `OutputDispatchRequested`, `OutputDispatchCompleted`, `OutputDispatchFailed`, `OutputDispatchDeduped` | output sink span/events | Output delivery telemetry links to `OutputDispatchRecord`, destination refs, dedupe key, ack/failure refs, and sink policy. Product channel UX and copy stay host-owned. |
+| `UsageRecorded`, `CostEstimated`, `CostCorrected` | metrics, span attributes, and cost logs | Cost records are monotonic. Corrections append and include rate table/version, estimate status, child rollup refs, and source record refs. |
+| `TelemetrySinkFailed`, `TelemetrySinkRecovered` | telemetry sink health logs/metrics | Include sink ID, sink kind, failure reason, last acknowledged export cursor, retry policy, dropped counts when applicable, and `terminal_preserved`. These events never fail the run. |
+| `InvariantFailed`, `JournalAppendFailed`, `RecoveryPlanned`, `ReplayStarted`, `ReplayCompleted`, `ReplayFailed`, `AntiEntropyRepairSuggested`, `AntiEntropyRepairApplied` | recovery logs and repair spans | Repair telemetry can rebuild derived exports from journal cursors. It must not rerun providers, tools, output sends, memory writes, extensions, or product compensation. |
+
+Deferred mappings:
+
+| Deferred family | Owner phase | Deferral |
+| --- | --- | --- |
+| `stream_rule`, `realtime` | Phase 05a streaming/realtime | Map after stream/realtime contracts provide emitted-kind fixtures, cursor semantics, and redaction cases. |
+| `isolation`, `child_lifecycle` | Phase 05b isolation execution and related stitching | Map process/environment spans after isolation fixtures define stats, process I/O redaction, cleanup, detach, and terminal preservation. |
+| `subagent` | Phase 05c subagents | Map child run spans and usage rollups after parent/child event wrapping and handoff policy fixtures exist. |
+| `extension` | Phase 05d extension SDK | Map extension action/hook/tool telemetry after core extension capability boundaries and host-runtime ownership are frozen. |
 
 ## Attribute Rules
 
@@ -76,6 +122,7 @@ Use SDK namespace for SDK-specific lineage:
 - `agent_sdk.turn.id`
 - `agent_sdk.attempt.id`
 - `agent_sdk.event.id`
+- `agent_sdk.event.family`
 - `agent_sdk.event.kind`
 - `agent_sdk.runtime_package.fingerprint`
 - `agent_sdk.source.kind`
@@ -84,8 +131,17 @@ Use SDK namespace for SDK-specific lineage:
 - `agent_sdk.content_capture`
 - `agent_sdk.journal.cursor`
 - `agent_sdk.policy.decision_ids`
+- `agent_sdk.redaction.policy_id`
+- `agent_sdk.retention.class`
+- `agent_sdk.telemetry.sink.id`
+- `agent_sdk.telemetry.export.cursor`
+- `agent_sdk.usage.record.id`
+- `agent_sdk.cost.record.id`
+- `agent_sdk.cost.rate_table.version`
 - `agent_sdk.isolation.environment_id`
 - `agent_sdk.subagent.child_run_id`
+
+High-cardinality values such as content hashes, remote handles, filesystem paths, provider account IDs, and credential profile IDs must be omitted, redacted, hashed, or replaced by host-approved aliases according to policy before they become OTel attributes.
 
 ## Golden Span Shape
 
@@ -148,12 +204,18 @@ When MCP instrumentation is merged into an existing tool span, add MCP attribute
 - Raw prompt/model/tool/memory content is off by default.
 - Content opt-in follows telemetry/privacy contract.
 - Provider account IDs and credential IDs are hashed or redacted by policy.
+- Opt-in raw content requires an explicit content-capture policy, redaction policy, retention class/window, sampling decision, sink permission, and policy/approval refs when required.
+- Hidden chain-of-thought, credentials, auth headers, and unredacted environment values are never exported as OTel content attributes.
 
 ## Failure Rules
 
 - Exporter failure emits `TelemetrySinkFailed`.
 - Run continues.
-- Journal records export cursor so repair replay can re-export.
+- Journal records export cursor so repair replay can re-export idempotently.
+- Exporter retry uses a sink-scoped `TelemetryExportCursor`; it is distinct from `EventCursor`, `JournalCursor`, and optional `ArchiveCursor`.
+- A sink acknowledges an export cursor only after the sink-specific delivery contract says the projection is durably accepted or safely deduped.
+- Repair replay reads journal-backed records and telemetry records; it does not replay raw content unless the original content-capture policy, sampling decision, retention, and sink permission still allow it.
+- Terminal run, usage, cost, sink failure, and recovery cursor projections are preserved under fanout overflow or represented by a repairable sink-health record.
 
 ## Acceptance Tests
 
@@ -161,13 +223,18 @@ When MCP instrumentation is merged into an existing tool span, add MCP attribute
 - `otel_uses_pinned_semconv_declaration`
 - `otel_schema_url_is_1_41_0`
 - `otel_stability_opt_in_is_gen_ai_latest_experimental`
+- `otel_phase04_emitted_kind_mapping_has_no_unmapped_active_kind`
+- `otel_phase05_emitted_kind_mapping_is_deferred_with_owner`
 - `otel_sdk_fields_use_agent_sdk_namespace`
 - `otel_golden_span_contains_required_gen_ai_and_agent_sdk_fields`
 - `otel_opt_in_content_attributes_absent_by_default`
+- `otel_content_capture_requires_redaction_retention_sampling_and_sink_permission`
 - `mcp_tool_call_does_not_double_span_under_sdk_tool_span`
 - `mcp_attributes_merge_or_link_without_double_counting_usage`
 - `otel_raw_content_absent_by_default`
 - `otel_sink_failure_does_not_fail_run`
+- `otel_export_cursor_repairs_from_journal_without_run_control`
+- `otel_terminal_usage_and_cost_survive_sink_overflow`
 
 ## Complete Example
 

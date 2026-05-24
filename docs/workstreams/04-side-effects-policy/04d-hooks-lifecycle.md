@@ -56,3 +56,19 @@ Extension subprocess runtime, approval policy authority, arbitrary transcript mu
 - Hook ordering, timeout, queue, failure, and mutation-rights matrices.
 - Hook response mutations are journaled before apply.
 - Hook config and code-first helpers produce the same package shape.
+
+## Validation Evidence
+
+- Worker agent: Chandrasekhar (`019e586b-19bb-7b21-a871-77362b135b05`).
+- Changed files: `docs/contracts/hook-lifecycle-contract.md`, `docs/contracts/api-contracts.md`.
+- `git diff --check -- docs/contracts/hook-lifecycle-contract.md docs/contracts/api-contracts.md` passed.
+- Scoped docs audits confirmed no generic hook hatches, no ambient callback registration, journal-before-apply, event/journal alignment, and product-neutrality.
+- No Rust source, package manifests, executable tests, or fixtures were created.
+- Cross-cutting proposals: none.
+
+## Review Packet
+
+- Primitive decision: reuse `RuntimePackage`, `HookSpec`, `PolicyRef`, `AgentEvent`, `RunJournal`, and `EffectIntent` / `EffectResult` through target domain operations; no new primitive or capability variant.
+- SDK-owned boundaries preserved: hook points, typed responses, package lowering, mutation rights, events, journal/replay behavior, and security failure policy.
+- Host-owned boundaries preserved: hook config files, executor installation, extension subprocesses, UI, and product hook libraries.
+- Reviewer checklist: PASS for simplicity, product-neutrality, event/journal durability, privacy/redaction, replay/idempotency, and capability fingerprint impact.

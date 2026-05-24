@@ -463,7 +463,7 @@ These are minimum fields. Event-specific DTOs may add optional fields, but they 
 | `structured_output` | `schema_id`, `schema_version`, `validation_attempt`, `repair_attempt`, `validation_status`, `redacted_errors`, `validated_output_ref`. |
 | `tool` | `canonical_tool_name`, `tool_source`, `effect_class`, `attempt_index`, `approval_ref`, `idempotency_key`, `status`, `result_ref`, `effect_ref`. |
 | `isolation` | `environment_id`, `adapter_kind`, `capability_report_ref`, `image_ref`, `mount_policy_hash`, `network_policy_hash`, `process_ref`, `exit_status`, `cleanup_status`. |
-| `approval` | `approval_request_id`, `dispatcher_kind`, `decision`, `actor_ref`, `timeout_ms`, `source_scope`, `policy_refs`, `denial_reason`. |
+| `approval` | `approval_request_id`, `dispatcher_kind`, `decision`, `actor_ref`, `timeout_ms`, `source_scope`, `policy_refs`, `denial_reason`, `effect_ref`. |
 | `hook` | `hook_id`, `hook_point`, `source`, `execution_mode`, `queue_policy`, `timeout_ms`, `failure_policy`, `mutation_rights`, `response_class`, `status`, `error_ref`. |
 | `child_lifecycle` | `child_artifact_id`, `child_artifact_kind`, `owner_run_id`, `shutdown_behavior`, `detach_status`, `reclaim_policy_ref`, `host_ack_ref`, `terminal_status`, `error_ref`. |
 | `memory_context` | `context_contribution_id`, `context_item_id`, `context_kind`, `producer_ref`, `source_ref`, `content_ref`, `selection_reason`, `policy_refs`, `projection_id`, `included_counts`, `omitted_counts`, `redaction_policy_id`. |

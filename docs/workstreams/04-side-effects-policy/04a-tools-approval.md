@@ -56,3 +56,19 @@ Runtime-package canonical schema, concrete shell/container execution, product ap
 - Intent/result journal proof for every tool call, with intent-before-external-effect proof for mutating tools.
 - Tool-pack snapshot and fingerprint proof.
 - Primitive-lowering evidence: no ambient tool discovery or unjournaled side-effect path.
+
+## Validation Evidence
+
+- Worker agent: Lorentz (`019e586a-b953-7e01-be4b-4b5fe64df070`).
+- Changed files: `docs/contracts/tool-approval-contract.md`, `docs/contracts/tool-pack-contract.md`.
+- `git diff --check -- docs/contracts/tool-approval-contract.md docs/contracts/tool-pack-contract.md` passed.
+- Scoped docs audit confirmed coverage for `RuntimePackage`, `CapabilitySpec`, `PolicyRef`, approval-dispatch `EffectIntent` / `EffectResult`, tool-execution `EffectIntent` / `EffectResult`, `RunJournal`, `AgentEvent`, `SourceRef`, `DestinationRef`, `ContentRef`, package deltas, fail-closed rules, idempotency, and reconciliation.
+- No Rust source, package manifests, executable tests, or fixtures were created.
+- Cross-cutting proposals sent to stitching: final tool/approval event names and tool-pack fingerprint inputs.
+
+## Review Packet
+
+- Primitive decision: reuse kernel primitives and typed package sidecars; no new kernel primitive or capability variant.
+- SDK-owned boundaries preserved: policy stages, approval broker semantics, approval-dispatch intent/result, tool execution intent/result, package snapshots, and side-effect audit.
+- Host-owned boundaries preserved: approval UI/copy, installed tools, concrete file/process/runtime adapters, compatibility modes, and product undo UX.
+- Reviewer checklist: PASS for simplicity, product-neutrality, event/journal durability, privacy/redaction, replay/idempotency, and capability fingerprint impact after stitching reconciles fingerprint inputs.

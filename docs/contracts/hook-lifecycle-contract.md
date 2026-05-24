@@ -122,6 +122,8 @@ The default hook posture is observation-first and safe under load:
 - Slow observe hooks cannot block provider streaming, tool execution, cancellation, or terminal sealing.
 - Blocking hooks must be explicitly declared and can guard only their named lifecycle point.
 - Security-critical blocking hooks cannot fail open.
+- `FailOpenObserveOnly` is valid only for non-security observation hooks. Package validation rejects fail-open behavior when the hook point, policy ref, or declared mutation rights can affect approval, permissions, sandboxing, isolation, retention, content capture, output delivery, process ownership, child lifecycle, or externally visible effects.
+- Nonblocking hooks are observe-only unless a later feature contract explicitly gives them a queue-backed mutation protocol. Security-relevant hooks that can deny, interrupt, modify, retry, or repair must be blocking and bounded.
 - Extension-backed hooks use the same SDK hook contract, but their JSON-RPC/process bridge is outside `agent-sdk-core`.
 
 ## Registration Surfaces
@@ -158,8 +160,11 @@ Canonical lowering:
 
 - Config hooks parse into `HookSpec` values.
 - Reserved hook registration helpers such as `AgentBuilder::on(...)` create the same `HookSpec` sidecar shape using default timeout, failure, privacy, and policy refs.
+- Code-first hooks register their executor with a host/runtime executor registry and store only a stable `HookExecutorRef` in the package snapshot. The canonical package never stores a function pointer, closure, process handle, or ambient callback table.
+- Config hooks and code-first helpers both lower to the same typed hook sidecar DTO before `AgentRuntime::start_run` begins resolving the effective package. The same logical hook expressed through config, helper, or explicit `HookSpec` must produce the same package sidecar shape and fingerprint inputs after defaults, policy refs, executor refs, and source provenance are resolved.
 - `RuntimePackageBuilder` stores hook specs as typed package sidecars with hook executor refs. A hook becomes a `CapabilitySpec` only when a feature workstream explicitly exposes it as a callable/discoverable capability.
 - Runtime package fingerprint includes hook ID, point, source, ordering, execution mode, queue/overflow config, timeout, failure, mutation rights, privacy, policy ref, and executor ref.
+- Missing hook policy refs, unresolved executor refs, invalid failure policy for security-relevant hooks, or mutation rights not allowed at the hook point fail package validation before the run starts.
 - A hook cannot be added to an active run by mutating an ambient registry. Hook discovery or activation creates a next-turn or next-run package delta.
 
 ## Mutation Rights
@@ -195,6 +200,22 @@ If a response class is not in the hook spec's `mutation_rights`, the SDK rejects
 
 `HookResponse` is intentionally closed for the first Rust slice. Future response classes require updating this enum, this table, event payload fixtures, journal fixtures, and mutation-right tests. Hooks do not emit arbitrary events or enqueue generic SDK effects. A behavior-changing hook response is accepted only when it lowers into an existing domain operation such as context injection, tool denial, approval request mutation, process request mutation, child lifecycle action, or cleanup repair; that domain operation emits its normal events and journal records.
 
+## Response Lowering Matrix
+
+Hook responses are proposals to lifecycle-specific domain owners. They are not a second event bus, side-effect queue, policy engine, or transcript mutation API.
+
+| Response class | Lowers into | Required records before apply | Notes |
+| --- | --- | --- | --- |
+| `ObserveOnly` | no domain mutation | `HookRecord { invocation, completion }` | May be best-effort when nonblocking and non-security. |
+| `InjectContext`, `MarkProtectedContext`, `RequestCompaction`, `RequestProjectionAuditRepair` | context admission, compaction, or projection-audit operation | `HookRecord { response accepted }` plus `ContextRecord` | Contributions remain candidates until policy admits them as `ContextItem` values. |
+| `ModifyProjection` | context projection metadata patch | `HookRecord { response accepted }` plus `ContextRecord { projection audit }` | Cannot mutate the lossless transcript or raw provider request directly. |
+| `ModifyValidationHints`, `RequestRetry` | structured-output validation, model retry, or recovery policy | `HookRecord { response accepted }` plus `StructuredOutputRecord`, `ModelAttemptRecord`, or `RecoveryRecord` | Retry budgets, idempotency, and repair policy still apply. |
+| `ModifyToolRequest`, `Deny`, `RequestApproval`, `RewriteToolResult` | tool and approval domain operations | `HookRecord { response accepted }` plus `ToolRecord` and/or `ApprovalRecord` | Tool execution still appends intent before executor start. Result rewrites create journaled patches; they do not erase the original result. |
+| `ModifyApprovalRequest` | approval broker request mutation | `HookRecord { response accepted }` plus `ApprovalRecord` before dispatch | Missing or unhealthy dispatchers fail closed according to approval policy. |
+| `ModifySubagentRequest`, `RequestUsageRollupRepair` | subagent start policy, child lifecycle, or rollup repair | `HookRecord { response accepted }` plus `SubagentRecord`, `ChildLifecycleRecord`, or `RecoveryRecord` | Depth, package stripping, handoff policy, and usage rollup authority stay with subagent/child lifecycle domains. |
+| `ModifyProcessRequest`, `ValidateDetach`, `RequestCleanupRepair` | isolation, process ownership, child lifecycle, or recovery operation | `HookRecord { response accepted }` plus `IsolationRecord`, `ChildLifecycleRecord`, or `RecoveryRecord` | Hooks cannot silently downgrade isolation, detach processes, or create implicit orphans. |
+| `StopCompletionWithRepairNeeded`, `StopRun` | run lifecycle or recovery transition | `HookRecord { response accepted }` plus `RunRecord` or `RecoveryRecord` | Terminal or repair-needed events come from the run/recovery domain, not from the hook itself. |
+
 ## Ordering, Timeouts, And Failure
 
 ```rust
@@ -220,6 +241,7 @@ Rules:
 - Security-relevant hooks cannot use `FailOpenObserveOnly`.
 - A timeout on a nonblocking observe-only hook records `HookTimedOut` and continues.
 - A timeout on a blocking security hook applies its declared deny/interrupt/fail policy.
+- A timeout or failure for a hook whose response could affect security, policy, or external side effects must deny, interrupt, or fail the guarded transition. It cannot be downgraded to observe-only after package validation.
 - Hook invocation is cancellable. Manual run cancellation interrupts in-flight hooks and records `HookCancelled` before child shutdown reconciliation continues.
 - `OnRunCancelRequested` hooks have a separate small cleanup deadline and cannot extend the run's child-shutdown grace period unless the run policy explicitly allows it.
 
@@ -240,7 +262,7 @@ Journal records:
 
 - `HookRecord { registered spec hash }`
 - `HookRecord { invocation started }`
-- `HookRecord { response summary }`
+- `HookRecord { response accepted/rejected summary, response class, mutation-right decision, target domain refs }`
 - `HookRecord { timeout/cancel/failure }`
 - `ContextRecord`, `ToolRecord`, `ApprovalRecord`, `SubagentRecord`, `IsolationRecord`, or `RecoveryRecord` for the typed mutation the hook requested.
 
@@ -248,6 +270,9 @@ Rules:
 
 - A hook response that changes run behavior is journaled before it is applied.
 - Accepted hook proposals lower into normal SDK domain operations. Any side effect created by that operation must satisfy intent-before-effect.
+- Behavior-changing responses use this order: validate hook point and `mutation_rights`; evaluate the effective policy refs; append the accepted or rejected `HookRecord`; append the target domain intent/record when the domain operation is side-effecting; apply the mutation only after those appends succeed; emit `HookResponseApplied` as a journal-backed event.
+- If the required journal append fails before applying a mutation, the mutation is not applied. Security-relevant guarded transitions deny, interrupt, or fail according to policy; non-security observe-only failures may record diagnostics and continue.
+- `EffectKind::HookMutation`, when used, records that a hook proposal changed run behavior. It is not a generic authorization to execute arbitrary effects; the target domain operation must still use its normal `EffectIntent` / `EffectResult`, policy, events, and reconciliation records.
 - `HookRegistered` is a run-effective event emitted when a hook spec becomes part of the immutable runtime package for a specific run, after `RunStarted` has a `run_id`. Pre-run package construction is represented by package/capability validation records, not by run-scoped `AgentEvent`s.
 - Hook events use `SourceRef.kind = hook` for in-process hooks and `SourceRef.kind = extension` for extension-provided hooks.
 - Hook payloads default to IDs, refs, hashes, sizes, statuses, policy refs, and redacted summaries. Raw content is opt-in.
@@ -265,13 +290,20 @@ An extension-provided hook is just a hook whose `HookSource` and `executor_ref` 
 
 - `agent_on_hook_lowers_to_hook_spec_sidecar`
 - `config_hook_and_code_hook_share_runtime_package_shape`
+- `hook_helper_and_explicit_hook_spec_emit_equivalent_package_fingerprint`
+- `hook_helper_resolves_executor_ref_before_start_run`
 - `hook_execution_mode_and_queue_are_fingerprinted`
 - `hook_ordering_is_deterministic_by_point_phase_order_and_id`
 - `nonblocking_observe_hook_timeout_fails_open_with_event`
 - `security_hook_timeout_denies_or_interrupts_not_fail_open`
+- `nonblocking_security_relevant_hook_is_rejected_by_package_validation`
 - `hook_response_class_outside_mutation_rights_is_rejected`
+- `hook_response_lowering_matrix_has_no_generic_effect_hatch`
+- `hook_response_apply_event_is_journal_backed_after_records`
+- `hook_mutation_rights_matrix_matches_allowed_response_table`
 - `before_tool_hook_can_deny_before_executor_start`
 - `before_isolation_process_hook_cannot_silently_downgrade_environment`
+- `hook_response_mutation_append_failure_prevents_apply`
 - `cancel_interrupts_inflight_hooks_and_continues_child_shutdown`
 - `audit_replay_does_not_reinvoke_hooks`
 - `resume_replay_restores_committed_hook_response_state`
@@ -318,7 +350,7 @@ Wiring:
 3. Runtime package fingerprints the hook sidecar, executor ref, and policy fields.
 4. Agent loop reaches `BeforeToolCall`.
 5. Hook bus invokes matching hooks in deterministic order.
-6. SDK journals any behavior-changing response before applying it.
+6. SDK validates mutation rights and policy, journals any behavior-changing response and target domain intent, then applies the mutation.
 
 Events:
 
@@ -331,8 +363,9 @@ Journal:
 
 - `HookRecord { registered spec hash }`
 - `HookRecord { invocation started }`
-- `HookRecord { response summary }`
-- `ToolRecord`, `ApprovalRecord`, or `RecoveryRecord` for the applied mutation.
+- `HookRecord { response accepted/rejected summary, response class, target domain refs }`
+- `ToolRecord`, `ApprovalRecord`, `ContextRecord`, `IsolationRecord`, `SubagentRecord`, `ChildLifecycleRecord`, or `RecoveryRecord` for the applied mutation.
+- `EffectIntent` / `EffectResult` through the target domain when the accepted response creates a side effect.
 
 Policies and failures:
 

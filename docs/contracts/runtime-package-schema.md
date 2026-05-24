@@ -184,8 +184,8 @@ The algorithm name and schema version are part of the preimage.
 - Output contract schema IDs, validation policy, repair policy, and local validator version for typed runs.
 - Output delivery sink IDs, delivery policy refs, dedupe policy, and sink capability versions.
 - Provider-visible tool names, descriptions, input/output schemas, risk/effect metadata.
-- Executable tool route IDs, source IDs, handler versions, and required permissions.
-- Tool pack IDs, versions, and policies.
+- Executable tool route IDs, executor refs, source IDs, handler versions, and required permissions.
+- Tool pack IDs, versions, source refs/trust, typed sidecar versions, executor refs, schema refs, policy refs, redaction refs, isolation/detach policy, and reconciliation requirements.
 - MCP server IDs, exposed tool/resource/prompt names, namespace rules, and capability versions.
 - Hook IDs, hook kinds, ordering, execution mode, queue/overflow policy, mutation rights, timeout policy, and source IDs.
 - Stream rule IDs, versions, matchers, channels, actions, repeat policy, and privacy policy.
@@ -193,7 +193,7 @@ The algorithm name and schema version are part of the preimage.
 - Subagent IDs, route policy, context policy, tool policy, depth policy.
 - Child lifecycle default policy, allowed policy refs, detach policy refs, and cleanup timeout policy.
 - Extension IDs, versions, declared SDK-facing capabilities, executor refs, action capability IDs, and policy refs.
-- Approval, permission, sandbox, autonomy, escalation, retention, and content-capture policy snapshots.
+- Approval, permission, sandbox, autonomy, escalation, retention, redaction, and content-capture policy snapshots.
 - Capability catalog source kind/ref/version/hash/trust/activation policy when catalog data affects active capabilities.
 
 ## Excluded From Fingerprint

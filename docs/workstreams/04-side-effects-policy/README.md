@@ -15,11 +15,13 @@ This phase proves side-effecting features all lower through the same policy, jou
 
 ## Exit Gate
 
-- [ ] Every mutating side effect uses or maps to `EffectIntent` / `EffectResult`.
-- [ ] Missing policy, dispatcher, adapter, sink, or journal append fails closed when required.
-- [ ] Tool, hook, output, and telemetry behaviors reuse `RuntimePackage`, `PolicyRef`, `RunJournal`, and `AgentEvent`.
-- [ ] Product channel UX, approval UI, telemetry dashboards, and extension runtimes remain host-owned.
-- [ ] Stitching checkpoint complete: blocking cross-cutting proposals from Phase 04 are accepted, rejected, or explicitly deferred before Phase 05 starts.
+- [x] Every mutating side effect uses or maps to `EffectIntent` / `EffectResult`.
+- [x] Missing policy, dispatcher, adapter, sink, or journal append fails closed when required.
+- [x] Tool, hook, output, and telemetry behaviors reuse `RuntimePackage`, `PolicyRef`, `RunJournal`, and `AgentEvent`.
+- [x] Product channel UX, approval UI, telemetry dashboards, and extension runtimes remain host-owned.
+- [x] Stitching checkpoint complete: blocking cross-cutting proposals from Phase 04 are accepted, rejected, or explicitly deferred before Phase 05 starts.
+
+Exit evidence: [Phase 04 exit report](_phase/phase-exit-report.md).
 
 ## Next Phase
 

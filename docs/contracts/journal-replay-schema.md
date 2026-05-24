@@ -92,7 +92,7 @@ Cross-run, all-agent, or arbitrary filtered durable replay belongs to an optiona
 | `StructuredOutputRecord` | schema ID, validation attempts, repair prompts, validated output refs |
 | `StreamRuleRecord` | rule compile/match/intervention state, cursor, repeat state |
 | `HookRecord` | hook spec hash, invocation, timeout/cancel/failure, response summary, applied mutation refs |
-| `ApprovalRecord` | request, dispatcher, timeout, response actor, policy refs |
+| `ApprovalRecord` | request, dispatcher intent/result, timeout, response actor, policy refs |
 | `ToolRecord` | intent, idempotency key, approval ref, attempt, result, effect metadata |
 | `IsolationRecord` | environment, adapter, mounts, network, process, stats, cleanup |
 | `ChildLifecycleRecord` | child artifact ownership, shutdown intent/result, detach intent/ack, reclaim policy/result |
@@ -133,6 +133,7 @@ pub struct EffectResult {
 pub enum EffectKind {
     ProviderRequest,
     ToolExecution,
+    ApprovalDispatch,
     MemoryWrite,
     ExtensionAction,
     OutputDelivery,
@@ -178,6 +179,7 @@ Required side-effect intent records:
 - provider request
 - model attempt start
 - tool execution
+- approval dispatch when a host/user dispatcher is required
 - accepted hook proposal lowered to a domain operation
 - hook response that mutates run behavior through an existing domain operation
 - memory write

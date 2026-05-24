@@ -29,17 +29,40 @@ Acceptance boundary:
 - Runtime packages can accept any external tool pack that satisfies the `ToolPack` contract.
 - Test fakes in core can exercise the loop without file, shell, URL, SQLite, or AST dependencies.
 
+## RuntimePackage Lowering And Snapshot
+
+Tool packs are package inputs, not live registries. A host may discover installed SDK toolkit packs, MCP tools, extension actions, or host-provided tools, but a running agent can only see and execute the capabilities lowered into its active `RuntimePackage`.
+
+Lowering a pack creates:
+
+- callable or discoverable `CapabilitySpec` entries with `CapabilityId`, `CapabilityKind`, namespace, projection mode, executor ref, policy ref, sidecar refs, and optional isolation ref;
+- a typed tool-pack sidecar snapshot containing `ToolPackId`, version, source `SourceRef`, trust state, tool specs, executor route refs, permission/approval/sandbox policy refs, redaction policy refs, and reconciliation requirements;
+- provider-visible schemas and executable registry routes whose hashes match the runtime-package projection/execution invariant;
+- package fingerprint inputs for every execution-affecting schema, executor route, policy ref, sidecar version, catalog source, isolation/detach policy, and redaction rule.
+
+Rules:
+
+- No preset display name, catalog scan, MCP discovery result, extension manifest, or host registry entry is executable by itself.
+- Hidden/discoverable tools may return candidates, but activation creates a package delta for the next turn or run. It never mutates the active package ambiently.
+- Missing `PolicyRef`, missing executor ref, namespace collision, stale catalog snapshot, or provider-visible schema without an executable route fails package validation.
+- Toolkit helpers and manually declared tool specs must produce the same canonical package shape, fingerprint, `AgentEvent`s, `RunJournal` records, and policy failures.
+
 ## Common Tool Spec Fields
 
+- typed tool spec ID and capability ID
 - canonical tool name
+- namespace and projection mode
 - source kind and source ID
 - input schema
 - output schema
 - effect class: read, write, network, process, memory, remote send, child run
 - risk class
+- executor ref
+- policy refs for permission, approval, sandbox, autonomy/escalation, retention, and redaction where applicable
 - required permissions
 - sandbox/isolation requirement
 - idempotency hint
+- reconciliation requirement
 - timeout
 - cancellation support
 - process ownership policy when the tool can start child processes
@@ -84,6 +107,8 @@ The core must leave room for hosts or later optional crates to add those, but im
 | MCP resource | MCP allowlist permission | server/tool namespace policy |
 | skill/plugin URI | skill/plugin read permission | installed source trust |
 
+Read and resource outputs stay behind refs until policy admits them. A read/search/resource tool result should return `ContentRef`s, source hashes, anchors, MIME/type metadata, bounds, truncation state, and redacted summaries. If the result should influence a later provider call, it creates a `ContextContribution`; only `PostTool` policy and the context assembler can admit that contribution as a `ContextItem` in a `ContextProjection`.
+
 ## Effect Class, Intent, And Reversibility Matrix
 
 Every tool call, including reads, records auditable tool execution intent/result. Mutation and external visibility are separate from approval defaults and reversibility metadata.
@@ -99,7 +124,22 @@ Every tool call, including reads, records auditable tool execution intent/result
 | memory write | yes | policy-dependent | memory write receipt, idempotency key |
 | remote message send | yes | yes/source-scoped | dedupe key, channel ack |
 
-The shared `ToolRecord` must contain or map one-to-one to `EffectIntent { kind: ToolExecution }` before executor start and `EffectResult` after terminal status for all rows. Mutating file/process/network/memory behavior adds the relevant effect metadata; read tools still record request, source, bounds, hashes, truncation, policy refs, and result refs for audit and replay.
+The shared `ToolRecord` must contain or map one-to-one to `EffectIntent { kind: ToolExecution }` before executor start and `EffectResult` after terminal status for all rows. Mutating file/process/network/memory behavior adds the relevant effect metadata and family-specific effect kind when applicable; read tools still record request, source, bounds, hashes, truncation, policy refs, and result refs for audit and replay.
+
+## Idempotency And Reconciliation
+
+Mutating packs must make replay and crash windows explicit. They cannot rely on "best effort" host behavior outside the journal.
+
+Required mutating fields:
+
+- `idempotency_key` for retryable operations, or an explicit non-idempotent reason and policy ref when retry is unsafe;
+- `dedupe_key` for externally visible sends or operations where duplicate delivery is possible;
+- before/after hashes or state refs for file, archive, structured-data, and memory mutations;
+- external operation or receipt refs for process, network, MCP, memory, extension, or output-delivery effects;
+- reconciliation adapter/ref, unsafe-pending reason, and terminal append status for unknown or crash-window outcomes;
+- inverse candidate or non-reversible marker, with the inverse treated as advisory metadata rather than an automatic undo promise.
+
+If `ToolRecord { intent }` cannot be appended, the mutating executor must not start. If an external side effect occurs but terminal result append fails, the run must enter recovery before another non-idempotent operation begins. Anti-entropy may repair derived indexes, telemetry cursors, package views, or known terminal records through the recorded reconciler; it must not rerun a non-idempotent tool or silently compensate external reality.
 
 ## Edit Flow
 
@@ -113,14 +153,16 @@ sequenceDiagram
   participant Journal
 
   Model->>Read: "read/search"
+  Read->>Journal: "ToolRecord: read intent/result with ContentRef"
   Read-->>Model: "anchors + hashes"
   Model->>Planner: "edit request with anchors"
   Planner->>Journal: "EditPlanCreated"
   Planner-->>Model: "preview diff"
   Model->>Approval: "apply request"
   Approval-->>Apply: "approved"
+  Apply->>Journal: "ToolRecord: EffectIntent { kind: ToolExecution }"
   Apply->>Journal: "EffectIntent { kind: FileWrite }"
-  Apply-->>Journal: "EffectResult { effect_id }"
+  Apply-->>Journal: "EffectResult { effect_id, before/after hash, reconciliation }"
 ```
 
 ## Reversibility Boundary
@@ -180,8 +222,14 @@ Rules:
 - `shell_requires_timeout_and_sandbox_policy`
 - `raw_shell_string_requires_high_risk_approval`
 - `tool_discovery_activation_creates_package_delta`
+- `tool_discovery_search_is_read_only_until_package_delta`
+- `tool_pack_snapshot_includes_capability_sidecar_policy_and_executor_refs`
+- `tool_pack_fingerprint_changes_when_executor_policy_or_sidecar_changes`
 - `mutating_tool_records_effect_metadata`
 - `read_tool_records_execution_intent_and_result`
+- `mutating_tool_requires_idempotency_or_non_retryable_policy`
+- `mutating_tool_reconciliation_required_for_unknown_terminal_status`
+- `tool_intent_append_failure_prevents_tool_executor_start`
 - `agent_sdk_core_builds_without_toolkit_features`
 - `runtime_package_accepts_external_tool_pack_contract_without_core_tool_impl`
 - `url_read_requires_network_permission`
@@ -224,9 +272,9 @@ let pack = ToolPackBuilder::new(ToolPackId::new("workspace_safe"))
 
 Canonical lowering:
 
-- `ToolPackPreset::WorkspaceReadOnly` expands into explicit read/list/search tool specs, executor refs, permission refs, and redaction policy refs.
-- `ToolPackPreset::WorkspaceEditWithApproval` expands into preview/apply specs with approval and effect-lineage requirements.
-- Runtime package fingerprint includes the lowered specs and policy refs, not the preset display name.
+- `ToolPackPreset::WorkspaceReadOnly` expands into explicit read/list/search `CapabilitySpec`s, executor refs, permission refs, redaction policy refs, and a typed tool-pack sidecar.
+- `ToolPackPreset::WorkspaceEditWithApproval` expands into preview/apply `CapabilitySpec`s with approval policy refs, effect-lineage requirements, idempotency hints, and reconciliation metadata.
+- Runtime package fingerprint includes the lowered specs, sidecar versions, executor refs, schemas, policy refs, isolation/detach policy, and redaction refs, not the preset display name.
 
 Equivalence:
 
@@ -251,8 +299,16 @@ Typed shape:
 ```rust
 // Non-compiling contract sketch.
 let edit_tool = ToolSpec {
+    tool_spec_id: ToolSpecId::new("tool_spec.workspace_edit.v1"),
+    capability_id: CapabilityId::new("cap.sdk.workspace_edit.v1"),
     canonical_name: CanonicalToolName::new("workspace_edit"),
+    namespace: CapabilityNamespace::new("sdk.workspace"),
     source: ToolSourceRef::sdk_toolkit("workspace_edit"),
+    source_ref: SourceRef::sdk_toolkit("sdk.workspace_edit_pack.v1"),
+    destination: DestinationRef::tool("workspace_edit"),
+    executor_ref: ExecutorRef::tool("toolkit.workspace_edit.v1"),
+    policy_refs: vec![PolicyRef::new("approval.write_file")],
+    sidecar_ref: PackageSidecarRef::tool_pack("sdk.workspace_edit_pack.v1"),
     input_schema: SchemaRef::content("schemas/workspace_edit_input_v1"),
     output_schema: SchemaRef::content("schemas/workspace_edit_output_v1"),
     effect_class: EffectClass::AnchoredEdit,
@@ -260,6 +316,7 @@ let edit_tool = ToolSpec {
     required_permissions: vec![Permission::WorkspaceWrite],
     isolation_requirement: None,
     idempotency_hint: IdempotencyHint::RequiresAnchorHash,
+    reconciliation: ReconciliationRequirement::BeforeAfterHash,
     timeout_ms: 10_000,
     cancellation: CancellationSupport::BestEffort,
     process_ownership: Some(ProcessOwnershipPolicy::agent_owned(parent_run_id)),
@@ -283,31 +340,34 @@ Replaceable ports:
 
 Wiring:
 
-1. Runtime package includes the tool spec and executor ref.
+1. Runtime package includes the tool spec as a `CapabilitySpec` plus a typed tool-pack sidecar and executor ref.
 2. Model sees projected schema only if the package validates.
 3. Edit planner produces preview diff without mutation.
 4. Approval policy gates apply.
-5. Applier verifies anchor hash, writes, records before/after hashes, and returns effect metadata.
+5. Applier appends tool execution intent, verifies anchor hash, appends file-write intent, writes, records before/after hashes, and returns effect/reconciliation metadata.
 
-Events:
+`AgentEvent` variants:
 
 - `ToolRequested`
 - `ToolApprovalRequired`
 - `ApprovalRequested`
-- `ToolStarted`
+- `ToolStarted` only after intent append
 - `ToolCompleted` or `ToolFailed`
 
-Journal:
+`RunJournal` records:
 
+- `ToolRecord { requested }`
 - `ToolRecord { edit plan preview }`
 - `ApprovalRecord { apply decision }`
-- `ToolRecord { effect intent }`
-- `ToolRecord { effect completed, before_hash, after_hash, inverse_candidate }`
+- `ToolRecord { EffectIntent { kind: ToolExecution } }`
+- `ToolRecord { EffectIntent { kind: FileWrite } }` or one-to-one mapped file-write payload
+- `ToolRecord { EffectResult, before_hash, after_hash, inverse_candidate, reconciliation_ref }`
 
 Policies and failures:
 
 - Stale anchors fail without writing.
 - Shell commands require timeout and sandbox policy.
+- Missing policy refs, executor refs, or intent append fail closed before execution.
 - Shell processes are agent-owned by default and cannot outlive the run without explicit detach records.
 - Non-reversible writes are marked explicitly.
 - LSP/debugger/browser tools stay out of the first core toolkit slice.
@@ -322,4 +382,7 @@ Tests:
 - `edit_anchor_uses_hashline_snapshot_not_plain_line_number`
 - `edit_apply_fails_on_stale_anchor_without_known_before_state`
 - `mutating_tool_records_effect_metadata`
+- `read_tool_records_execution_intent_and_result`
+- `tool_pack_snapshot_includes_capability_sidecar_policy_and_executor_refs`
+- `tool_intent_append_failure_prevents_tool_executor_start`
 - `start_script_detach_requires_explicit_policy_and_journal_record`

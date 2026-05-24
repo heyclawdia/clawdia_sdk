@@ -228,6 +228,7 @@ Rules:
 - Event streams yield `EventFrame { event, cursor, archive_cursor, overflow }`, not bare payloads, so observers can persist cursors and detect slow-subscriber gaps.
 - Simple subscription helpers use conservative default `SubscriptionOptions`; advanced subscription helpers expose `SubscriberQueueConfig` for capacity, terminal reserve, and overflow policy.
 - Hook helpers and hook config lower into `HookSpec` sidecars and executor refs inside the same `RuntimePackage`; they cannot install ambient callbacks after a run starts.
+- Reserved hook helpers such as `AgentBuilder::on(...)`, `RuntimePackageBuilder::on(...)`, and declarative `hooks_from_config(...)` are API conveniences only. When the hook feature is activated, they must produce the same canonical hook sidecar shape as explicit `HookSpec` construction, resolve executor/policy refs before `AgentRuntime::start_run`, and fail package validation before execution when refs, mutation rights, or failure policy are invalid.
 - Defaults are conservative: redacted content, local validation, bounded retries, finite timeouts, no ambient tools, no ambient isolation downgrade, agent-owned child cleanup on manual cancel, and no implicit detached processes.
 - Advanced config can override limits and policy refs, but it cannot disable required lineage, local validation, or side-effect intent records.
 
@@ -327,6 +328,8 @@ The core must accept external tool packs through contracts without linking their
 - `request_builder_and_explicit_run_request_emit_equivalent_events`
 - `agent_on_hook_lowers_to_hook_spec_sidecar`
 - `config_hook_and_code_hook_share_runtime_package_shape`
+- `hook_helper_and_explicit_hook_spec_emit_equivalent_package_fingerprint`
+- `hook_helpers_cannot_register_after_run_start`
 - `manual_cancel_cascades_to_agent_owned_children_by_default`
 - `run_completion_preserves_explicitly_detached_process_when_policy_allows`
 - `subscribe_all_lowers_to_event_bus_all_subscription`
@@ -411,7 +414,7 @@ Canonical lowering:
 - `Agent::run_typed::<T>` lowers into `RunRequestBuilder::output::<T>`.
 - `RunRequestBuilder::output::<T>` lowers into `OutputContract::for_type::<T>`.
 - `RunRequestBuilder::build` resolves a per-run `RuntimePackage`, validates it, stores its fingerprint, and returns a canonical `RunRequest`.
-- Reserved hook helpers and config hooks lower into `HookSpec` sidecars and executor refs in the runtime package.
+- Reserved hook helpers and config hooks lower into `HookSpec` sidecars and executor refs in the runtime package before `AgentRuntime::start_run`; they never append callbacks to an active run or bypass runtime-package fingerprinting.
 - Reserved child lifecycle builder options select or tighten package-declared policy refs before the run starts.
 - `RunRequestBuilder::run` always returns `RunResult`.
 - Typed extraction from a generic result is explicit through `RunResult::structured_output::<T>()` or `RunResult::into_typed_output::<T>()`.
@@ -422,6 +425,7 @@ Equivalence:
 - Simple, builder, and explicit `RunRequest` paths enter `AgentRuntime::start_run`.
 - They use the same state machine, package fingerprint, events, journal records, policy checks, telemetry, and error variants.
 - Typed output helpers add only `OutputContract` construction and typed result extraction after validation.
+- Hook helper/config paths add only `HookSpec` sidecar construction and executor-ref resolution before package validation; invocation, mutation rights, events, and journal records are owned by the hook lifecycle contract.
 
 Replaceable ports:
 
