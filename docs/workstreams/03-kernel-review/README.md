@@ -12,9 +12,17 @@ This is a separate phase because it depends on all Phase 01 and Phase 02 outputs
 
 ## Exit Gate
 
-- [ ] The Phase 01 package spine and Phase 02 primitive kernel are internally consistent.
-- [ ] The feature-to-primitive matrix and review matrix reflect accepted Phase 01 and Phase 02 decisions.
-- [ ] Later phases can use the kernel without reopening must-answer primitive questions.
+- [x] The Phase 01 package spine and Phase 02 primitive kernel are internally consistent.
+- [x] The feature-to-primitive matrix and review matrix reflect accepted Phase 01 and Phase 02 decisions.
+- [x] Later phases can use the kernel without reopening must-answer primitive questions.
+
+## Exit Evidence
+
+- [Phase 03 exit report](_phase/phase-exit-report.md) reconciles Phase 01 runtime-package authority, Phase 02 core API/event-journal/context-output contracts, source audit, matrices, proposal decisions, and next-phase readiness.
+- The phase delivery protocol is recorded in [../README.md](../README.md) and [../validation-gates.md](../validation-gates.md).
+- The source audit was reviewed in [../../architecture/external-sdk-lessons.md](../../architecture/external-sdk-lessons.md) with no new source rows required.
+- `docs/reference/feature-to-primitive-matrix.md` and `docs/contracts/review-matrix.md` now reflect content resolver policy, projection audit, and `ValidatedOutput` publication decisions.
+- Plan reviewer and implementation reviewer both returned PASS after findings were addressed.
 
 ## Next Phase
 

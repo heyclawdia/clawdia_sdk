@@ -68,3 +68,96 @@ Feature implementation details that belong to later owner roles, product host be
 - Run the whole-packet docs audits required by Workstream 00.
 - Apply [../../reference/sdk-review-checklist.md](../../reference/sdk-review-checklist.md).
 - Do not pass if Phase 01 or any Phase 02 goal leaves a must-answer primitive ambiguity open.
+
+## Validation Evidence
+
+Changed files:
+
+- `docs/workstreams/03-kernel-review/_phase/phase-execution-plan.md`
+- `docs/workstreams/03-kernel-review/_phase/phase-exit-report.md`
+- `docs/workstreams/README.md`
+- `docs/workstreams/validation-gates.md`
+- `docs/architecture/external-sdk-lessons.md`
+- `docs/contracts/review-matrix.md`
+- `docs/reference/feature-to-primitive-matrix.md`
+- `docs/reference/open-questions-and-ambiguities.md`
+- `docs/reference/cross-cutting-proposals.md`
+- `docs/workstreams/03-kernel-review/README.md`
+- `docs/workstreams/03-kernel-review/03a-kernel-final-review.md`
+
+Tests/fixtures:
+
+- No Rust source, package manifests, executable tests, or fixtures were created; this was a documentation-only stitching pass.
+- Future implementation tests remain owned by the relevant workstream goals and owner-role validation sections.
+
+Commands run:
+
+- `git diff --check`
+- whole-packet Markdown link audit
+- external URL liveness audit for markdown HTTP(S) links
+- no-code audit for `.rs`, `Cargo.toml`, executable tests, and fixture paths
+- workstream ownership audit
+- changed-file writable-scope audit
+- contract-index product-neutrality audit
+- owner-role and goal-doc validation-section completeness audit
+- primitive-lowering/disjoint-scope audit
+- product-neutrality added-line audit
+- primitive/no-mini-SDK audit
+- Phase 03 exit-gate audit
+
+Skipped tests and why:
+
+- Rust compile, unit, golden, property, smoke, and scenario tests are skipped because the workspace remains documentation-only and has no Rust crate yet.
+
+Events/journal/telemetry touched:
+
+- No event family or journal record was renamed. Phase 03 reconciled `ContextProjectionAudit` to `ContextRecord::ProjectionAudit` / `ContextProjectionAudited` and `ValidatedOutput` to `StructuredOutputRecord` / `StructuredOutputValidated`.
+- Telemetry remains derived from events, journals, usage, and policy decisions; it is not durable run truth.
+
+SDK-owned boundaries preserved:
+
+- Shared public names, ID taxonomy, runtime-package authority, event/journal alignment, context projection, content refs, structured output validation, and phase launch protocol remain SDK-owned.
+
+Host-owned boundaries preserved:
+
+- Product UI, approval transport, credentials, telemetry dashboards, trace-store schemas, concrete runtimes, marketplace/install flows, output channel UX, and workflow orchestration remain host-owned.
+
+Primitive-lowering evidence:
+
+- Phase 03 found no Phase 01/02 second run loop, package registry, event stream, journal, policy path, context projection path, side-effect path, telemetry truth store, or host adapter product layer.
+- Remaining feature workstreams must layer through `Agent`, `RunRequest`, `RuntimePackage`, `AgentEvent`, `RunJournal`, `PolicyRef`, `SourceRef`, `DestinationRef`, `ContentRef`, `EffectIntent`, typed ports, and package sidecars.
+
+Simplicity notes:
+
+- The added phase protocol organizes evidence and reviewer gates; it does not add a new SDK primitive or user-facing API surface.
+
+Cross-cutting proposal blocks:
+
+- Accepted: phase delivery protocol and reviewer gate for the rest of the packet.
+- Rejected: none.
+- Deferred: exact Rust crate layout, future fixture filenames, and implementation test commands remain deferred until code exists.
+
+## Review Packet
+
+Primitive decision:
+
+- Reused kernel primitives: `Agent`, `RunRequest`, `RuntimePackage`, `AgentEvent`, `RunJournal`, `PolicyRef`, `SourceRef`, `DestinationRef`, `ContentRef`, `EffectIntent`, `ValidatedOutput`, typed IDs.
+- New feature-layer primitives: none.
+- New capability variants: none.
+- Host-owned behavior kept out: UI, approval transport, credentials, concrete runtimes, telemetry dashboards, workflow engines, marketplaces, and channel UX.
+
+Validation evidence:
+
+- Contract/unit tests: not applicable until Rust code exists; future tests remain named by owner roles.
+- Golden fixtures: not applicable until Rust code exists; future fixture requirements remain named by owner roles.
+- Smoke/scenario tests: not applicable until Rust code exists.
+- Docs audits: whole-packet link, external URL, no-code, ownership, writable-scope, product-neutrality, role/goal completeness, primitive-lowering/disjoint-scope, no-mini-SDK, and Phase 03 exit-gate audits.
+
+Reviewer checklist:
+
+- Simplicity: PASS, one phase protocol and no new SDK API.
+- Product-neutrality: PASS, host-owned behavior remains outside core.
+- Event/journal durability: PASS, no durable-truth boundary changed.
+- Privacy/redaction: PASS, content refs and redacted summaries remain defaults.
+- Replay/idempotency: PASS, cursor/replay and side-effect reconciliation decisions remain intact.
+- Capability fingerprint impact: PASS, no new active capability variants or fingerprint groups.

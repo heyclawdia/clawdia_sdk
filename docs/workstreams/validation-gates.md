@@ -91,6 +91,23 @@ Simplicity notes:
 Cross-cutting proposal blocks:
 ```
 
+## Phase Exit Report
+
+Each phase should also produce a phase-level exit report, normally at `docs/workstreams/<NN-phase>/_phase/phase-exit-report.md`.
+
+The report should include:
+
+- phase objective and dependency status;
+- goal-by-goal status, changed files, and review-packet links;
+- accepted, rejected, deferred, and unresolved proposal blocks;
+- changed shared names, IDs, event/journal terms, runtime-package fingerprint inputs, or public matrices;
+- source-audit status when the phase goal requires it;
+- validation commands and outcomes;
+- reviewer-agent verdict and any resolved findings;
+- explicit next-phase readiness statement.
+
+The phase README exit gate should not be checked until the phase exit report proves every exit-gate item with current evidence.
+
 ## Review Packet
 
 Each implementation goal should include a compact review packet:

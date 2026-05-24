@@ -25,6 +25,35 @@ Validation needed:
 
 ## Accepted Decisions
 
+### 2026-05-24 Phase Delivery Protocol And Kernel Review Gate
+
+Status: accepted
+Proposed by: Phase 03 kernel review
+Date: 2026-05-24
+Affected workstreams: 03, 04, 05, 06, 07
+Affected files: `docs/workstreams/README.md`, `docs/workstreams/validation-gates.md`, `docs/workstreams/[0-9][0-9]-*/README.md`, `docs/workstreams/[0-9][0-9]-*/_phase/*`
+Decision owner: 00-integration-stitching
+
+Problem:
+
+The packet needed a durable per-phase review surface so humans and agents can see which goal workers ran, which proposals were accepted/rejected/deferred, which audits passed, and which reviewer gate allowed the next phase to start. Without that surface, parallel goal output can be correct locally but hard to review as one phase.
+
+Proposed change:
+
+Every multi-goal phase launches one subagent per goal file with disjoint writable scopes. Every phase writes a phase-local `_phase/phase-exit-report.md`, runs phase-level audits, and uses a dedicated reviewer agent as the gate before the next numbered phase starts. Single-goal stitching phases run serially but still use reviewer gates.
+
+Why this is cross-cutting:
+
+This affects the launch and completion protocol for every remaining workstream, not one contract.
+
+Compatibility impact:
+
+Documentation-only process change. Existing goal docs and owner-role writable scopes remain authoritative.
+
+Validation needed:
+
+Phase exit reports must include goal status, validation evidence, proposal decisions, reviewer verdict, and next-phase readiness. The phase README exit gate cannot be checked until that evidence exists.
+
 ### 2026-05-24 Primitive Simplification And Final Stitching
 
 Status: accepted

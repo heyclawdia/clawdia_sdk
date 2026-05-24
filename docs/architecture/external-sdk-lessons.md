@@ -28,6 +28,14 @@ Every source lesson that changes an SDK primitive should be auditable:
 | Apple Containerization | [repo README](https://github.com/apple/containerization) | 2026-05-23 | Explicit image/rootfs/process lifecycle, VM isolation, mount/network capability reports. | macOS/Swift/runtime specifics as core dependencies. | Keep `ExecutionEnvironment` and `IsolationRuntime` portable; concrete runtimes stay adapters. |
 | OpenTelemetry GenAI | [GenAI semconv](https://opentelemetry.io/docs/specs/semconv/gen-ai/), [agent spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/), [model/tool spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/), [MCP semconv](https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp/) | 2026-05-23 | Agent/model/tool span vocabulary, usage/cost attributes, MCP conventions, raw content caution. | Treating telemetry as durable run truth or raw content as default. | Telemetry remains a derived projection with content-capture policy and sink failure isolation. |
 
+## Phase 03 Source-Audit Reconciliation
+
+Date: 2026-05-24
+
+Phase 03 reviewed the source-audit rows against the Phase 01 runtime-package spine and Phase 02 primitive-kernel outputs. No source lesson changed the accepted SDK posture: the current rows still support the product-neutral kernel, explicit run/runtime split, context/content-ref separation, event/journal durability split, package/capability sidecar discipline, portable isolation boundary, and telemetry-as-derived-projection rule.
+
+Phase 03 therefore records the source audit as reviewed with no new source rows required. Later feature phases may update the audit only when a source-backed lesson changes a contract, validation gate, or primitive decision.
+
 ## Summary Table
 
 | Source | Reusable lessons | Incidental or risky parts |

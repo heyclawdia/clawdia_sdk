@@ -19,6 +19,21 @@ The rule is intentionally simple: **run phases in numeric order, and run every g
 
 Do not run a later phase until the previous phase README exit gate passes. Phases 04, 05, and 06 include explicit stitching checkpoints: blocking cross-cutting proposals must be accepted, rejected, or deferred with an owner before the next phase starts.
 
+## Phase Delivery Protocol
+
+Every phase should leave an auditable packet for humans and agents:
+
+1. Read the phase README, every goal doc in the phase, owner role docs, and required shared standards before editing.
+2. For multi-goal phases, launch one subagent per goal file with disjoint writable scopes. Each worker edits only its goal/role writable files and returns the handoff format from [validation-gates.md](validation-gates.md).
+3. For single-goal stitching phases, run the goal serially under the integration owner. Reviewer subagents may still be used for plan and implementation gates.
+4. Consolidate goal outputs in a phase-local `_phase/` folder, with `phase-exit-report.md` as the human/agent review surface.
+5. Run phase-level audits: links, ownership/writable scope, no-code constraints for documentation-only phases, product-neutrality, primitive/no-mini-SDK layering, proposal reconciliation, and phase exit checklist.
+6. Spawn a dedicated reviewer agent after integration. The reviewer gates progression to the next phase and must return PASS or blocking findings with file/section references.
+7. Check the phase README exit gate only after all goal packets, audits, proposal decisions, and reviewer findings pass.
+8. Do not start the next numbered phase until the current phase README exit gate is checked and the phase exit report names the reviewer verdict.
+
+For multi-goal phases, subagent workers should not edit shared architecture or reference docs directly unless their goal explicitly allows it. Cross-cutting decisions go into each worker handoff first; the stitching owner reconciles them in the phase checkpoint.
+
 ## How To Launch A Goal
 
 For a phase folder, launch one Codex goal per non-README goal file in that folder; all sibling goals are parallel-safe by contract. Point each Codex run at one goal file directly:
