@@ -12,9 +12,19 @@ This document defines the shared validation language for parallel Agent SDK phas
 | Property/table tests | generated or table-driven cases | reducers, fingerprints, filters, regex safety, policy matrices |
 | Smoke tests | package/import/runtime checks with fake implementations | extension packaging, browser-safe helpers, optional crates |
 | Scenario tests | multi-component fake workflows | chat, voice, headless, subagents, isolation, recovery |
-| Docs audits | link, ownership, source-map, boundary, and simplicity checks | documentation-only or integration/stitching work |
+| Docs audits | link, ownership, boundary, and simplicity checks | documentation-only or integration/stitching work |
 
 ## Universal Required Evidence
+
+Documentation-only and implementation goals have different proof surfaces.
+
+Every documentation-only packet goal must provide:
+
+- link/path, ownership, boundary, or simplicity audit evidence appropriate to its owner role;
+- primitive-lowering review proving helpers and feature docs reuse the kernel instead of adding parallel paths;
+- explicit accepted/rejected/deferred proposal blocks where cross-role decisions are involved;
+- named future tests, fixtures, or smoke checks for behavior that cannot run until code exists;
+- a concise statement that no Rust source, package manifests, executable tests, or fixtures were created when the task is documentation-only.
 
 Every implementation goal must provide:
 

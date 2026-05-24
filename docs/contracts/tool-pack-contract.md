@@ -66,7 +66,7 @@ Out of scope for the first SDK toolkit slice:
 - Product-specific code-review agents.
 - Broad AST rewrite engines.
 
-The core must leave room for hosts or later optional crates to add those, but Phase 2 should start with read/search/hash-anchored edit/write/shell/resource primitives only.
+The core must leave room for hosts or later optional crates to add those, but implementation should start with read/search/hash-anchored edit/write/shell/resource primitives only.
 
 ## Per-Resource Permission Matrix
 
@@ -84,11 +84,13 @@ The core must leave room for hosts or later optional crates to add those, but Ph
 | MCP resource | MCP allowlist permission | server/tool namespace policy |
 | skill/plugin URI | skill/plugin read permission | installed source trust |
 
-## Effect Class And Reversibility Matrix
+## Effect Class, Intent, And Reversibility Matrix
 
-| Effect class | Requires intent before execute | Requires approval by default | Reversibility metadata |
+Every tool call, including reads, records auditable tool execution intent/result. Mutation and external visibility are separate from approval defaults and reversibility metadata.
+
+| Effect class | External mutation? | Requires approval by default | Reversibility metadata |
 | --- | --- | --- | --- |
-| read | no external mutation | no, if in read scope | source/hash/truncation |
+| read | no | no, if in read scope | source/hash/truncation |
 | anchored edit | yes | yes | before/after hash, diff, inverse candidate |
 | write/overwrite | yes | yes | before/after hash, created/deleted path, non-reversible marker if needed |
 | broad AST apply | yes | yes, second decision after preview | later optional crate only; preview ref, changed paths, inverse candidates |
@@ -96,6 +98,8 @@ The core must leave room for hosts or later optional crates to add those, but Ph
 | network send | yes | yes | dedupe key, ack ref, non-reversible marker |
 | memory write | yes | policy-dependent | memory write receipt, idempotency key |
 | remote message send | yes | yes/source-scoped | dedupe key, channel ack |
+
+The shared `ToolRecord` must contain or map one-to-one to `EffectIntent { kind: ToolExecution }` before executor start and `EffectResult` after terminal status for all rows. Mutating file/process/network/memory behavior adds the relevant effect metadata; read tools still record request, source, bounds, hashes, truncation, policy refs, and result refs for audit and replay.
 
 ## Edit Flow
 
@@ -134,7 +138,7 @@ Required effect metadata:
 - formatter/diagnostic output ref
 - external side-effect warning
 
-Tool-pack journal records may add file, process, network, or memory-specific fields, but mutating packs must embed or map one-to-one to `EffectIntent` and `EffectResult`. `workspace_edit`, `workspace_write`, and `shell` use `EffectKind::FileWrite`, `EffectKind::ToolExecution`, `EffectKind::ProcessStart`, or `EffectKind::ProcessSignal` as appropriate; they must not invent a separate file/process effect spine.
+Tool-pack journal records may add file, process, network, or memory-specific fields, but every tool call must embed or map one-to-one to tool execution intent/result records. Mutating packs additionally use `EffectKind::FileWrite`, `EffectKind::ProcessStart`, `EffectKind::ProcessSignal`, or the relevant memory/output kind as appropriate; they must not invent a separate file/process effect spine.
 
 Evolution/product undo UX remains host-owned.
 
@@ -177,6 +181,7 @@ Rules:
 - `raw_shell_string_requires_high_risk_approval`
 - `tool_discovery_activation_creates_package_delta`
 - `mutating_tool_records_effect_metadata`
+- `read_tool_records_execution_intent_and_result`
 - `agent_sdk_core_builds_without_toolkit_features`
 - `runtime_package_accepts_external_tool_pack_contract_without_core_tool_impl`
 - `url_read_requires_network_permission`

@@ -214,7 +214,7 @@ The contract has three representations:
 - `LoopState` enum.
 - Executable transition table.
 
-Phase 2 must include a test that extracts or enumerates all state names in the three representations and fails on drift. If this is too costly to automate from Markdown, the Rust crate must keep a generated snapshot copied from this contract and checked into tests.
+Implementation must include a test that extracts or enumerates all state names in the three representations and fails on drift. If this is too costly to automate from Markdown, the Rust crate must keep a generated snapshot copied from this contract and checked into tests.
 
 ## Acceptance Tests
 

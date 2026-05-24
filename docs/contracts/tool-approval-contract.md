@@ -7,7 +7,7 @@ Approval is a broker/policy contract, not a UI event. This contract defines one 
 - Strands makes tool execution observable through before/after hooks and tool events. The SDK should keep that visibility but encode mutation rights as typed responses.
 - Claude Agent SDK treats permission mode as explicit configuration. The SDK should do the same while keeping richer host approval transports behind ports.
 - Cursor separates agent runs from product UI. The SDK should never assume desktop approval transport.
-- Host products commonly have existing approval pipelines. Phase 2 should map those into SDK ports instead of inventing product prompt paths in core.
+- Host products commonly have existing approval pipelines. Implementation should map those into SDK ports instead of inventing product prompt paths in core.
 
 ## Policy Layers
 
@@ -34,7 +34,7 @@ Layers are separate because they answer different questions:
 | `ApprovalDispatcher` | Host-owned delivery and reply collection port. | desktop prompt, CLI prompt, remote channel |
 | `ApprovalBroker` | Own pending request lifecycle and decision attribution. | request/timeout/respond |
 
-Tool execution is also a side effect. Once policy allows execution, the tool path must append an `EffectIntent { kind: ToolExecution }` or a `ToolRecord { intent }` that maps one-to-one to the common effect fields before the executor starts. Terminal tool records must contain or map to `EffectResult`.
+Tool execution is also an auditable effect path. Once policy allows execution, every tool call, including read-only calls, must append an `EffectIntent { kind: ToolExecution }` or a `ToolRecord { intent }` that maps one-to-one to the common effect fields before the executor starts. Terminal tool records must contain or map to `EffectResult`. Read-only status affects approval defaults and mutation metadata; it does not remove the intent/result audit requirement.
 
 ## Policy Stages
 
@@ -69,7 +69,7 @@ Rules:
 
 Acceptance tests must include a policy-stage matrix for each implemented feature path. At minimum, tool work must cover `PreTool` and `PostTool`; context projection work must cover `ModelInputProjection`; output delivery must cover `Delivery`; subagent work must cover `Handoff`; streaming work must cover `Stream`.
 
-## Policy Precedence And Compatibility Migration
+## Policy Precedence And Compatibility
 
 Precedence is deterministic:
 
@@ -106,7 +106,7 @@ flowchart TD
   J --> G
 ```
 
-Fail-open behavior is a host compatibility mode, not an SDK default. A host adapter must make the mode explicit with a policy ID, event, and migration note.
+Fail-open behavior is a host compatibility mode, not an SDK default. A host adapter must make the mode explicit with a policy ID, event, and compatibility note.
 
 Compatibility fields:
 
@@ -115,7 +115,7 @@ Compatibility fields:
 - `target_behavior`
 - `owner`
 - `kill_switch`
-- `migration_gate`
+- `compatibility_gate`
 - `event_kind_on_use`
 
 ## Decision Enum
@@ -146,7 +146,7 @@ Compatibility adapter mapping:
 | `deny` | `ApprovalDecision::Denied` |
 | `toolApprovalMode: yolo` | `AutonomyPolicy` yields explicit allow with risk/audit metadata |
 
-The SDK target is fail-closed for missing dispatchers. Any compatibility path that fails open must stay in host adapters until a reviewed migration flips it.
+The SDK target is fail-closed for missing dispatchers. Any compatibility path that fails open must stay in host adapters until a reviewed compatibility plan flips it.
 
 ## Approval Request Schema
 
@@ -213,7 +213,7 @@ Rules:
 ## Acceptance Tests
 
 - `approval_precedence_denies_before_autonomy_and_dispatch`
-- `headless_no_escalation_uses_configured_migration_mode_not_ambient_fail_open`
+- `headless_no_escalation_uses_configured_compatibility_mode_not_ambient_fail_open`
 - `headless_missing_dispatcher_denies`
 - `agent_sdk_core_cannot_send_out_of_band_approval`
 - `dispatcher_timeout_records_timeout_then_denied`

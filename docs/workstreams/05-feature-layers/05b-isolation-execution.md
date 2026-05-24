@@ -31,6 +31,7 @@ Parallel-safe with every other goal in Phase 05 after Phase 04 exits. Do not sta
 ## Primitive Focus
 
 - Isolation is `ExecutionEnvironment` plus `IsolationRuntime` adapter port, package requirements, policy checks, events, and journal records.
+- SDK-owned isolation classes are coarse containment enums; concrete adapter refs such as `mlx.macos-sandbox` are host-provided registry identifiers. Adapter selection must also compare capability/trust vectors for locality, tenancy, mount/network/secret enforcement, cleanup, and auditability.
 - Concrete containers, VMs, and remote sandboxes are optional adapters.
 
 ## Must Not Own
@@ -39,6 +40,6 @@ Approval UI, tool semantics, provider routing, or concrete runtime implementatio
 
 ## Validation And Review
 
-- Unsupported adapter and downgrade fail closed.
+- Unsupported adapter and class/capability/trust-vector downgrades fail closed unless explicitly policy-approved.
 - Mount/network/process lifecycle is journaled.
 - Cleanup and detached process behavior matches child lifecycle policy.

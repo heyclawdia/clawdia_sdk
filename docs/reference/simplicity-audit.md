@@ -14,7 +14,7 @@ The architecture is feature-rich but mostly defensible because the hard parts ar
 | Events | `runtime.subscribe_run`, `subscribe_agent`, `subscribe_events` | `AgentEventBus`, `EventFrame`, cursors, queue options, archive replay |
 | Structured output | typed model derives/looks up schema | `OutputContract`, validation policy, repair policy, schema refs |
 | Tools | opt-in `ToolPack` presets | tool specs, handlers, approval, effect lineage, isolation |
-| Isolation | `ExecutionEnvironment::isolated("name")` builder | capability reports, mount/network/secrets/process lifecycle |
+| Isolation | `IsolationRequirement::at_least(IsolationClass::Sandbox).prefer("adapter.ref")` builder | capability reports, mount/network/secrets/process lifecycle |
 | Telemetry | default redacted usage/cost sink | OTel mapping, content policy, export health, cost correction |
 | Extensions | manifest plus typed SDK helpers | JSON-RPC protocol, capability gating, browser-safe subpaths |
 | Subagents | parent starts child with bounded request | topology, package stripping, mailbox, event wrapping, rollup |
@@ -66,7 +66,7 @@ Every simple API should lower into canonical contracts:
 - `run_text` -> `RunRequest`
 - `run_typed::<T>` -> `RunRequest` plus `OutputContract::for_type::<T>`
 - `StreamRule::mask_regex` -> full `StreamRule`
-- `ExecutionEnvironment::isolated` -> `EnvironmentSpec`
+- `IsolationRequirement::at_least(...).prefer(...).fallback(...)` -> `EnvironmentSpec`
 - `ToolPack::workspace_readonly` -> `RuntimePackage` entries
 
 Do not add separate "easy runtime" or "quick event bus" behavior.

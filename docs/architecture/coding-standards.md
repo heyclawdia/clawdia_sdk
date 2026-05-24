@@ -1,6 +1,6 @@
 # Agent SDK Coding Standards
 
-These standards apply to the future Rust-first `agent_sdk` design. They are derived from the Phase 1 SDK study, TDD, DDD, Rust async practice, and observability requirements.
+These standards apply to the future Rust-first `agent_sdk` design. They are grounded in TDD, DDD, Rust async practice, and observability requirements.
 
 ## Architecture Standards
 
@@ -15,7 +15,7 @@ These standards apply to the future Rust-first `agent_sdk` design. They are deri
 
 ## Test-First Standards
 
-Phase 1 is documentation-only, but phase 2 should start with tests before implementation.
+The current workspace is documentation-only, but implementation should start with tests before code.
 
 - Start with small Rust unit tests for state transitions: input accepted, model requested, tool requested, approval required, tool result appended, continue, stop, cancel, compact, retry, and recover.
 - Add golden event tests for every `AgentEvent` variant so event names, causal IDs, and redaction rules remain stable.
@@ -94,7 +94,7 @@ Observability is a core SDK feature, not a plugin.
 
 ## Documentation Standards
 
-- Every future implementation slice should update architecture docs and risk notes before code lands.
+- Every future implementation slice should update the owning architecture, contract, or decision-register docs before code lands.
 - Conceptual Rust examples in docs must be labeled non-compiling sketches until they become crate APIs.
-- Any change to public events, journals, snapshots, or extension contracts needs a migration note and compatibility strategy.
+- Any change to public events, journals, snapshots, or extension contracts needs a compatibility note and strategy.
 - Source links in docs should prefer primary docs, repos, or specifications.

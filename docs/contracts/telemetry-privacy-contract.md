@@ -20,6 +20,34 @@ OpenTelemetry GenAI separates traces, spans, events, metrics, usage, and errors.
 
 A sink cannot request more raw content than the event/journal/content policy captured.
 
+## Fanout Backpressure
+
+`TelemetryFanout` is a bounded, nonblocking projection path. Agent-loop code may enqueue telemetry projections, but it must not await network exporters or durable trace sinks on the hot path.
+
+```rust
+// Non-compiling contract sketch.
+pub struct TelemetryFanoutConfig {
+    pub queue_capacity: NonZeroUsize,
+    pub terminal_reserve: NonZeroUsize,
+    pub overflow: TelemetryOverflowPolicy,
+    pub repair_cursor: Option<TelemetryExportCursorPolicy>,
+}
+
+pub enum TelemetryOverflowPolicy {
+    DropNonTerminalProgress,
+    CoalesceProgressByRun,
+    FailSinkNotRun,
+}
+```
+
+Rules:
+
+- Terminal usage, cost correction, sink failure, and recovery cursor records get reserved queue capacity.
+- Slow sinks can drop or coalesce non-terminal progress according to policy, but they cannot block provider streaming, tool execution, journal append, cancellation, or terminal sealing.
+- Export workers drain fanout queues off-loop and append sink-health or repair records when export fails.
+- Overflow emits `TelemetrySinkFailed` or `TelemetryOverflowed` with dropped counts, affected sink ID, terminal-preserved flag, and optional repair cursor.
+- A sink cannot observe raw content merely because it is replaying a repair cursor; content capture remains policy-bound.
+
 ## Required Telemetry Fields
 
 - run ID, trace ID, span ID
@@ -78,6 +106,8 @@ Opt-in capture must declare:
 - `child_usage_rollup_preserves_child_run_id`
 - `trace_export_uses_journal_records_not_display_events`
 - `otel_sink_failure_does_not_fail_run`
+- `slow_telemetry_sink_overflow_does_not_block_run`
+- `terminal_usage_record_survives_overflow`
 - `safe_telemetry_defaults_lower_to_content_capture_off`
 - `telemetry_helper_and_explicit_sink_emit_equivalent_usage_records`
 
@@ -152,7 +182,7 @@ let telemetry = TelemetryRecordPayload {
     content_capture: ContentCaptureMode::Off,
 };
 
-telemetry_fanout.record(telemetry).await;
+telemetry_fanout.try_record(telemetry)?;
 ```
 
 Replaceable ports:
@@ -167,7 +197,7 @@ Wiring:
 2. Redaction/content policy strips raw content by default.
 3. Cost estimator records initial estimate.
 4. Provider usage correction appends a correction record.
-5. Sink failures are recorded for repair replay.
+5. Export workers drain sinks off-loop. Sink failures are recorded for repair replay.
 
 Events:
 
@@ -189,6 +219,7 @@ Policies and failures:
 - Sink cannot request raw content that was not captured by policy.
 - Account IDs, credential IDs, remote handles, and paths are hashed or aliased.
 - Cost accounting works from usage metadata without prompt/tool/model content.
+- Slow sinks cannot block the run loop; overflow preserves terminal usage/cost records.
 
 SDK owns / Host owns:
 
@@ -200,3 +231,5 @@ Tests:
 - `telemetry_sink_cannot_escalate_content_capture`
 - `model_usage_correction_appends_cost_corrected`
 - `trace_export_uses_journal_records_not_display_events`
+- `slow_telemetry_sink_overflow_does_not_block_run`
+- `terminal_usage_record_survives_overflow`

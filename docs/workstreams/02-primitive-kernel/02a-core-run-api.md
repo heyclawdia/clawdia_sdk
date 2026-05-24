@@ -28,6 +28,7 @@ Parallel-safe with every other goal in Phase 02 after Phase 01 exits. Do not sta
 
 - `docs/contracts/api-contracts.md`
 - `docs/contracts/run-handle-reconnect-contract.md`
+- `docs/contracts/loop-state-machine.md`
 - `docs/contracts/hook-lifecycle-contract.md` only where the core hook contract is explicitly in scope
 
 ## Read-Only Inputs
@@ -35,7 +36,6 @@ Parallel-safe with every other goal in Phase 02 after Phase 01 exits. Do not sta
 - `docs/contracts/runtime-package-schema.md`
 - `docs/contracts/event-schema.md`
 - `docs/contracts/journal-replay-schema.md`
-- `docs/contracts/loop-state-machine.md`
 - `docs/architecture/primitive-map.md`
 
 ## Primitive Focus

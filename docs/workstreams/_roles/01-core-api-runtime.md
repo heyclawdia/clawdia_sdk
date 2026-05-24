@@ -9,6 +9,7 @@ Core runtime agent.
 - `docs/contracts/api-contracts.md`
 - `docs/contracts/run-handle-reconnect-contract.md`
 - `docs/contracts/hook-lifecycle-contract.md`
+- `docs/contracts/loop-state-machine.md`
 
 ## Future Implementation Writable Scope
 
@@ -27,7 +28,6 @@ Once SDK code exists, this workstream may own core run-control modules and tests
 - `docs/contracts/event-schema.md`
 - `docs/contracts/journal-replay-schema.md`
 - `docs/contracts/runtime-package-schema.md`
-- `docs/contracts/loop-state-machine.md`
 - `docs/architecture/primitive-map.md`
 - `docs/architecture/architecture-proposal.md`
 

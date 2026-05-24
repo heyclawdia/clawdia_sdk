@@ -182,7 +182,7 @@ Rules:
 - Detached work remains observable after the parent run seals through durable journal records and host-owned process/reclaim tracking. Live events are not sufficient ownership proof.
 - Missing or failed detach acknowledgement blocks completion with `RepairNeeded` or cancels/terminates according to policy.
 - Cleanup, process signaling, child cancellation, hook cancellation, detach transfer, and reclaim follow intent-before-effect ordering: append intent, perform bounded effect, append terminal result or recovery record.
-- Hooks cannot veto cancellation. `OnRunCancelRequested` hooks may enqueue bounded SDK cleanup effects inside the same policy deadline.
+- Hooks cannot veto cancellation. `OnRunCancelRequested` hooks may propose cleanup repair or existing child/process lifecycle operations inside the same policy deadline; accepted proposals lower into those operations' normal intent/result records.
 
 ## Reconnect Flow
 

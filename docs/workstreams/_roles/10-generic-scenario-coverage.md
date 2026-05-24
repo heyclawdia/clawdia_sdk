@@ -38,7 +38,7 @@ Scenarios must be generic enough for many hosts to reuse:
 
 ## Must Not Own
 
-SDK core contract authority, product runtime migration, UI routing implementation, host trace-store schema, external runtime process lifecycle, marketplace UX, workflow/DAG engines, or product-specific recommendation/evolution features.
+SDK core contract authority, product runtime compatibility, UI routing implementation, host trace-store schema, external runtime process lifecycle, marketplace UX, workflow/DAG engines, or product-specific recommendation/evolution features.
 
 ## Integration Handoff
 

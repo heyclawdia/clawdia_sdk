@@ -20,6 +20,7 @@ This phase layers streaming, realtime, isolation, subagents, and extensions over
 - [ ] Isolation never silently downgrades to host execution.
 - [ ] Subagents default to isolated child context and explicit handoff policy.
 - [ ] Extensions split core SDK capabilities from host extension manifest/runtime concerns.
+- [ ] Stitching checkpoint complete: blocking cross-cutting proposals from Phase 05 are accepted, rejected, or explicitly deferred before Phase 06 starts.
 
 ## Next Phase
 

@@ -32,7 +32,7 @@ Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Do not sta
 ## Primitive Focus
 
 - Tools lower into `RuntimePackage` capabilities, executor refs, policy refs, journal records, and events.
-- Mutating tools use side-effect intent/result, idempotency, and reconciliation metadata.
+- Every tool call records tool execution intent/result; mutating tools add side-effect metadata, idempotency, and reconciliation fields.
 - Built-in packs remain optional toolkit layers, not core product behavior.
 
 ## Must Not Own
@@ -42,6 +42,6 @@ Runtime-package canonical schema, concrete shell/container execution, product ap
 ## Validation And Review
 
 - Approval matrix and fail-closed dispatcher absence.
-- Intent-before-effect journal proof for mutating tools.
+- Intent/result journal proof for every tool call, with intent-before-external-effect proof for mutating tools.
 - Tool-pack snapshot and fingerprint proof.
 - Primitive-lowering evidence: no ambient tool discovery or unjournaled side-effect path.

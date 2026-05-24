@@ -43,14 +43,20 @@ This mirrors the Pi-style boundary: core loop and contracts stay small; harness/
 
 ## First Rust Slice Primitive Surface
 
-The first slice has two gates: a minimal fake-provider text run, then the typed-output gate over the same kernel. Optional feature layers expand only after those gates:
+The first slice has three explicit profiles. P0 proves one fake-provider text run. P1 adds typed output over the same run loop. P2 adds tool/approval side effects over the same package, policy, event, journal, and effect spine. Optional feature layers expand only after the profile they depend on:
+
+| Profile | Required surface | Not required |
+| --- | --- | --- |
+| P0 text run | run lifecycle, provider port, context projection, events, journal, package fingerprint, refs/IDs, provider-request effect records | typed output, tools, approvals, isolation, extensions, telemetry exporters, subagents, realtime |
+| P1 typed output | P0 plus `OutputContract`, schema refs, local validation, repair accounting, `ValidatedOutput` | tool execution, output delivery channels, approval UI |
+| P2 tools/approval | P1 plus `ToolExecutor`, `ApprovalBroker`, tool capabilities, tool effect intent/result records | concrete toolkit packs, concrete isolation adapters, extension runtimes |
 
 - run control: `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, `RunResult`;
 - package snapshot: `RuntimePackage`, `RuntimePackageRef`, first-slice `CapabilitySpec`, typed package sidecars, `PolicyRef`;
 - content, context, and output: `AgentMessage`, `ArtifactRef`, `ContentRef`, `ContextContribution`, `ContextItem`, `ContextProjection`, `OutputContract`, `ValidatedOutput`;
 - observability and durability: `AgentEvent`, `EventFrame`, `EventFilter`, `EventCursor`, `RunJournal`, `JournalRecord`, `JournalCursor`;
 - side effects: `EffectIntent`, `EffectResult`, `IdempotencyKey`, `DedupeKey`, `PolicyDecision`;
-- ports: `ProviderAdapter`, fake `ToolExecutor`, approval policy/broker port, `OutputSink`, journal/store ports;
+- ports: `ProviderAdapter`, optional fake `OutputSink`, journal/store ports; P2 activates `ToolExecutor` and approval policy/broker ports;
 - boundaries: `EntityRef`, `SourceRef`, `DestinationRef`, `PrivacyClass`, `RetentionClass`, `TrustClass`, `LineageRef`, and typed IDs.
 
 Tool packs, hooks, stream rules, memory stores, isolation adapters, subagents, extensions, telemetry exporters, and output channels are feature layers over these primitives. They may add helpers and optional crates, but they must not create a second run loop, event stream, journal, package registry, policy path, or side-effect path. Reserved feature ports can exist as traits or contracts before implementation, but they are not required to pass the MVP fake-provider run.
@@ -61,21 +67,21 @@ The API docs name three tiers so the first slice stays small without losing plan
 
 | Tier | Required when | Examples |
 | --- | --- | --- |
-| MVP public | Required for one fake-provider text or typed run. | `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, `RunResult`, `RuntimePackage`, `CapabilitySpec`, `AgentMessage`, `ContextProjection`, `OutputContract`, `AgentEvent`, `RunJournal`, core refs/IDs, provider/fake tool/output ports. |
+| P0/P1 public | Required for one fake-provider text run and typed-output run. | `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, `RunResult`, `RuntimePackage`, first-slice `CapabilitySpec`, `AgentMessage`, `ContextProjection`, `OutputContract`, `AgentEvent`, `RunJournal`, core refs/IDs, provider and optional fake output ports. |
 | Reserved public contract | Contract may be documented now, but implementation waits for the owning phase goal. | hook lifecycle, stream rules, isolation, subagents, extension capabilities, telemetry exporters, event archive replay. |
 | Optional crate API | Public only from an optional crate or host adapter. | concrete toolkit tools, isolation adapters, extension JSON-RPC bridge, OTel exporter helpers, workflow/orchestration helpers. |
 
 Reserved public contracts must not be required for the MVP crate to compile or run a fake-provider run.
 
-## MVP Public Types
+## P0/P1 Public Types
 
-The MVP public contract targets only the names needed for one fake-provider text or typed run. Implementations may keep fields private.
+The P0/P1 public contract targets only the names needed for one fake-provider text run and the typed-output gate over the same loop. Implementations may keep fields private.
 
 | Type | Owns | Must not own |
 | --- | --- | --- |
 | `Agent` | Immutable agent identity, default instructions, default model route, default context/memory policy handles. | Active execution, provider clients, UI routing, approval transport. |
 | `AgentBuilder` | Construction of an `Agent` from typed identity, instructions, default route refs, and context policy refs. | Runtime package mutation after build or lifecycle hook registration in the MVP path. |
-| `AgentRuntime` | Active run orchestration for provider/tool/output ports, journal, policies, subscriptions, and per-run package resolution. | Product dispatch between external runtimes, desktop, CLI, remote, or scheduled surfaces; assuming one global runtime package forever. |
+| `AgentRuntime` | Active run orchestration for provider/output ports, journal, policies, subscriptions, and per-run effective package resolution. | Product dispatch between external runtimes, desktop, CLI, remote, or scheduled surfaces; owning a mutable global execution package. |
 | `RunRequest` | One requested execution: source, destination, input parts, runtime package ref, output contract, cancellation, and host metadata. | Provider-specific wire request. |
 | `RunHandle` | Event stream, cancellation handle, final result receiver, and replay cursor for one run. | UI rendering decisions. |
 | `RunResult` | Terminal status, final message or structured output, usage/cost summary, and causal IDs. | Durable analytics storage. |
@@ -86,8 +92,6 @@ The MVP public contract targets only the names needed for one fake-provider text
 | `AgentEventBus` | Core lifecycle event subscription, filtering, cursors, and run-scoped replay API. | Workflow/DAG/barrier engines, UI rendering, telemetry storage, or global durable event archive ownership. |
 | `RunJournal` | Append-only durable run ledger port. | UI event buffering or transcript rendering. |
 | `ProviderAdapter` | Provider projection and streaming transport. | Internal transcript mutation or approval decisions. |
-| `ToolExecutor` | Tool attempts, concurrency, timeouts, cancellation, and result envelopes. | Policy decisions. |
-| `ApprovalBroker` | Approval request lifecycle, pending decisions, timeouts, and attribution. | UI copy or out-of-band channel implementation. |
 
 ## Reserved And Optional Public Types
 
@@ -99,6 +103,8 @@ These names are documented so contracts can converge, but they are not required 
 | `RunChildLifecyclePolicy` | Child-artifact and subagent feature work. | Concrete process/container control implementation. |
 | `EventArchive` | Optional indexed durable event replay port for cross-run/all-agent/filtered catch-up. | Core guarantee that every journal backend supports global queries. |
 | `TelemetrySink` | Optional telemetry crate/adapter over derived events, journals, usage, and cost. | Run control flow or durable run truth. |
+| `ToolExecutor` / `ApprovalBroker` | P2 tools/approval side-effect work. | Policy bypass, UI copy, or out-of-band approval channel implementation. |
+| `ExternalAgentAdapter` | Optional host adapter boundary for launch/restore/send/receive/retire against external runtimes. | Host runtime-session cache, restore-key policy, prewarm, retirement scheduling, UI routing, or product-specific process management. |
 | `StreamRule`, `ExecutionEnvironment`, `SubagentRequest`, `CoreExtensionCapabilities` | Owning feature phases. | Parallel run loops, package registries, journals, policies, or host products. |
 
 Public signature support types must also be exported or reachable from stable modules when they appear in public method signatures. MVP signatures should use only MVP support types; reserved support types become required only when their feature APIs are activated:
@@ -140,13 +146,15 @@ impl AgentBuilder {
 }
 
 pub struct AgentRuntime {
-    default_package: Option<RuntimePackage>,
+    default_package_ref: Option<RuntimePackageRef>,
     package_resolver: Arc<dyn RuntimePackageResolver>,
     providers: ProviderRegistry,
-    tools: ToolRegistry,
-    approval: Arc<dyn ApprovalBroker>,
+    output_sinks: OutputSinkRegistry,
     journal: Arc<dyn RunJournal>,
     events: Arc<dyn AgentEventBus>,
+    // P2 feature ports. They are absent in a P0/P1 runtime.
+    tools: Option<ToolRegistry>,
+    approval: Option<Arc<dyn ApprovalBroker>>,
 }
 
 impl AgentRuntime {
@@ -195,7 +203,9 @@ impl RunResult {
 }
 ```
 
-Reserved hook helpers, child lifecycle helpers, telemetry registration, event archive replay, stream rules, isolation, subagents, and extension helpers should be shown in their owning contracts, not the MVP conceptual API. When activated, each helper must lower into the same `RunRequest`, `RuntimePackage`, `AgentEvent`, `RunJournal`, `PolicyRef`, and `EffectIntent` path instead of adding a parallel behavior path.
+`AgentRuntime` resolves a request package ref plus runtime defaults into one effective per-run `RuntimePackage` before execution starts. That effective package snapshot, not the runtime object, is the execution authority and fingerprint source for the run.
+
+Reserved hook helpers, child lifecycle helpers, telemetry registration, event archive replay, stream rules, tools/approval, isolation, subagents, and extension helpers should be shown in their owning contracts, not the P0/P1 conceptual API. When activated, each helper must lower into the same `RunRequest`, `RuntimePackage`, `AgentEvent`, `RunJournal`, `PolicyRef`, and `EffectIntent` path instead of adding a parallel behavior path.
 
 ## Ergonomic Surface And Lowering Contract
 
@@ -260,7 +270,7 @@ Every public error carries causal IDs when available and a typed retry classific
 
 ## Slice Order
 
-Phase 2 should implement contracts in this order. The MVP text gate is one fake-provider text run after steps 1-6. Step 7 completes the first-slice typed-output gate over the same run loop. Later steps are feature layers.
+Implementation should land contracts in this order. The MVP text gate is one fake-provider text run after steps 1-6. Step 7 completes the first-slice typed-output gate over the same run loop. Later steps are feature layers.
 
 1. Domain IDs, errors, privacy, source/destination refs.
 2. Event envelope, event bus filters, cursors, and golden event records.
@@ -338,17 +348,14 @@ let agent = Agent::builder()
     .name(AgentName::new("Workspace Assistant"))
     .default_model_route(ModelRouteId::new("host.openai.default"))
     .default_context_policy(ContextPolicyRef::new("host.standard_chat"))
-    .on(HookPoint::BeforeToolCall, AuditHook::new())
     .build()?;
 
 let runtime = AgentRuntime::builder()
-    .default_package(runtime_package.clone())
+    .default_package_ref(RuntimePackageRef::from_package(&runtime_package))
     .package_resolver(Arc::new(package_resolver))
     .providers(Arc::new(provider_registry))
-    .tools(Arc::new(tool_registry))
-    .approval(Arc::new(approval_broker))
     .journal(Arc::new(run_journal))
-    .telemetry(TelemetryFanout::new(vec![otel_sink, host_sink]))
+    .telemetry(TelemetryFanout::safe_defaults())
     .build()?;
 
 let request = RunRequest {
@@ -415,14 +422,14 @@ Equivalence:
 
 Replaceable ports:
 
-- `ProviderRegistry`, `ToolRegistry`, `ApprovalBroker`, `RunJournal`, and `CheckpointStore` are MVP traits or registries; `TelemetrySink` and `IsolationRuntimeRegistry` are reserved optional ports.
+- `ProviderRegistry`, `OutputSinkRegistry`, `RunJournal`, and `CheckpointStore` are P0/P1 traits or registries. `ToolRegistry`, `ApprovalBroker`, `TelemetrySink`, and `IsolationRuntimeRegistry` are reserved optional/P2 ports.
 - Optional crates can provide concrete tool packs, isolation runtimes, OTel export, or host adapters without changing `agent-sdk-core`.
 - `AgentRuntimeBuilder` accepts fake ports first so contract tests can run without product-host imports.
 
 Wiring:
 
 1. Host builds `Agent` from product configuration.
-2. Host builds or references a `RuntimePackage` snapshot for the run.
+2. Host builds or references a runtime package template/ref for the run.
 3. Host composes runtime ports and optional package resolver.
 4. SDK resolves the effective package before the provider call, starts a run, and returns `RunHandle`.
 5. Host consumes events or waits for `RunResult`.

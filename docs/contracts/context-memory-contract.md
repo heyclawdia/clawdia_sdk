@@ -122,11 +122,8 @@ Journal records:
 
 - `MessageRecord`
 - `ContextRecord`
-- `MemoryRetrievalRecord`
-- `ContextSelectionRecord`
-- `MemoryWriteIntentRecord`
-- `MemoryWriteResultRecord`
-- `CompactionRecord`
+
+`ContextRecord` is the top-level journal kind for context and memory payloads. It has typed payload variants for `MemoryRetrieval`, `ContextContributionReceived`, `ContextSelection`, `ProjectionAudit`, `Compaction`, `MemoryWriteIntent`, and `MemoryWriteResult`. Memory writes are side effects: `MemoryWriteIntent` contains or maps one-to-one to `EffectIntent { kind: MemoryWrite }`, and `MemoryWriteResult` contains or maps one-to-one to the matching `EffectResult`.
 
 ## Acceptance Tests
 

@@ -207,9 +207,9 @@ The live filter path must not parse event payload JSON, copy raw content, query 
 
 `best_effort_live` diagnostics and progress frames may fan out without a journal cursor. `journal_backed` frames must append first and include the returned `JournalCursor`; if append fails, the SDK emits only a `diagnostic_only` frame without a journal cursor and must not execute side effects that require durable audit.
 
-## Stable Phase 1 Event Taxonomy
+## Stable Event Taxonomy
 
-Phase 1 stabilizes the event families, event kind names, and envelope fields. Payload fields remain versioned and can be extended in Phase 2, but renaming a family or event kind requires an explicit migration note.
+This packet stabilizes the event families, event kind names, and envelope fields. Payload fields remain versioned and can be extended during implementation, but renaming a family or event kind requires an explicit compatibility note.
 
 | Family | Stable event kinds | Journal requirement |
 | --- | --- | --- |
@@ -292,7 +292,7 @@ flowchart TD
   A --> K["session/journal events"]
 ```
 
-Recommended span attributes. The Phase 2 exporter contract pins OpenTelemetry GenAI semantic conventions `1.41.0` in `gen_ai_latest_experimental` mode; SDK-specific lineage remains under `agent_sdk.*`.
+Recommended span attributes. The exporter contract pins OpenTelemetry GenAI semantic conventions `1.41.0` in `gen_ai_latest_experimental` mode; SDK-specific lineage remains under `agent_sdk.*`.
 
 - `gen_ai.operation.name`
 - `gen_ai.provider.name`
@@ -384,7 +384,7 @@ Minimal record kinds:
 | --- | --- | --- |
 | `RunRecord` | Run start, source surface, agent ID, runtime package fingerprint, root trace, terminal status. | Reconnect, audit, and top-level trace correlation. |
 | `TurnRecord` | Turn start/end, input summary, context projection ID, outcome. | Rebuild loop progress without parsing messages. |
-| `ContextRecord` | Injected context items, projection audit, omissions, redaction, compaction. | Explain what reached the model and why. |
+| `ContextRecord` | Context contribution intake, memory retrieval, selection/omission, projection audit, redaction, compaction, and memory write intent/result payloads. | Explain what reached the model and why without creating separate memory journal kinds. |
 | `MessageRecord` | Message IDs, roles, part kinds, content references, summaries, lineage. | Reconstruct transcript safely without requiring raw content. |
 | `ModelAttemptRecord` | Provider/model, attempt ID, stream cursor, final message ID, stop reason, usage, error. | Retry safely and keep partial streams distinct from completed messages. |
 | `StreamRuleRecord` | Rule compile status, match cursor, redacted match details, intervention action, partial-output handling, injected context refs, repeat-state changes. | Explain why a model stream stopped, retried, masked, or asked for approval while output was still being generated. |
@@ -530,7 +530,7 @@ Opt-in content capture must state:
 
 ## Minimal Telemetry And Cost Guarantees
 
-Hosts should be able to rely on these Phase 1 telemetry and accounting guarantees:
+Hosts should be able to rely on these telemetry and accounting guarantees:
 
 - Every run emits a root trace/span identity, runtime package fingerprint, source surface, terminal status, start time, end time, and duration.
 - Every model attempt emits provider, model, attempt ID, latency, stop reason, retry classification, input/output/cache token usage when reported, and a marker when usage is estimated.
@@ -542,7 +542,7 @@ Hosts should be able to rely on these Phase 1 telemetry and accounting guarantee
 - Telemetry sinks are non-blocking. Sink failure emits health/failure events and falls back to journal/local logging without failing the agent loop.
 - Raw content is never required for cost accounting; token counts, byte counts, media duration, tool units, hashes, and IDs are sufficient.
 
-## Minimal Phase-2 Tests
+## Minimal Implementation Tests
 
 - Message metadata is stripped before provider calls.
 - Context item lineage survives projection and compaction.

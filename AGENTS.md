@@ -5,8 +5,8 @@ This workspace is the authoritative documentation and planning home for the new 
 ## Scope
 
 - Treat `/Users/clawdia/clawdia_sdk` as the source of truth for Agent SDK architecture, contracts, examples, workstreams, and open questions.
-- Keep the SDK packet product-neutral. Do not add product-specific host adapters or examples to the active handoff unless the user explicitly requests a separate reference archive.
-- Do not edit `/Users/clawdia/clawdia/docs/architecture/agent-sdk` as an authoritative packet. That location should remain a pointer back here.
+- Keep the SDK packet product-neutral. Do not add product-specific host adapters or examples to the active handoff unless the user explicitly requests a separate external task.
+- Do not create or maintain parallel Agent SDK packets outside this workspace.
 - Do not create branches unless the user explicitly approves.
 - Do not create Rust source files, executable tests, package manifests, or fixtures while the task is documentation-only.
 
@@ -29,7 +29,6 @@ This workspace is the authoritative documentation and planning home for the new 
 
 - SDK contracts live in `docs/contracts/`.
 - Examples live in `docs/examples/`.
-- Historical plans and risks live in `docs/reference/`.
 - Every normative contract must preserve explicit SDK-owned and host-owned boundaries.
 - Ergonomic helpers are only thin lowering layers into canonical contracts; they must not bypass validation, policy, journal, event, telemetry, or redaction behavior.
 - Higher-level features should layer on the primitive kernel instead of creating parallel registries, side-effect paths, or hidden runtime state.

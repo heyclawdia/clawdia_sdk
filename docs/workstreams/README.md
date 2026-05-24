@@ -17,7 +17,7 @@ The rule is intentionally simple: **run phases in numeric order, and run every g
 | [06 Scenario Coverage](06-scenario-coverage/README.md) | one goal | Prove generic scenarios compose from the primitives without importing product behavior. |
 | [07 Final Review](07-final-review/README.md) | one goal | Run whole-packet review and decide readiness for coding. |
 
-Do not run a later phase until the previous phase README exit gate passes.
+Do not run a later phase until the previous phase README exit gate passes. Phases 04, 05, and 06 include explicit stitching checkpoints: blocking cross-cutting proposals must be accepted, rejected, or deferred with an owner before the next phase starts.
 
 ## How To Launch A Goal
 
@@ -79,5 +79,5 @@ flowchart TD
 - Treat every other file as read-only unless the goal explicitly delegates a narrow stitching reconciliation.
 - Shared architecture docs under `docs/architecture/` and shared reference docs under `docs/reference/` are writable only by the integration role unless a goal explicitly says otherwise.
 - If a goal needs a shared rename, new event family, new ID type, changed runtime-package fingerprint input, or new primitive, include a proposal block in the handoff unless the goal is an integration/stitching goal.
-- Keep product-specific behavior out of active SDK handoff docs unless the user explicitly asks for a separate host reference archive.
+- Keep product-specific behavior out of active SDK handoff docs unless the user explicitly asks for a separate external host-adapter task.
 - End with changed files, validation performed, primitive-lowering evidence, unresolved risks, and cross-cutting proposal blocks.

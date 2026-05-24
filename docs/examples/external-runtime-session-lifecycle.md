@@ -20,7 +20,7 @@ stateDiagram-v2
   HistoryReplay --> ActiveSession
   ActiveSession --> LaterPrompt: "same surface"
   LaterPrompt --> ActiveSession: "fingerprint stable"
-  LaterPrompt --> RetireRuntime: "fingerprint stale"
+  LaterPrompt --> RetireRuntime: "fingerprint outdated"
   ActiveSession --> RetireRuntime: "over compaction threshold"
   ActiveSession --> RetireRuntime: "surface close/reset"
   ActiveSession --> Shutdown: "host shutdown"

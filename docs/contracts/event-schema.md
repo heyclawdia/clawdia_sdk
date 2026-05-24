@@ -413,7 +413,7 @@ Feature goals must add fixtures before emitting additional reserved kinds. Famil
 | `telemetry_cost` | `TelemetrySinkFailed`, `TelemetrySinkRecovered`, `UsageRecorded`, `CostEstimated`, `CostCorrected` |
 | `recovery` | `InvariantFailed`, `JournalAppendFailed`, `RecoveryPlanned`, `ReplayStarted`, `ReplayCompleted`, `ReplayFailed`, `AntiEntropyRepairSuggested`, `AntiEntropyRepairApplied` |
 
-Adding a family or kind requires a contract update and golden fixture. Renaming a family or kind requires a migration note. `RealtimeConnectionRestarted` is a compatibility alias only; new adapters should emit the requested/started/completed/failed sequence so observers can tell whether a restart was merely planned, in progress, successful, or failed.
+Adding a family or kind requires a contract update and golden fixture. Renaming a family or kind requires a compatibility note. `RealtimeConnectionRestarted` is a compatibility alias only; new adapters should emit the requested/started/completed/failed sequence so observers can tell whether a restart was merely planned, in progress, successful, or failed.
 
 `HookRegistered` is run-effective, not a pre-run package construction event. It is emitted only after a hook spec is part of a specific run's immutable runtime package and a `run_id` exists. Package construction and validation use runtime-package records/fixtures rather than run-scoped `AgentEvent`s.
 
@@ -431,7 +431,7 @@ Hosts or optional workflow crates own external side-effect compensation, user-vi
 
 ## Minimal Payload Contracts
 
-Payloads are versioned. Phase 2 must define one serde DTO per event kind before adapter work starts.
+Payloads are versioned. Implementation must define one serde DTO per event kind before adapter work starts.
 
 Every payload must include:
 
@@ -451,7 +451,7 @@ Payloads must not include raw content by default. Raw content can appear only wh
 
 ## Per-Family Payload Minimums
 
-These are minimum fields. Event-specific DTOs may add optional fields, but they cannot remove these without a migration note.
+These are minimum fields. Event-specific DTOs may add optional fields, but they cannot remove these without a compatibility note.
 
 | Family | Required payload fields |
 | --- | --- |
@@ -476,7 +476,7 @@ These are minimum fields. Event-specific DTOs may add optional fields, but they 
 
 ## Payload Freeze Gate
 
-Before coding any adapter, Phase 2 must create a golden payload fixture for every event kind that adapter can emit. A fake provider/tool/approval/isolation/subagent/realtime adapter can emit only event kinds that already have fixtures.
+Before coding any adapter, implementation must create a golden payload fixture for every event kind that adapter can emit. A fake provider/tool/approval/isolation/subagent/realtime adapter can emit only event kinds that already have fixtures.
 
 Each workstream must maintain an emitted-kind matrix:
 
@@ -493,7 +493,7 @@ Family-level fixture coverage is still required, but it is not enough for implem
 
 ## Source And Destination
 
-`SourceRef.kind` is finite:
+`SourceRef.kind` has a stable core set plus namespaced extension kinds. Core kinds are finite for indexing, but hosts/adapters may use `other:<namespace>/<kind>` only when they also provide source policy, privacy, and redaction metadata:
 
 - `user`
 - `system`
@@ -514,8 +514,9 @@ Family-level fixture coverage is still required, but it is not enough for implem
 - `policy`
 - `stream_rule`
 - `isolation_runtime`
+- `other:<namespace>/<kind>`
 
-`DestinationRef.kind` is finite:
+`DestinationRef.kind` has the same stable-core-plus-namespaced-extension shape:
 
 - `provider`
 - `tool`
@@ -532,6 +533,9 @@ Family-level fixture coverage is still required, but it is not enough for implem
 - `isolation_runtime`
 - `hook`
 - `output_sink`
+- `other:<namespace>/<kind>`
+
+Namespaced `other` kinds are not a shortcut around typed refs. Durable SDK-owned behaviors still need normal `EntityRef`, policy refs, events, journal records, and owner review before becoming core kinds.
 
 ## Redaction
 

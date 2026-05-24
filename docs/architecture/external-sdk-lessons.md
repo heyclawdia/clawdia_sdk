@@ -320,6 +320,6 @@ Rust takeaway:
 - `ApprovalPolicy`, `ApprovalBroker`, `PermissionPolicy`, `SandboxPolicy`, `EscalationPolicy`.
 - `SessionManager`, `CheckpointStore`, `RunJournal`.
 - `HookBus`, `HookResponse`, `HookMutation`.
-- `MemorySystem`, `ContextAssembler`, `CompactionPolicy`.
+- `MemoryPort`, `ContextAssembler`, `CompactionPolicy`.
 - `SubagentSupervisor`, `AgentTopology`, `HandoffRecord`.
 - `RemoteChannelAdapter`, `OutputSink`.

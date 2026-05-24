@@ -15,6 +15,7 @@ This phase is separated because scenario coverage depends on all feature-layer c
 - [ ] Every scenario maps to SDK-owned primitives and host-owned boundaries.
 - [ ] Scenario gaps become proposal blocks or accepted primitive changes with owners.
 - [ ] Examples remain product-neutral.
+- [ ] Stitching checkpoint complete: accepted scenario proposals are reconciled into shared docs and unresolved blockers are concrete before Phase 07 starts.
 
 ## Next Phase
 

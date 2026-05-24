@@ -19,6 +19,7 @@ This phase proves side-effecting features all lower through the same policy, jou
 - [ ] Missing policy, dispatcher, adapter, sink, or journal append fails closed when required.
 - [ ] Tool, hook, output, and telemetry behaviors reuse `RuntimePackage`, `PolicyRef`, `RunJournal`, and `AgentEvent`.
 - [ ] Product channel UX, approval UI, telemetry dashboards, and extension runtimes remain host-owned.
+- [ ] Stitching checkpoint complete: blocking cross-cutting proposals from Phase 04 are accepted, rejected, or explicitly deferred before Phase 05 starts.
 
 ## Next Phase
 

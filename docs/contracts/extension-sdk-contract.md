@@ -29,8 +29,6 @@ pub struct CoreExtensionCapabilities {
     pub providers: Vec<ProviderCapability>,
     pub subagents: Vec<SubagentCapability>,
     pub actions: Vec<ExtensionActionCapability>,
-    pub browser_safe_subpaths: Vec<BrowserSafeSubpath>,
-    pub package_compatibility: PackageCompatibility,
 }
 
 pub struct HostExtensionManifest {
@@ -42,6 +40,8 @@ pub struct HostExtensionManifest {
     pub commands: Vec<HostCommandContribution>,
     pub ui_surfaces: Vec<HostUiSurfaceContribution>,
     pub action_permissions: Vec<ActionPermission>,
+    pub browser_safe_exports: Vec<BrowserSafeSubpath>,
+    pub package_compatibility: PackageCompatibility,
     pub trust_state: TrustState,
 }
 ```
@@ -56,8 +56,6 @@ pub struct HostExtensionManifest {
 - providers
 - subagents
 - extension action capabilities
-- browser-safe helper subpaths
-- package compatibility range
 
 ## Host Manifest Fields
 
@@ -67,6 +65,7 @@ pub struct HostExtensionManifest {
 - app-event subscriptions
 - commands and UI surfaces
 - action permissions and trust state
+- browser-safe exports and package compatibility range
 - installation, marketplace, packaging, and process-management metadata
 
 ## JSON-RPC Runtime
@@ -151,7 +150,7 @@ Browser-safe means no transitive dependency on:
 - filesystem path probing
 - subprocess spawning
 
-`@agent-sdk/extension-sdk/browser-safe` is browser-safe. Root and media exports are not browser-safe in Phase 2 unless separately declared and tested.
+`@agent-sdk/extension-sdk/browser-safe` is browser-safe. Root and media exports are not browser-safe unless separately declared and tested.
 
 ## App Events
 
@@ -197,7 +196,6 @@ let capabilities = CoreExtensionCapabilities::builder("com.example.reviewer")
     .tool("review_notes")
     .before_model_call_nonblocking()
     .action("submit_ui_effect")
-    .browser_safe_subpath("@agent-sdk/extension-sdk/browser-safe")
     .build()?;
 ```
 
@@ -209,8 +207,6 @@ let capabilities = CoreExtensionCapabilitiesBuilder::new(ExtensionId::new("com.e
     .tool(ToolCapability::new("review_notes"))
     .hook(HookCapability::before_model_call_nonblocking())
     .action(ExtensionActionCapability::submit_ui_effect())
-    .browser_safe_subpath(BrowserSafeSubpath::new("@agent-sdk/extension-sdk/browser-safe"))
-    .package_compatibility(PackageCompatibility::range("^1.0.0"))
     .build()?;
 ```
 
@@ -218,7 +214,7 @@ Canonical lowering:
 
 - Core capability helpers lower into explicit `CoreExtensionCapabilities` fields.
 - Host resolves declared `CoreExtensionCapabilities` into `RuntimePackage` sidecars/capabilities only after policy checks.
-- Browser-safe subpath helpers lower into package export smoke-test requirements.
+- Browser-safe exports and package compatibility are declared by `HostExtensionManifest` or optional extension crate packaging tests, not by core capability refs.
 
 Equivalence:
 
@@ -254,13 +250,13 @@ let manifest = HostExtensionManifest {
         providers: vec![],
         subagents: vec![],
         actions: vec![ExtensionActionCapability::submit_ui_effect()],
-        browser_safe_subpaths: vec![BrowserSafeSubpath::new("@agent-sdk/extension-sdk/browser-safe")],
-        package_compatibility: PackageCompatibility::range("^1.0.0"),
     },
     app_event_subscriptions: vec![AppEventSubscription::prefix("agent.host.event.*")],
     commands: vec![],
     ui_surfaces: vec![],
     action_permissions: vec![ActionPermission::SubmitUiEffect],
+    browser_safe_exports: vec![BrowserSafeSubpath::new("@agent-sdk/extension-sdk/browser-safe")],
+    package_compatibility: PackageCompatibility::range("^1.0.0"),
     trust_state: TrustState::HostTrusted,
 };
 ```

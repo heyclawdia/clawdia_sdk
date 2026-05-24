@@ -21,8 +21,6 @@ One senior integration agent. This role is serialized and should not be split ac
 - `/Users/clawdia/clawdia_sdk/docs/workstreams/README.md`
 - `/Users/clawdia/clawdia_sdk/docs/workstreams/validation-gates.md`
 - `/Users/clawdia/clawdia_sdk/docs/workstreams/[0-9][0-9]-*/**`
-- `/Users/clawdia/clawdia_sdk/docs/plans/*.md`
-- `/Users/clawdia/clawdia_sdk/docs/reference/source-migration-map.md`
 - `/Users/clawdia/clawdia_sdk/docs/reference/open-questions-and-ambiguities.md`
 - `/Users/clawdia/clawdia_sdk/docs/reference/cross-cutting-proposals.md`
 - `/Users/clawdia/clawdia_sdk/docs/reference/feature-to-primitive-matrix.md`
@@ -53,10 +51,7 @@ Exception: when the user explicitly asks for a whole-packet stitching/reconcilia
 
 - Run the whole-packet Markdown link audit over `/Users/clawdia/clawdia_sdk`.
 - Run the workstream ownership audit proving no duplicated writable files and no non-stitching writes to `docs/architecture/*` or `docs/reference/*`.
-- Verify `docs/reference/source-migration-map.md` matches actual file inventory.
-- Verify any legacy in-product architecture packet, if present, is pointer-only and not an active SDK handoff source.
 - Verify contract index excludes product-specific host-adapter references from normative contract tables.
-- Verify every workstream has `## Required Validation` and names tests, fixtures, smoke checks, or docs audits.
+- Verify every owner role has `## Required Validation`, every goal doc has `## Validation And Review`, and both name tests, fixtures, smoke checks, or docs audits.
 - Verify every workstream has primitive-lowering review criteria and disjoint future implementation writable scope.
-- Run whitespace checks in any legacy product checkout touched by the task.
 - Handoff evidence: link-audit output, ownership-audit output, product-neutrality audit output, changed shared names/IDs, and unresolved cross-cutting proposals.

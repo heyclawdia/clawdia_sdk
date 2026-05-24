@@ -1,6 +1,6 @@
 # Agent SDK Contracts
 
-These files turn the Phase 1 architecture into explicit Phase 2 implementation contracts.
+These files define the current implementation contracts for the Agent SDK.
 
 They are still documentation. They are not Rust source, executable tests, or fixtures. Their job is to remove ambiguity before a coding agent starts.
 
@@ -17,13 +17,13 @@ They are still documentation. They are not Rust source, executable tests, or fix
 | [context-memory-contract.md](context-memory-contract.md) | Messages, artifacts/content refs, context contributions, admitted context items, context projection, memory ports, compaction, and projection audit boundaries. |
 | [hook-lifecycle-contract.md](hook-lifecycle-contract.md) | First-class lifecycle hooks, config/code registration, typed mutation rights, ordering, timeout, cancellation, and extension boundaries. |
 | [journal-replay-schema.md](journal-replay-schema.md) | Append-only journal record schemas, replay modes, checkpoints, side-effect atomicity, resume, cancel, and anti-entropy. |
-| [tool-approval-contract.md](tool-approval-contract.md) | Permission, sandbox, approval, escalation, autonomy, source-scoped approval, and compatibility migration rules. |
+| [tool-approval-contract.md](tool-approval-contract.md) | Permission, sandbox, approval, escalation, autonomy, source-scoped approval, and compatibility rules. |
 | [structured-output-contract.md](structured-output-contract.md) | User-provided output schemas, validation, repair retries, streaming candidates, and typed results. |
 | [stream-rule-contract.md](stream-rule-contract.md) | Literal/regex stream matching, channels, cursor semantics, interventions, privacy, and resume behavior. |
 | [tool-pack-contract.md](tool-pack-contract.md) | Built-in optional tool packs for read/search/edit/write/shell/resource/tool discovery and effect lineage. |
 | [isolation-runtime-contract.md](isolation-runtime-contract.md) | Portable isolated execution contract, adapter capabilities, mounts, network, secrets, process lifecycle, cleanup, and fallback. |
 | [subagent-contract.md](subagent-contract.md) | Parent-owned subagent supervision, package stripping, route validation, event wrapping, usage rollup, and no-chat promotion rules. |
-| [extension-sdk-contract.md](extension-sdk-contract.md) | Manifest/JSON-RPC contracts, extension capability boundaries, browser-safe helpers, and packaging smoke tests. |
+| [extension-sdk-contract.md](extension-sdk-contract.md) | Host manifest/JSON-RPC contracts, SDK-facing core capability boundaries, browser-safe helper exports, and packaging smoke tests. |
 | [output-delivery-contract.md](output-delivery-contract.md) | Destination refs, output sink dispatch, dedupe, intent-before-delivery, and host channel boundaries. |
 | [otel-mapping-contract.md](otel-mapping-contract.md) | SDK-to-OpenTelemetry mapping, semconv stability, MCP dedupe, content opt-in, and exporter failure behavior. |
 | [telemetry-privacy-contract.md](telemetry-privacy-contract.md) | Telemetry/cost/content-capture sink authority, redaction limits, and trace-sink boundaries. |
@@ -31,14 +31,14 @@ They are still documentation. They are not Rust source, executable tests, or fix
 
 ## Contract Rules
 
-- These contracts are normative for Phase 2 planning.
+- These contracts are normative for implementation planning.
 - If implementation discovers a mismatch, update the contract before changing code.
 - Each contract implementation must satisfy the relevant workstream validation gates in [../workstreams/validation-gates.md](../workstreams/validation-gates.md).
 - Contract reviews should use [../reference/sdk-review-checklist.md](../reference/sdk-review-checklist.md), including the simplicity, product-neutrality, event/journal, privacy, and boundary passes.
 - Simplicity guidance lives in [../reference/simplicity-audit.md](../reference/simplicity-audit.md). Simplify through defaults, presets, builders, and canonical lowering before adding or removing primitives.
 - The primitive kernel lives in [../architecture/primitive-map.md](../architecture/primitive-map.md). New contracts must say whether they add a kernel primitive, a feature layer, an optional adapter, or host-owned behavior.
 - The feature-to-primitive matrix lives in [../reference/feature-to-primitive-matrix.md](../reference/feature-to-primitive-matrix.md). New work must update or cite it when adding behavior.
-- Public event, journal, runtime package, or extension wire fields need migration notes.
+- Public event, journal, runtime package, or extension wire fields need compatibility notes.
 - Do not turn host-owned behavior into SDK-owned behavior just because it appears in a diagram.
 - Examples live under [../examples](../examples) and should be updated when these contracts change.
 - Normative contract docs end with `## Complete Example` sections. Those examples must name typed shapes, replaceable ports, wiring, events, journal records, policies/failures, SDK-owned boundaries, host-owned boundaries, and tests.
@@ -46,7 +46,7 @@ They are still documentation. They are not Rust source, executable tests, or fix
 
 ## Scenario References
 
-Scenario references are not normative SDK contracts. They are coverage examples for products built on the SDK. Keep them product-neutral; host-specific adapters belong outside this active handoff unless the user explicitly asks for a separate reference archive.
+Scenario references are not normative SDK contracts. They are coverage examples for products built on the SDK. Keep them product-neutral; host-specific adapters belong outside this active handoff unless the user explicitly asks for a separate external task.
 
 | Reference | Purpose |
 | --- | --- |
@@ -66,7 +66,7 @@ The SDK exposes ports, schemas, events, and optional toolkit contracts. These re
 - Concrete process control, detached child/process inspectors, and reclaim schedulers.
 - Proposal scoring, benchmark UI, product undo/revert UX, and automatic self-improvement policy.
 
-## External Patterns To Keep Stealing From
+## External Patterns To Learn From
 
 - Strands: [agent hooks](https://strandsagents.com/latest/documentation/docs/user-guide/concepts/agents/hooks/), [streaming](https://strandsagents.com/latest/documentation/docs/user-guide/concepts/streaming/), and [bidirectional hooks](https://strandsagents.com/latest/documentation/docs/user-guide/concepts/bidirectional-streaming/hooks/) for typed lifecycle, strongly named stream events, and connection/interruption/restart events.
 - Cursor SDK: [SDK release notes](https://cursor.com/changelog/sdk-release) for the simple agent/run split, inspectable runs, cancellation, SSE streaming, and `Last-Event-ID` reconnect.

@@ -34,6 +34,7 @@ Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Do not sta
 - Telemetry is a derived projection from events, journals, usage, and policy decisions.
 - Raw content capture is opt-in by policy and bounded by redaction, retention, sampling, and destination permission.
 - Sink failure never controls the run.
+- Phase 04 owns content-capture, redaction, usage/cost, fanout backpressure, sink failure, and repair-cursor semantics. Complete OTel emitted-kind mapping after Phase 05 adds the later emitted kinds, or in the next stitching checkpoint.
 
 ## Must Not Own
 
@@ -41,7 +42,7 @@ Durable run truth, product dashboards, billing UX, provider credentials, or raw 
 
 ## Validation And Review
 
-- Golden span/log mapping for emitted kinds.
+- Golden span/log mapping for emitted kinds available in Phase 04; later feature-layer emitted kinds are mapped after Phase 05 or recorded as deferred with an owner.
 - Redaction and content-capture policy matrix.
 - Sink failure and retry behavior.
 - Primitive-lowering evidence: telemetry does not create its own event stream or ledger.

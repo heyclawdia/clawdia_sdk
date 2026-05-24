@@ -4,13 +4,12 @@ This packet describes a future Rust-first `agent_sdk` crate family and extension
 
 It is intentionally standalone and product-neutral. The SDK should support demanding host workflows such as desktop chat, CLI/headless runs, realtime voice, remote channels, external runtimes, extensions, telemetry, and subagents without inheriting any one product's UI, trace store, process cache, marketplace, or workflow assumptions.
 
-## What Changed In This Reorg
+## Current Packet
 
 - The authoritative Agent SDK packet lives in `/Users/clawdia/clawdia_sdk`.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Parallel implementation ownership lives in [workstreams](workstreams/README.md).
-- Historical plans, risk notes, and scratch diagrams live in [reference](reference/source-migration-map.md).
 
 ## Navigation
 
@@ -22,17 +21,15 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 | [architecture/primitive-map.md](architecture/primitive-map.md) | First-principles primitive map: ownership, responsibilities, methods, and non-ownership boundaries. |
 | [architecture/observability-and-lineage.md](architecture/observability-and-lineage.md) | Source, destination, metadata, context-injection, stable event taxonomy, journal/replay, trace, privacy, telemetry, cost, and multi-agent lineage model. |
 | [architecture/architecture-proposal.md](architecture/architecture-proposal.md) | Main middle-level proposal with module layout, flows, diagrams, and conceptual Rust skeletons. |
-| [architecture/coverage-gap-matrix.md](architecture/coverage-gap-matrix.md) | Phase 1 acceptance coverage, gaps, and Phase 2 candidates. |
+| [architecture/coverage-gap-matrix.md](architecture/coverage-gap-matrix.md) | Current coverage gaps and implementation candidates. |
 | [contracts/README.md](contracts/README.md) | Normative implementation contracts for API, events, loop, package, journal/replay, policy, tools, isolation, extension, and telemetry. |
 | [examples/README.md](examples/README.md) | Mermaid-heavy scenario examples for complex host workflows and SDK boundaries. |
 | [workstreams/README.md](workstreams/README.md) | Phase-gated Codex goal folders: what must run first, what can run in parallel, owner roles, and what closes each gate. |
 | [workstreams/validation-gates.md](workstreams/validation-gates.md) | Shared validation levels, required evidence, and target commands for every workstream. |
-| [plans/2026-05-23-agent-sdk-core-primitives-phase-goals-plan.md](plans/2026-05-23-agent-sdk-core-primitives-phase-goals-plan.md) | Current hardening plan for primitive extraction, phase-goal launch docs, source audit, and review gates. |
 | [reference/feature-to-primitive-matrix.md](reference/feature-to-primitive-matrix.md) | Feature-to-primitive mapping and primitive decision ladder used by Phase 00, Phase 01, and Phase 02. |
 | [reference/sdk-review-checklist.md](reference/sdk-review-checklist.md) | SDK review rubric for simplicity, product-neutrality, observability, durability, privacy, and API quality. |
 | [reference/simplicity-audit.md](reference/simplicity-audit.md) | Simplicity audit identifying what to default, merge, keep advanced-only, or preserve as essential complexity. |
 | [reference/open-questions-and-ambiguities.md](reference/open-questions-and-ambiguities.md) | Decision register for first Rust-slice resolved decisions, deferred details, and non-questions. |
-| [reference/source-migration-map.md](reference/source-migration-map.md) | Historical source-to-target migration audit. Not implementation authority. |
 
 ## Design Posture
 
@@ -51,20 +48,28 @@ The SDK should feel simple for normal usage and explicit for power users. Common
 - `agent.on(HookPoint::BeforeToolCall, hook)` or declarative hook config for lifecycle hooks that lower into `HookSpec`.
 - `RuntimePackage::for_agent(...).tool_pack(...)` for common package composition.
 - `StreamRule::mask_regex(...)` for common streaming safeguards.
-- `ExecutionEnvironment::isolated("coder").image(...).workspace(...)` for common isolated workloads.
+- `ExecutionEnvironment::require(IsolationRequirement::at_least(IsolationClass::Sandbox).prefer("adapter.ref"))` for common isolated workloads.
 
 Those helpers are thin. They lower into the same canonical contracts as advanced usage: `RunRequest`, `OutputContract`, `RuntimePackage`, `StreamRule`, `EnvironmentSpec`, `SubagentRequest`, `CoreExtensionCapabilities`, events, journal records, and policy checks. Simple APIs cannot bypass local validation, approval, redaction, lineage, or side-effect intent records.
 
 ## Primitive Kernel
 
-The MVP Rust slice should stay small enough to prove one fake-provider text or typed run:
+The first implementation slice should use explicit readiness profiles so reserved feature contracts do not accidentally become MVP requirements:
+
+| Profile | Proves | Must not require |
+| --- | --- | --- |
+| P0 text run | one fake-provider text run through the run loop, context projection, events, journal, and provider port | tools, approvals, isolation, extensions, telemetry exporters, subagents, realtime, or typed output |
+| P1 typed output | `OutputContract` lowering, local validation, repair accounting, and typed result extraction over the same P0 loop | tool execution or output-channel delivery as a prerequisite |
+| P2 side effects | tool/approval execution using the shared package, policy, event, journal, and `EffectIntent` spine | a second run loop, event stream, journal, package registry, policy path, or side-effect path |
+
+The MVP Rust slice should stay small enough to prove P0, then P1:
 
 - `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, and `RunResult` for run lifecycle.
 - `RuntimePackage`, the first-slice `CapabilitySpec` profile, typed sidecars, and source-qualified catalog snapshots for immutable per-run package state.
 - `AgentMessage`, `ArtifactRef`, `ContentRef`, `ContextContribution`, `ContextItem`, `ContextProjection`, `OutputContract`, and `ValidatedOutput` for content refs, context admission/projection, and typed output.
 - `EffectIntent`, `EffectResult`, `IdempotencyKey`, and `DedupeKey` for side effects.
 - `AgentEvent`, `EventFrame`, `EventFilter`, `EventCursor`, `RunJournal`, `JournalRecord`, and `JournalCursor` for live observation and durable truth.
-- Typed ports for provider, fake tool execution, approval policy decisions, host output delivery, and storage.
+- Typed ports for provider projection/streaming, optional fake output delivery, and storage.
 - `EntityRef`, `SourceRef`, `DestinationRef`, `PolicyRef`, `PrivacyClass`, `RetentionClass`, `TrustClass`, and typed IDs for lineage across every boundary.
 
 Everything else layers over that kernel. Tool packs install callable package capabilities plus typed tool sidecars. Hooks are package sidecars plus ordered executors. Stream rules are package sidecars plus journaled interventions. Memory, tools, skills, host input, remote channels, subagents, and compaction create context candidates; only policy-admitted items become provider context. Isolation is a typed environment requirement plus adapter port. Subagents are parent-owned child runs. Extensions declare core capabilities that a host may resolve into a package. Telemetry is a projection, not durable truth. Output delivery is a sink port with journaled intent and dedupe, not product channel UX.

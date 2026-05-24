@@ -52,4 +52,4 @@ Send all new event family names, payload schema versions, event frame fields, ev
 - Replay matrix: resume, cancel, crash, failed provider stream, failed tool, failed approval, partial side effect, and archive unsupported cases.
 - Redaction audit: every event family has privacy class, redaction policy, content-capture mode, and no raw content by default; hook and child lifecycle fixtures must prove content-ref/redacted-summary defaults.
 - Primitive-lowering review: live events and journal records stay distinct; new behaviors reuse `AgentEvent`, `EventFrame`, `EventCursor`, `EntityRef`, `EffectIntent`, `EffectResult`, `RunJournal`, and `JournalCursor` instead of creating feature-specific event streams or ledgers.
-- Handoff evidence: fixture list, replay matrix, queue matrix, event/journal schema versions, and any migration notes.
+- Handoff evidence: fixture list, replay matrix, queue matrix, event/journal schema versions, and any compatibility notes.

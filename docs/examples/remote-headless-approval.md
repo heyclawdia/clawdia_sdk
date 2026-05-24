@@ -63,7 +63,7 @@ sequenceDiagram
 ## Acceptance Tests
 
 - `headless_no_dispatcher_denies`
-- `headless_no_escalation_uses_configured_migration_mode_not_ambient_fail_open`
+- `headless_no_escalation_uses_configured_compatibility_mode_not_ambient_fail_open`
 - `extension_submitted_action_cannot_self_approve`
 - `remote_output_uses_dedupe_key_before_resend`
 - `source_scoped_approval_uses_source_channel_or_denies`

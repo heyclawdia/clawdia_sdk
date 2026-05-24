@@ -27,7 +27,6 @@ pub struct OutputContract {
 pub enum OutputSchemaDialect {
     JsonSchema2020_12Subset,
     RustSerdeTypeName,
-    HostSemanticValidator,
 }
 
 pub enum OutputSchemaRef {
@@ -54,7 +53,6 @@ pub enum OutputSchemaRef {
 pub enum OutputMode {
     FinalOnly,
     IncrementalPreview,
-    ToolAugmentedFinal,
 }
 
 pub struct ValidationPolicy {
@@ -156,7 +154,7 @@ impl OutputContract {
 }
 ```
 
-Phase 2 starts with a JSON Schema 2020-12 subset plus optional host semantic validators. New dialects require contract updates.
+P1 starts with a JSON Schema 2020-12 subset plus optional host semantic validators referenced from `ValidationPolicy`. Semantic validators are policy-governed validation refs, not schema dialects. New dialects or tool-augmented final-output modes require contract updates and owner review before they can affect fingerprints.
 
 Replaceable pieces:
 
@@ -210,7 +208,7 @@ Schema ID/version rules:
 - `SCHEMA_ID` is stable and snake_case or namespaced.
 - `SCHEMA_VERSION` changes when validation meaning changes.
 - The schema fingerprint is computed from canonical schema bytes or a registered content ref.
-- If a derived schema fingerprint differs from a registered schema with the same ID/version, package validation fails unless `SchemaDriftPolicy` explicitly allows migration.
+- If a derived schema fingerprint differs from a registered schema with the same ID/version, package validation fails unless `SchemaDriftPolicy` explicitly allows a compatibility transition.
 - The provider receives a schema hint or schema ref, never Rust type metadata as authority.
 
 ## Presets And Builders
@@ -419,7 +417,7 @@ Replaceable ports:
 Wiring:
 
 1. Host adds `output_contract` to `RunRequest`.
-2. Runtime package fingerprint includes schema ID/version, schema hash, validator refs, repair policy, and retry budget.
+2. Runtime package resolution normalizes that contract into the effective package sidecar and fingerprint, including schema ID/version, schema hash, validator refs, repair policy, and retry budget.
 3. Provider adapter receives only a projection hint if supported.
 4. Model candidate returns as `OutputCandidate`.
 5. SDK validator returns `StructuredOutputResult<TodoExtraction>` or a typed failure.

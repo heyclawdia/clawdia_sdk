@@ -26,17 +26,8 @@ Only goal in Phase 07. Run after Phase 06 exits. This is the final pre-coding pa
 
 ## Writable Files
 
-- `README.md`
-- `AGENTS.md`
-- `docs/start-here.md`
-- `docs/architecture/*.md`
-- `docs/contracts/README.md`
-- `docs/contracts/review-matrix.md`
-- `docs/workstreams/README.md`
-- `docs/workstreams/validation-gates.md`
-- `docs/workstreams/[0-9][0-9]-*/**`
-- `docs/reference/*.md`
-- narrow contract reconciliation edits allowed by [../_roles/00-integration-stitching.md](../_roles/00-integration-stitching.md)
+- Files listed in [../_roles/00-integration-stitching.md](../_roles/00-integration-stitching.md).
+- Narrow contract reconciliation edits allowed by [../_roles/00-integration-stitching.md](../_roles/00-integration-stitching.md) when they install accepted shared primitive, ownership, event/journal, runtime-package, or product-neutrality decisions.
 
 ## Primitive Focus
 
@@ -58,7 +49,6 @@ Future Rust source, executable tests, package manifests, product-specific host a
 
 - Whole-packet markdown link audit.
 - Workstream ownership audit.
-- Source-map inventory audit.
 - Product-neutrality audit.
 - No-code audit.
 - Independent implementation review using [../../reference/sdk-review-checklist.md](../../reference/sdk-review-checklist.md).

@@ -32,7 +32,7 @@ Parallel-safe with every other goal in Phase 05 after Phase 04 exits. Do not sta
 
 - Split core extension capabilities from host extension manifest/runtime concerns.
 - Extension-declared tools, hooks, providers, subagents, and actions resolve into runtime-package sidecars/capabilities only after host policy.
-- Browser-safe helper exports remain packaging smoke-test requirements.
+- Browser-safe helper exports, package compatibility, trust state, action permissions, runtime, and install metadata remain host/optional-extension packaging concerns, not core capability fields.
 
 ## Must Not Own
 
@@ -40,7 +40,7 @@ Marketplace UX, extension installation, subprocess lifecycle in core, app-event 
 
 ## Validation And Review
 
-- Manifest helper and explicit manifest lower to the same capability fields.
+- Core capability helpers and explicit core capability declarations lower to the same SDK-facing capability fields.
 - Extension action crosses host approval.
 - Browser-safe exports prove no native/process/fs dependencies.
 - Core has no extension runtime imports.

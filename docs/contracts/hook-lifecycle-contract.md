@@ -87,14 +87,6 @@ pub enum HookResponse {
     RequestProjectionAuditRepair(ProjectionAuditRepairRequest),
     StopCompletionWithRepairNeeded(RepairNeededReason),
     StopRun(StopReason),
-    EnqueueSdkEffect(SdkEffectRequest),
-}
-
-pub enum SdkEffectRequest {
-    ChildShutdown(ChildShutdownRequest),
-    ProcessSignal(ProcessSignalRequest),
-    Cleanup(CleanupRequest),
-    EmitEvent(EmitEventRequest),
 }
 
 pub enum HookExecutionMode {
@@ -193,7 +185,7 @@ Hooks mutate only through typed responses. No hook receives arbitrary mutable re
 | `AfterSubagentTerminal` | observe, `RequestUsageRollupRepair` |
 | `BeforeIsolationProcessStart` | observe, deny, `ModifyProcessRequest` within `ProcessOwnershipPolicy` and isolation policy |
 | `AfterIsolationProcessExit` | observe, `RequestCleanupRepair` |
-| `OnRunCancelRequested` | observe, enqueue bounded SDK cleanup effect, cannot veto cancellation |
+| `OnRunCancelRequested` | observe, propose cleanup through `RequestCleanupRepair` or an existing child/process lifecycle operation, cannot veto cancellation |
 | `BeforeRunComplete` | observe, `ValidateDetach`, `StopCompletionWithRepairNeeded` |
 | `AfterRunTerminal` | observe only; best effort and cannot change terminal result |
 | `BeforeCompaction` | observe, `MarkProtectedContext` through policy |
@@ -201,7 +193,7 @@ Hooks mutate only through typed responses. No hook receives arbitrary mutable re
 
 If a response class is not in the hook spec's `mutation_rights`, the SDK rejects it as `PolicyDenied` and records `HookResponseRejected`.
 
-`HookResponse` is intentionally closed for the first Rust slice. Future response classes require updating this enum, this table, event payload fixtures, journal fixtures, and mutation-right tests. `EnqueueSdkEffect` is also closed through `SdkEffectRequest`; it cannot become a generic escape hatch for arbitrary host work.
+`HookResponse` is intentionally closed for the first Rust slice. Future response classes require updating this enum, this table, event payload fixtures, journal fixtures, and mutation-right tests. Hooks do not emit arbitrary events or enqueue generic SDK effects. A behavior-changing hook response is accepted only when it lowers into an existing domain operation such as context injection, tool denial, approval request mutation, process request mutation, child lifecycle action, or cleanup repair; that domain operation emits its normal events and journal records.
 
 ## Ordering, Timeouts, And Failure
 
@@ -255,7 +247,7 @@ Journal records:
 Rules:
 
 - A hook response that changes run behavior is journaled before it is applied.
-- Hook-enqueued side effects lower into normal SDK side-effect records and must satisfy intent-before-effect.
+- Accepted hook proposals lower into normal SDK domain operations. Any side effect created by that operation must satisfy intent-before-effect.
 - `HookRegistered` is a run-effective event emitted when a hook spec becomes part of the immutable runtime package for a specific run, after `RunStarted` has a `run_id`. Pre-run package construction is represented by package/capability validation records, not by run-scoped `AgentEvent`s.
 - Hook events use `SourceRef.kind = hook` for in-process hooks and `SourceRef.kind = extension` for extension-provided hooks.
 - Hook payloads default to IDs, refs, hashes, sizes, statuses, policy refs, and redacted summaries. Raw content is opt-in.
@@ -263,7 +255,7 @@ Rules:
 
 ## Extension Boundary
 
-Core owns `HookSpec`, `HookPoint`, `HookInput`, `HookResponse`, closed `SdkEffectRequest`, events, journal records, ordering, execution mode, queue/overflow semantics, timeout, policy, and canonical lowering.
+Core owns `HookSpec`, `HookPoint`, `HookInput`, `HookResponse`, lifecycle-specific proposal types, events, journal records, ordering, execution mode, queue/overflow semantics, timeout, policy, and canonical lowering.
 
 Optional extension crates or hosts own JSON-RPC, subprocess lifecycle, marketplace UX, app-event fanout, packaged resource fallback, and concrete hook process management.
 

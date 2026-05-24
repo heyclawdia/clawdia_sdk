@@ -8,7 +8,7 @@ This example shows how memory, history, compaction, projection audit, and replay
 flowchart TD
   A["User/remote/CLI input"] --> B["AgentMessage"]
   C["Conversation history"] --> D["ContextAssembler"]
-  E["MemorySystem glance/recall/detail"] --> D
+  E["MemoryPort glance/recall/detail"] --> D
   F["Tool results"] --> D
   G["Extension context proposals"] --> D
   H["Compaction summary"] --> D
@@ -87,4 +87,3 @@ sequenceDiagram
 - `extension_context_proposal_cannot_bypass_projection_policy`
 - `resume_after_compaction_requires_content_ref_manifest`
 - `memory_store_event_uses_memory_policy_not_ui_state`
-

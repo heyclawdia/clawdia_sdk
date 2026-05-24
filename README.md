@@ -36,12 +36,11 @@ flowchart TD
 | Area | Path | Authority |
 | --- | --- | --- |
 | Architecture posture | [docs/architecture](docs/architecture) | SDK design direction, primitive kernel, feature layers, and conceptual skeletons |
-| Implementation contracts | [docs/contracts](docs/contracts/README.md) | Normative Phase 2 contract packet |
+| Implementation contracts | [docs/contracts](docs/contracts/README.md) | Normative contract packet |
 | Workstream ownership and validation | [docs/workstreams](docs/workstreams/README.md) | Phase sequencing, parallel goal launch docs, owner roles, write boundaries, and validation gates |
 | Standards and review | [coding_standards.md](coding_standards.md), [docs/reference/sdk-review-checklist.md](docs/reference/sdk-review-checklist.md) | Coding posture and SDK review rubric |
 | Simplicity audit | [docs/reference/simplicity-audit.md](docs/reference/simplicity-audit.md) | Simplification guidance that preserves capability |
 | Scenario coverage | [docs/examples](docs/examples/README.md) | Generic host workflows and boundary examples, not SDK core |
-| Historical context | [docs/reference](docs/reference/source-migration-map.md) | Plans, risks, notes, and migration audit |
 
 ## Parallelization Rule
 

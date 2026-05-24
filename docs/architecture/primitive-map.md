@@ -8,7 +8,7 @@ Every primitive should expose three layers:
 
 | Layer | Shape | Rule |
 | --- | --- | --- |
-| Simple | one-line helpers such as `run_text`, `run_typed::<T>`, `tool_pack(WorkspaceReadOnly)`, `StreamRule::mask_regex`, or `ExecutionEnvironment::isolated("coder")` | lowers into the same stable contract used by advanced callers |
+| Simple | one-line helpers such as `run_text`, `run_typed::<T>`, `tool_pack(WorkspaceReadOnly)`, `StreamRule::mask_regex`, or `IsolationRequirement::at_least(IsolationClass::Sandbox).prefer("adapter.ref")` | lowers into the same stable contract used by advanced callers |
 | Builder | defaulted builders with conservative safe defaults and common overrides | keeps normal customization readable without hand-building every DTO |
 | Advanced | explicit contract structs, registries, policies, adapters, and refs | remains the canonical source of truth for tests, events, journals, and wire formats |
 
@@ -22,7 +22,7 @@ Before adding a primitive, capability variant, registry, or side-effect path, an
 2. Can this be a `CapabilitySpec` entry that points to a typed sidecar contract?
 3. Can this be an optional adapter behind an existing port?
 4. Can this stay host-owned with only typed refs, events, journals, and policy decisions in the SDK?
-5. If all answers are no, add a primitive proposal with owner role, fingerprint impact, events, journal records, policy/ref fields, validation, and migration risk.
+5. If all answers are no, add a primitive proposal with owner role, fingerprint impact, events, journal records, policy/ref fields, validation, and compatibility risk.
 
 The answer must be recorded in the goal review packet. A feature is not ready for implementation if it needs a new primitive but cannot explain why the existing kernel, a typed sidecar, an optional adapter, or a host-owned boundary is insufficient.
 
@@ -117,7 +117,7 @@ New primitives must pass the decision ladder above before they are added.
 | `OutputContract` | User/host-requested output shape, schema ID, validation policy, repair policy, and typed result mode. | `schema`, `validator`, `repair_policy`, `projection_hint`. | Product-specific form rendering or business scoring. |
 | `StructuredOutputValidator` | Local parse, schema validation, semantic validation, and error reporting for model output candidates. | `validate`, `explain_errors`, `redacted_error_summary`. | Provider transport or hidden mutation of model output. |
 | `ValidatedOutput` | Typed output value, schema version, validation report, source attempt IDs, and lineage. | `as_json`, `typed_ref`, `lineage`, `redacted_summary`. | Raw provider transcript storage. |
-| `MemorySystem` | Retrieval and storage port for memories. | `glance`, `recall`, `detail`, `store`, `ingest`. | UI memory browsing or extension-side shadow memory. |
+| `MemoryPort` | Retrieval and storage port for memories. | `glance`, `recall`, `detail`, `store`, `ingest`. | UI memory browsing or extension-side shadow memory. |
 | `ContextAssembler` | Turns messages, memory, system instructions, tools, hooks, and host context into `ContextProjection`. | `assemble`, `budget`, `explain_projection`. | Provider call transport. |
 | `ConversationManager` | Transcript windowing and history policy. | `append`, `project_history`, `reduce_context`, `snapshot`. | Memory store or trace analytics. |
 | `CompactionPolicy` | When and how to compact context, plus protected context preservation. | `should_compact`, `compact`, `before_compact`, `after_compact`. | Hidden deletion without journal events. |

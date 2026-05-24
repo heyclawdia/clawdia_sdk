@@ -222,7 +222,8 @@ impl Agent {
 
 pub struct AgentRuntime {
     providers: ProviderRegistry,
-    runtime_package: RuntimePackage,
+    default_package_ref: Option<RuntimePackageRef>,
+    package_resolver: Arc<dyn RuntimePackageResolver>,
     policies: RuntimePolicies,
     session: Arc<dyn SessionManager>,
     journal: Arc<dyn RunJournal>,
@@ -280,12 +281,14 @@ pub trait AgentLoop {
 
 Important responsibilities:
 
-- `RunContext` owns run-scoped IDs, package, policies, cancellation, journal, telemetry, and session references.
+- `RunContext` owns run-scoped IDs, the resolved effective `RuntimePackage`, policies, cancellation, journal, telemetry, and session references.
 - `TurnContext` owns per-turn projection, attempts, usage, and outcome.
 - `AgentLoop` asks other ports to do work. It does not know how a provider network client, MCP server, extension subprocess, or UI approval prompt is implemented.
-- The transition table in Phase 2 must be executable and must include cancel, max-iteration, denied-tool, interrupted-tool, stream-rule, and resume edges. The Mermaid state diagram and Rust enum are one contract; if one changes, the other changes in the same review.
+- The transition table must be executable and must include cancel, max-iteration, denied-tool, interrupted-tool, stream-rule, and resume edges. The Mermaid state diagram and Rust enum are one contract; if one changes, the other changes in the same review.
 
 ## Runtime Package
+
+`AgentRuntime` stores package refs, resolvers, registries, and ports. It does not own a mutable global package. Before each run starts, the runtime resolves `RunRequest.runtime_package`, runtime defaults, host catalog snapshots, and any `RunRequest.output_contract` into one effective per-run `RuntimePackage`; that snapshot is journaled and fingerprinted.
 
 ```rust
 // Non-compiling sketch.
@@ -364,7 +367,7 @@ pub trait StructuredOutputValidator: Send + Sync {
 
 Flow:
 
-1. Host attaches an `OutputContract` to `RunRequest` or `TurnContext`.
+1. Host attaches an `OutputContract` to `RunRequest`; per-turn output override support is deferred until a separate contract proves the replay and fingerprint shape.
 2. `ContextAssembler` includes concise instructions for the shape, while `ProviderAdapter` uses provider-native structured-output or JSON-schema support when available.
 3. Provider output maps into `ModelOutputCandidate`, not directly into final `RunResult`.
 4. `StructuredOutputValidator` parses and validates locally against the requested schema, required fields, enum values, ranges, discriminators, and host-defined semantic checks.
@@ -483,7 +486,7 @@ Approval rules:
 
 ### Policy And Approval Edge Cases
 
-- Phase 1 intentionally specifies a safer SDK contract than some legacy product compatibility paths. Interactive approval transports may have historical fail-open behavior when event wiring is unavailable, and some older headless paths may fail open when no escalation channel exists. The SDK target is fail-closed for missing dispatchers. Any compatibility behavior must remain behind host adapters until a reviewed compatibility plan flips those paths.
+- The SDK contract is fail-closed for missing approval dispatchers. Any host compatibility behavior that fails open must remain behind host adapters until a reviewed compatibility plan changes those paths.
 - Headless runs with no approval dispatcher deny the requested action, emit `ApprovalDispatchUnavailable` and `ApprovalDenied`, and continue only if the tool result policy allows a denied tool result. They never fall back to desktop UI silently.
 - Headless dispatcher timeouts emit `ApprovalTimedOut`, resolve the broker decision as denied, cancel any parked receiver, and append the timeout before the loop continues or fails.
 - Source-scoped remote runs dispatch only through the source-approved channel or a configured host escalation route. If neither exists, they deny.
@@ -492,7 +495,7 @@ Approval rules:
 - Extension-submitted actions can request and observe, but extensions cannot answer their own approvals. Host policy and the broker own the decision.
 - YOLO/autonomy mode is an explicit policy layer, not an approval-broker bypass. It still emits policy decisions, tool risk metadata, usage, and cost events.
 - Cancellation during approval appends cancellation, closes the approval request, and returns a cancelled result to the loop without executing the tool.
-- Phase 2 must define a single SDK decision enum, then map host compatibility terms such as `approve`, `approve_for_session`, and `deny` into that enum at the adapter edge.
+- Implementation must define a single SDK decision enum, then map host compatibility terms such as `approve`, `approve_for_session`, and `deny` into that enum at the adapter edge.
 
 ## Built-In Tool Packs
 
@@ -618,7 +621,7 @@ Boundaries:
 ```mermaid
 flowchart TD
   A["Run input"] --> B["ConversationManager"]
-  M["MemorySystem"] --> C["ContextAssembler"]
+  M["MemoryPort"] --> C["ContextAssembler"]
   B --> C
   H["Hooks and extension context"] --> C
   C --> D["ContextProjection"]
@@ -740,7 +743,7 @@ The packaged extension SDK fallback must remain predictable:
 - Node ESM support through fallback resolution is unsupported until a loader, import-map, or installation strategy is implemented and smoked from outside the repo.
 - Node ESM package shape is valid when the SDK is reachable through normal `node_modules` resolution; smoke tests should cover root, browser-safe helper, and process-only media subpaths.
 - Bun fallback resolution must be verified for root, browser-safe helper, and process-only media subpaths before it is documented as supported.
-- CommonJS `require` is not a supported extension SDK contract for Phase 1 because the package is ESM and has no `require` export.
+- CommonJS `require` is not a supported extension SDK contract because the package is ESM and has no `require` export.
 - The active browser-safe helper surface is `@agent-sdk/extension-sdk/browser-safe`; root and media exports remain process/native surfaces unless a later browser-safe subpath explicitly says otherwise.
 - Packaging smokes should import `.`, `./browser-safe`, and `./media` with Bun from outside the repo only when the fallback strategy is supported; import the same subpaths with Node ESM through normal local `node_modules` resolution; verify `@agent-sdk/extension-sdk/browser-safe` has no Node/process/native dependency in browser use; and prove extension-local dependencies win over the host fallback.
 
@@ -776,10 +779,10 @@ This keeps the core reusable for desktop hosts, CLI tools, scheduled tasks, remo
 - Telemetry failure isolation: sink failures degrade to local logging/journal and never crash the loop.
 - Fast tests: mock providers and scripted streams exercise loops without live network calls.
 
-## Migration Path
+## Adoption Path
 
 1. Keep existing product runtime behavior unchanged.
-2. Turn accepted docs into phase-2 Rust API tests and fixtures only after user approval.
+2. Turn accepted docs into Rust API tests and fixtures only after user approval.
 3. Prototype `agent_sdk` as a separate crate with mock provider, mock tools, event stream, and journal.
 4. Add adapters for external runtime concepts only after core contracts are proven with fakes.
 5. Add concrete external-runtime adapters only after runtime package/fingerprint and event mapping contracts are proven.
@@ -796,11 +799,11 @@ This keeps the core reusable for desktop hosts, CLI tools, scheduled tasks, remo
 - Generic side-effect lineage can support host features that need reversibility or audit, but the SDK must not become a self-improvement product. It records what happened and exposes safe apply/replay/recovery contracts; hosts decide what to propose, evaluate, approve, show, or revert.
 - First-class isolation makes tool execution safer and more portable, but adapter capabilities vary widely. The SDK should expose portable policy/lifecycle contracts and let Apple Containerization, Docker, remote sandboxes, or local process adapters declare what they actually support.
 
-## Open Questions Answered For Phase 1
+## Resolved Design Questions
 
-- `AgentRuntime` should support many independent `RunHandle`s. Scheduling, admission control, prioritization, and host UI routing belong above the core runtime. Phase 2 should define executor/backpressure traits and run-admission tests.
+- `AgentRuntime` should support many independent `RunHandle`s. Scheduling, admission control, prioritization, and host UI routing belong above the core runtime. Implementation should define executor/backpressure traits and run-admission tests.
 - Hooks should split by performance sensitivity. Pure observe hooks are nonblocking and allocation-light; blocking lifecycle hooks are explicit, bounded, and return typed mutation responses. Code hooks and config hooks lower into the same `HookSpec` runtime package capability.
-- Stable v1 event fields are event family, event kind, schema version, event ID, timestamp, run ID, agent ID, optional turn/attempt/message/tool/approval/stream-rule/hook/child-artifact/execution-environment/subagent IDs, trace context, source, destination, parent event, correlation keys, tags, privacy class, delivery semantics, runtime package fingerprint, and payload schema version. Phase 2 should freeze payload field schemas with golden tests.
+- Stable v1 event fields are event family, event kind, schema version, event ID, timestamp, run ID, agent ID, optional turn/attempt/message/tool/approval/stream-rule/hook/child-artifact/execution-environment/subagent IDs, trace context, source, destination, parent event, correlation keys, tags, privacy class, delivery semantics, runtime package fingerprint, and payload schema version. Implementation should freeze payload field schemas with golden tests.
 - Runtime-wide event listening is part of core: `subscribe_all`, `subscribe_run`, `subscribe_agent`, and typed `subscribe_events` over compiled envelope/index filters. `RunHandle::stream_from` remains the run-scoped convenience path, not the only event API.
 - `EventCursor` is the live/recent stream cursor and `JournalCursor` is the durable replay cursor. Run-scoped replay comes from the run journal; cross-run/all-event replay requires an indexed archive/journal view.
 - OTel-compatible message/tool events can carry IDs, roles, sizes, MIME types, hashes, summaries, usage, latency, policy decisions, and status by default. Raw prompt/model/tool/memory content is off by default and requires explicit host policy plus retention declaration.

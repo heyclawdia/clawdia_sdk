@@ -1,10 +1,10 @@
 # Runtime Package Schema Contract
 
-`RuntimePackage` is the immutable snapshot that binds what the model can see to what the runtime can execute. It prevents provider projection, tool execution, policy, hooks, and tracing from drifting during a run.
+`RuntimePackage` is the immutable per-run effective snapshot that binds what the model can see to what the runtime can execute. Package refs, presets, and runtime defaults are inputs to resolution; the resolved effective package is the execution authority and fingerprint source for the run. It prevents provider projection, tool execution, policy, hooks, and tracing from drifting during a run.
 
 ## Package And Capability Boundary
 
-`RuntimePackage` is the canonical per-run snapshot. It should be small at the center and explicit at the edges:
+`RuntimePackage` is the canonical per-run effective snapshot. It should be small at the center and explicit at the edges:
 
 - package fields hold provider route, policies, output contracts, delivery sinks, lifecycle defaults, and typed sidecar snapshots;
 - `CapabilitySpec` describes callable or discoverable capabilities that may be projected to a provider or executed through a registry;
@@ -12,6 +12,8 @@
 - host-installed catalogs are captured as source-qualified snapshots before anything becomes active.
 
 `CapabilitySpec` must not become the universal bag for every package concern. If a concept is not callable/discoverable, model-visible, or executable by a registry, it usually belongs in a typed package field or sidecar instead.
+
+The runtime may expose builders, refs, presets, and package templates for ergonomics, but those are not live execution state. `AgentRuntime::start_run` resolves the request package ref, default package ref, host catalogs, and `RunRequest.output_contract` into one effective package before the first provider projection.
 
 ```rust
 // Non-compiling contract sketch.
@@ -82,13 +84,13 @@ pub struct CapabilityCatalogSnapshot {
 }
 ```
 
-Validation rejects stale static role/tool tables when a source-qualified catalog is required. Activation always creates a package delta for the next turn or run.
+Validation rejects outdated static role/tool tables when a source-qualified catalog is required. Activation always creates a package delta for the next turn or run.
 
-## MVP Capability Profile
+## P0/P1 Capability Profile
 
-The first Rust slice should support only the variants needed for a fake-provider text or typed run:
+The P0/P1 slice should support only the variants needed for a fake-provider text or typed run:
 
-| Variant | Required in MVP | Purpose |
+| Variant | Required in P0/P1 | Purpose |
 | --- | --- | --- |
 | `Tool` | optional fake only | Proves provider-visible tool specs match executable routes. |
 | `McpTool` / `McpResource` | reserved | Feature layer owned by tools/toolpack workstream. |
@@ -98,7 +100,7 @@ The first Rust slice should support only the variants needed for a fake-provider
 | `StreamControl` | reserved | Feature layer owned by streaming workstream. |
 | `RealtimeAction` | reserved | Feature layer owned by streaming/realtime workstream. |
 
-Provider route is required in MVP, but it is a package field, not a `CapabilityKind`. Typed output is required for typed runs, but `OutputContract` is a package/run contract field, not a callable capability. Fake output delivery may be present through an output sink sidecar and `OutputSink` port, not a capability variant.
+Provider route is required in P0, but it is a package field, not a `CapabilityKind`. Typed output is required for P1 typed runs, but `OutputContract` is a run-request authority normalized into an effective package sidecar/fingerprint before execution; it is not a callable capability. Fake output delivery may be present through an output sink sidecar and `OutputSink` port, not a capability variant.
 
 Reserved variants may appear in contract docs before implementation, but they cannot be projected, executed, or emitted by an adapter until their workstream supplies the typed sidecar contract and fixtures.
 
@@ -116,6 +118,7 @@ pub struct RuntimePackageCanonicalV1 {
     pub output_sinks: Vec<OutputSinkSnapshot>,
     pub capabilities: Vec<CapabilitySpec>,
     pub sidecars: Vec<PackageSidecarSnapshot>,
+    pub isolation_requirements: Vec<IsolationRequirementSnapshot>,
     pub catalogs: Vec<CapabilityCatalogSnapshot>,
     pub child_lifecycle: ChildLifecyclePolicySnapshot,
     pub policies: PolicySnapshot,
@@ -127,7 +130,7 @@ The runtime may keep richer in-memory indexes for fast lookup, but this canonica
 
 ## Fingerprint Algorithm
 
-1. Build `RuntimePackageCanonicalV1`.
+1. Resolve package refs, defaults, catalogs, and `RunRequest.output_contract` into one effective `RuntimePackageCanonicalV1`.
 2. Validate that provider-visible tool schemas have matching executable routes.
 3. Sort maps and lists by stable keys:
    - provider route ID
@@ -158,10 +161,10 @@ The algorithm name and schema version are part of the preimage.
 - MCP server IDs, exposed tool/resource/prompt names, namespace rules, and capability versions.
 - Hook IDs, hook kinds, ordering, execution mode, queue/overflow policy, mutation rights, timeout policy, and source IDs.
 - Stream rule IDs, versions, matchers, channels, actions, repeat policy, and privacy policy.
-- Isolation requirement kind, required capability class/version, mount/network/secret policy hashes.
+- Isolation requirement class, trust/locality/tenancy requirements, preferred adapter refs, fallback policy, required capability set, mount/network/secret policy hashes, cleanup guarantee, and auditability requirements.
 - Subagent IDs, route policy, context policy, tool policy, depth policy.
 - Child lifecycle default policy, allowed policy refs, detach policy refs, and cleanup timeout policy.
-- Extension IDs, versions, declared capabilities, action permissions, and browser-safe subpath declarations.
+- Extension IDs, versions, declared SDK-facing capabilities, executor refs, action capability IDs, and policy refs.
 - Approval, permission, sandbox, autonomy, escalation, retention, and content-capture policy snapshots.
 - Capability catalog source kind/ref/version/hash/trust/activation policy when catalog data affects active capabilities.
 
@@ -200,7 +203,7 @@ sequenceDiagram
   Loop->>Loop: "apply next turn/run only"
 ```
 
-Phase 2 may model package delta events as journal records before making them live events.
+Implementation may model package delta events as journal records before making them live events.
 
 ## Projection And Execution Invariant
 
@@ -245,7 +248,7 @@ If a tool is provider-visible, executable routing and policy must know how it wi
 - `agent_on_hook_lowers_to_hook_spec_sidecar`
 - `run_request_can_select_but_not_loosen_child_lifecycle_policy`
 - `reserved_capability_variant_requires_sidecar_contract_before_execution`
-- `mvp_package_profile_builds_without_reserved_feature_variants`
+- `p0_p1_package_profile_builds_without_reserved_feature_variants`
 
 ## Ergonomics
 

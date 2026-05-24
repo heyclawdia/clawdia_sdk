@@ -86,7 +86,7 @@ Cross-run, all-agent, or arbitrary filtered durable replay belongs to an optiona
 | --- | --- |
 | `RunRecord` | start, source surface, root trace, package fingerprint, terminal status |
 | `TurnRecord` | turn start/end, input summary, projection ID, outcome |
-| `ContextRecord` | injected items, projection audit, omissions, compaction, redaction |
+| `ContextRecord` | context contribution intake, memory retrieval, selection/omission, projection audit, compaction, redaction, and memory write intent/result payloads |
 | `MessageRecord` | message role, part kinds, lineage, content refs, commit/drop status |
 | `ModelAttemptRecord` | provider/model, attempt ID, stream cursor, stop reason, usage, error |
 | `StructuredOutputRecord` | schema ID, validation attempts, repair prompts, validated output refs |
@@ -178,8 +178,8 @@ Required side-effect intent records:
 - provider request
 - model attempt start
 - tool execution
-- hook-enqueued SDK effect
-- hook response that mutates run behavior
+- accepted hook proposal lowered to a domain operation
+- hook response that mutates run behavior through an existing domain operation
 - memory write
 - extension action
 - process signal or termination
@@ -312,7 +312,7 @@ Required reconciliation adapters:
 | memory write | memory store idempotency key or write receipt |
 | remote output send | channel dedupe key and ack lookup |
 | extension action | extension request ID and host action receipt |
-| hook-enqueued SDK effect | the lowered SDK side-effect family reconciler |
+| hook-requested domain operation | that operation's normal side-effect family reconciler |
 | isolated process | process status query and cleanup state |
 | child agent | child run journal terminal state |
 | detached child artifact | lifecycle owner/reclaim adapter and host ack ref |

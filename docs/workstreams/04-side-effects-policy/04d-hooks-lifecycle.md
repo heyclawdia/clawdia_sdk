@@ -33,6 +33,7 @@ Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Coordinate
 
 - Hook helpers lower into `HookSpec` and package sidecars/capabilities before a run starts.
 - Hook mutation rights are typed per hook point.
+- Hook responses are lifecycle-specific proposals that lower into existing domain operations; no generic event emission or SDK-effect hatch.
 - Security-relevant checks fail closed or interrupt by policy; nonblocking observation hooks may fail open only when not security-critical.
 
 ## Must Not Own

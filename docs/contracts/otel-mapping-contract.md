@@ -4,7 +4,7 @@ The SDK should export OTel-compatible telemetry without making OTel conventions 
 
 ## Stability Posture
 
-OpenTelemetry GenAI semantic conventions are still evolving. Phase 2 pins the first exporter to semantic conventions `1.41.0` in `gen_ai_latest_experimental` mode, verified against the OpenTelemetry docs on 2026-05-23.
+OpenTelemetry GenAI semantic conventions are still evolving. The first exporter contract pins semantic conventions `1.41.0` in `gen_ai_latest_experimental` mode, verified against the OpenTelemetry docs on 2026-05-23.
 
 Required declaration:
 
@@ -184,7 +184,7 @@ let exporter = OTelExporterConfig {
     failure_behavior: ExporterFailureBehavior::EmitTelemetrySinkFailedAndContinue,
 };
 
-otel_sink.export_run_span(RunTelemetryProjection {
+telemetry_fanout.try_record(TelemetryProjection::otel_span(RunTelemetryProjection {
     run_id,
     trace_id,
     package_fingerprint,
@@ -192,7 +192,7 @@ otel_sink.export_run_span(RunTelemetryProjection {
     provider_name: Some("openai".into()),
     model: Some("example-model".into()),
     usage_ref,
-}).await?;
+}))?;
 ```
 
 Replaceable ports:
@@ -204,8 +204,8 @@ Replaceable ports:
 Wiring:
 
 1. SDK records journal-backed model/tool/subagent events.
-2. Telemetry fanout projects events into spans.
-3. OTel exporter adds pinned schema URL and semconv stability.
+2. Telemetry fanout enqueues span projections without awaiting exporter I/O on the run loop.
+3. OTel exporter workers drain fanout queues and add pinned schema URL and semconv stability.
 4. Sink failure emits `TelemetrySinkFailed` and records export cursor for repair.
 
 Events:
