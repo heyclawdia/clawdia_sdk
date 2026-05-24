@@ -23,6 +23,7 @@ Only goal in Phase 03. Run after Phase 01 and every Phase 02 goal exit. Do not s
 - phase README
 - owner role doc
 - Phase 01 output and all Phase 02 goal outputs
+- read-only inputs below
 
 ## Writable Files
 
@@ -40,6 +41,11 @@ Only goal in Phase 03. Run after Phase 01 and every Phase 02 goal exit. Do not s
 - `docs/reference/open-questions-and-ambiguities.md`
 - `docs/reference/cross-cutting-proposals.md`
 - narrow contract reconciliation edits allowed by [../_roles/00-integration-stitching.md](../_roles/00-integration-stitching.md)
+
+## Read-Only Inputs
+
+- Phase 01 output and all Phase 02 goal outputs
+- all contract, example, plan, risk, and note docs not listed as writable, except for narrow stitching reconciliation allowed by the owner role
 
 ## Primitive Focus
 

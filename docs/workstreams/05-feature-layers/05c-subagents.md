@@ -23,10 +23,20 @@ Parallel-safe with every other goal in Phase 05 after Phase 04 exits. Do not sta
 - phase README
 - owner role doc
 - owner role doc read-only inputs
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/contracts/subagent-contract.md`
+
+## Read-Only Inputs
+
+- `docs/contracts/api-contracts.md`
+- `docs/contracts/runtime-package-schema.md`
+- `docs/contracts/event-schema.md`
+- `docs/contracts/journal-replay-schema.md`
+- `docs/contracts/context-memory-contract.md`
+- `docs/examples/subagent-supervision-workflow.md`
 
 ## Primitive Focus
 
@@ -39,6 +49,8 @@ User-chat conversation promotion, product routing, recursive agent societies, or
 
 ## Validation And Review
 
+- Future tests/fixtures: child package-diff fixtures, handoff policy matrix tests, mailbox/clarification fixtures, event wrapping fixtures, and usage rollup tests.
+- Docs audit: subagents must remain parent-owned child runs, not a separate runtime ledger or direct user-chat surface.
 - Child package strips recursive subagent tools by default.
 - Default handoff is `ContextHandoffPolicy::None`; summary or selected refs require explicit policy.
 - Parent cancel, completion, detach, mailbox, clarification, and usage rollup are journaled.

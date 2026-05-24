@@ -23,10 +23,20 @@ Only goal in Phase 06. Run after every Phase 05 goal exits. Do not start Phase 0
 - phase README
 - owner role doc
 - all prior phase exit reports
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/examples/*`
+
+## Read-Only Inputs
+
+- all SDK contracts
+- all architecture docs
+- `docs/workstreams/validation-gates.md`
+- `docs/reference/feature-to-primitive-matrix.md`
+- `docs/reference/open-questions-and-ambiguities.md`
+- all prior phase exit reports
 
 ## Primitive Focus
 

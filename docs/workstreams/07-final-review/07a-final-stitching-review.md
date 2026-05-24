@@ -23,11 +23,17 @@ Only goal in Phase 07. Run after Phase 06 exits. This is the final pre-coding pa
 - phase README
 - owner role doc
 - all phase and scenario outputs
+- read-only inputs below
 
 ## Writable Files
 
 - Files listed in [../_roles/00-integration-stitching.md](../_roles/00-integration-stitching.md).
 - Narrow contract reconciliation edits allowed by [../_roles/00-integration-stitching.md](../_roles/00-integration-stitching.md) when they install accepted shared primitive, ownership, event/journal, runtime-package, or product-neutrality decisions.
+
+## Read-Only Inputs
+
+- all phase and scenario outputs
+- all contract, example, plan, risk, and note docs not listed as writable, except for narrow final stitching edits allowed by the owner role
 
 ## Primitive Focus
 

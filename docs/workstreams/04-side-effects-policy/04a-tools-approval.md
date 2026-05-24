@@ -23,11 +23,20 @@ Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Do not sta
 - phase README
 - owner role doc
 - owner role doc read-only inputs
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/contracts/tool-approval-contract.md`
 - `docs/contracts/tool-pack-contract.md`
+
+## Read-Only Inputs
+
+- `docs/contracts/runtime-package-schema.md`
+- `docs/contracts/journal-replay-schema.md`
+- `docs/contracts/isolation-runtime-contract.md`
+- `docs/architecture/primitive-map.md`
+- `docs/examples/tool-pack-isolation-anti-entropy.md`
 
 ## Primitive Focus
 
@@ -41,6 +50,8 @@ Runtime-package canonical schema, concrete shell/container execution, product ap
 
 ## Validation And Review
 
+- Future tests/fixtures: approval policy matrix tests, dispatcher absence tests, tool-pack snapshot fixtures, and side-effect journal fixtures.
+- Docs audit: tool and approval helpers must reuse the shared runtime-package/effect/journal path.
 - Approval matrix and fail-closed dispatcher absence.
 - Intent/result journal proof for every tool call, with intent-before-external-effect proof for mutating tools.
 - Tool-pack snapshot and fingerprint proof.

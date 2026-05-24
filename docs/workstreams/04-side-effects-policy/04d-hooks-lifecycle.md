@@ -23,11 +23,20 @@ Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Coordinate
 - phase README
 - owner role doc
 - owner role doc read-only inputs
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/contracts/hook-lifecycle-contract.md`
 - `docs/contracts/api-contracts.md` only for hook helper/API lowering language
+
+## Read-Only Inputs
+
+- `docs/contracts/runtime-package-schema.md`
+- `docs/contracts/event-schema.md`
+- `docs/contracts/journal-replay-schema.md`
+- `docs/contracts/extension-sdk-contract.md`
+- `docs/architecture/primitive-map.md`
 
 ## Primitive Focus
 
@@ -42,6 +51,8 @@ Extension subprocess runtime, approval policy authority, arbitrary transcript mu
 
 ## Validation And Review
 
+- Future tests/fixtures: hook ordering tests, timeout/failure tests, mutation-rights matrix fixtures, and config/code lowering tests.
+- Docs audit: hook responses must lower into lifecycle-specific domain operations, not a generic effect/event hatch.
 - Hook ordering, timeout, queue, failure, and mutation-rights matrices.
 - Hook response mutations are journaled before apply.
 - Hook config and code-first helpers produce the same package shape.

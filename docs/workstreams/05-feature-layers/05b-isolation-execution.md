@@ -23,10 +23,20 @@ Parallel-safe with every other goal in Phase 05 after Phase 04 exits. Do not sta
 - phase README
 - owner role doc
 - owner role doc read-only inputs
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/contracts/isolation-runtime-contract.md`
+
+## Read-Only Inputs
+
+- `docs/contracts/tool-pack-contract.md`
+- `docs/contracts/tool-approval-contract.md`
+- `docs/contracts/runtime-package-schema.md`
+- `docs/architecture/architecture-proposal.md`
+- `docs/architecture/primitive-map.md`
+- `docs/examples/tool-pack-isolation-anti-entropy.md`
 
 ## Primitive Focus
 
@@ -40,6 +50,8 @@ Approval UI, tool semantics, provider routing, or concrete runtime implementatio
 
 ## Validation And Review
 
+- Future tests/fixtures: fake adapter capability tests, downgrade matrix tests, mount/network/process lifecycle fixtures, cleanup/recovery fixtures, and skipped concrete-runtime smoke notes.
+- Docs audit: isolation must stay `ExecutionEnvironment` plus `IsolationRuntime` adapter port; concrete runtimes remain adapter-owned.
 - Unsupported adapter and class/capability/trust-vector downgrades fail closed unless explicitly policy-approved.
 - Mount/network/process lifecycle is journaled.
 - Cleanup and detached process behavior matches child lifecycle policy.

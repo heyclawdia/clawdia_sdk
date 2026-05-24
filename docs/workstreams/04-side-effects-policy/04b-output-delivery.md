@@ -23,10 +23,19 @@ Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Do not sta
 - phase README
 - owner role doc
 - owner role doc read-only inputs
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/contracts/output-delivery-contract.md`
+
+## Read-Only Inputs
+
+- `docs/contracts/event-schema.md`
+- `docs/contracts/journal-replay-schema.md`
+- `docs/contracts/telemetry-privacy-contract.md`
+- `docs/architecture/primitive-map.md`
+- `docs/examples/remote-headless-approval.md`
 
 ## Primitive Focus
 
@@ -39,6 +48,8 @@ Product channel UI, remote credentials, notification copy, offline retry product
 
 ## Validation And Review
 
+- Future tests/fixtures: delivery intent/result fixtures, destination privacy matrix tests, sink-missing tests, and dedupe table tests.
+- Docs audit: output delivery must remain a host sink over shared effect, journal, event, privacy, and dedupe primitives.
 - Delivery intent precedes sink call.
 - Missing required sink is typed `HostConfigurationNeeded`.
 - Default delivery uses content refs or redacted summaries.

@@ -50,6 +50,8 @@ Runtime-package fingerprint rules, event/journal taxonomy, tool packs, concrete 
 
 ## Validation And Review
 
+- Future tests: compile/API lowering tests for `run_text`, `run_typed`, `AgentRuntime::start_run`, and `RunHandle` terminal completion.
+- Docs audit: simple helpers must lower into the same package, policy, journal, event, redaction, and lineage path as advanced `RunRequest`.
 - `run_text` and `run_typed` lower into `RunRequest`.
 - `RunHandle` completion waits for terminal run state, not only final visible text.
 - Public support types required by signatures are named.

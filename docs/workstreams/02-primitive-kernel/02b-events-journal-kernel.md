@@ -51,6 +51,8 @@ Feature-specific payload semantics, telemetry sink storage, host display events,
 
 ## Validation And Review
 
+- Future tests/fixtures: golden event envelope fixtures, journal record fixtures, replay/resume fixtures, and filter table tests.
+- Docs audit: every event/journal addition must preserve live-event versus durable-journal separation.
 - Event filters use envelope/index fields, not payload parsing.
 - Every side effect has intent-before-effect and terminal result record coverage.
 - Replay and resume use journal records and content refs, not live event assumptions.

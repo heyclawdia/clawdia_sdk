@@ -23,10 +23,19 @@ Parallel-safe with every other goal in Phase 05 after Phase 04 exits. Do not sta
 - phase README
 - owner role doc
 - owner role doc read-only inputs
+- read-only inputs below
 
 ## Writable Files
 
 - `docs/contracts/stream-rule-contract.md`
+
+## Read-Only Inputs
+
+- `docs/contracts/event-schema.md`
+- `docs/contracts/tool-approval-contract.md`
+- `docs/architecture/architecture-proposal.md`
+- `docs/architecture/observability-and-lineage.md`
+- `docs/examples/realtime-voice-workflow.md`
 
 ## Primitive Focus
 
