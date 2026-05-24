@@ -104,6 +104,22 @@ Provider route is required in P0, but it is a package field, not a `CapabilityKi
 
 Reserved variants may appear in contract docs before implementation, but they cannot be projected, executed, or emitted by an adapter until their workstream supplies the typed sidecar contract and fixtures.
 
+## Reserved Capability Variant Readiness
+
+Reserved variants are names, not implementation permission. A future workstream may move a variant from reserved to active only after its review packet names every field below and adds the matching contract tests or golden fixtures. Until then, package validation rejects any adapter attempt to project or execute that variant outside a test-only fake profile.
+
+| Variant | Owner role | Typed sidecar contract | Fingerprint fields | Emitted events | Journal records | Future validation |
+| --- | --- | --- | --- | --- | --- | --- |
+| `McpTool` | [04 Tools](../workstreams/_roles/04-tools-approval-toolpacks.md) | MCP/tool-pack sidecar in [tool-pack-contract.md](tool-pack-contract.md) plus approval policy refs | MCP server ID/version, canonical tool name, namespace, schema refs, executor ref, permission/approval refs, source trust | capability loaded, tool requested, approval requested/decided, tool started/completed/failed | package catalog snapshot, package delta, tool execution intent/result, approval record | MCP allowlist matrix, provider projection fixture, executor route fixture, intent-before-effect journal fixture |
+| `McpResource` | [04 Tools](../workstreams/_roles/04-tools-approval-toolpacks.md), [03 Context](../workstreams/_roles/03-context-structured-output.md) | MCP resource sidecar that yields `ContentRef` / `ContextContribution` candidates | MCP server/resource IDs, resource URI, parser/version, permission refs, content privacy/retention policy | resource discovered, resource read, context contribution received/selected/omitted | package catalog snapshot, resource read intent/result, context record | resource allowlist tests, content-ref redaction fixture, context admission/projection audit fixture |
+| `ToolDiscoveryCandidate` | [04 Tools](../workstreams/_roles/04-tools-approval-toolpacks.md) | discovery-index sidecar and activation policy refs | discovery index ID/version, candidate capability ID, source ref, activation policy ref, hidden/projection state | discovery searched, candidate returned, package delta requested/accepted/rejected | discovery record, package delta requested/accepted/rejected | hidden candidate not projected fixture, activation creates next snapshot test, no live package mutation test |
+| `AgentAsTool` | [07 Subagents](../workstreams/_roles/07-subagents-coordination.md) | subagent capability sidecar lowering to `SubagentRequest` | child agent ID/version, child package policy refs, route policy, depth/tool/context handoff policy, parent lifecycle refs | subagent requested/started/event/completed/failed/cancelled, usage rolled up | child start effect intent/result, subagent records, child lifecycle records, usage rollup | child package stripping fixture, handoff policy matrix, parent cancel/detach tests, event wrapping fixture |
+| `ExtensionAction` | [08 Extension SDK](../workstreams/_roles/08-extension-sdk-packaging.md) | SDK-facing `CoreExtensionCapabilities` action/tool sidecar, not host manifest fields | extension ID/version, action capability ID, executor/bridge ref, policy refs, trust/source refs represented as SDK-facing refs | extension capability loaded, action requested, approval requested/decided, action completed/failed | package catalog snapshot, extension action intent/result, approval record | core capability lowering tests, denied action fixture, extension cannot self-approve test, host-manifest exclusion audit |
+| `StreamControl` | [05 Streaming](../workstreams/_roles/05-streaming-realtime-rules.md) | stream-rule sidecar with matcher/intervention policy | stream rule ID/version, channel set, matcher hash, action, repeat policy, privacy/policy refs | stream rule matched, intervention requested/applied/failed, approval requested when needed | stream rule state, intervention intent/result, approval record where applicable | bounded matcher corpus, redacted match fixture, intervention matrix, resume repeat-state test |
+| `RealtimeAction` | [05 Streaming](../workstreams/_roles/05-streaming-realtime-rules.md) | realtime action sidecar plus realtime provider capability refs | realtime provider capability version, action ID, media/channel policy, restart/backpressure policy refs | realtime connected/restarted/closed, input/output delta, interruption/action requested/completed/failed | realtime session record, stream delta cursor records, intervention intent/result | send/receive fake workflow, restart/backpressure tests, media ref privacy fixture |
+
+Non-callable execution policy remains outside `CapabilitySpec` unless a row above explicitly makes it callable or discoverable. Provider route, output contracts, delivery sinks, telemetry policy, hooks, guardrails, child lifecycle, and isolation requirements remain package fields or typed sidecars with their own fingerprints.
+
 ## Required Snapshot Fields
 
 ```rust
@@ -124,15 +140,27 @@ pub struct RuntimePackageCanonicalV1 {
     pub policies: PolicySnapshot,
     pub fingerprint_inputs: FingerprintInputManifest,
 }
+
+pub struct FingerprintInputManifest {
+    pub algorithm: FingerprintAlgorithm,
+    pub canonical_schema_version: u16,
+    pub readiness_profile: ReadinessProfile,
+    pub included_groups: Vec<FingerprintInputGroup>,
+    pub excluded_groups: Vec<FingerprintExclusionGroup>,
+    pub reserved_feature_status: Vec<ReservedFeatureFingerprintStatus>,
+}
 ```
 
 The runtime may keep richer in-memory indexes for fast lookup, but this canonical DTO is the fingerprint source. Typed sidecars include, for example, tool-pack snapshots, isolation requirements, hook specs, stream rules, subagent definitions, extension core capability snapshots, telemetry policy, `PolicyStage` guardrail matrices, and output-delivery policy.
+
+`FingerprintInputManifest` is an audit surface, not a second fingerprint source. It records which canonical DTO groups were included, which volatile groups were excluded, and which reserved feature sidecars are inactive because their owner workstream has not supplied the required contract/fixture set.
 
 ## Fingerprint Algorithm
 
 1. Resolve package refs, defaults, catalogs, and `RunRequest.output_contract` into one effective `RuntimePackageCanonicalV1`.
 2. Validate that provider-visible tool schemas have matching executable routes.
-3. Sort maps and lists by stable keys:
+3. Validate that every non-P0/P1 capability variant is either inactive/reserved or has an accepted readiness row from its owner workstream.
+4. Sort maps and lists by stable keys:
    - provider route ID
    - canonical tool name
    - tool source ID
@@ -144,8 +172,8 @@ The runtime may keep richer in-memory indexes for fast lookup, but this canonica
    - policy ID
    - sidecar ID
    - catalog snapshot ID
-4. Serialize to canonical UTF-8 JSON or a named versioned canonical binary encoding.
-5. Hash the bytes with an algorithm named in the fingerprint, for example `sha256:runtime-package-canonical-v1:<digest>`.
+5. Serialize to canonical UTF-8 JSON or a named versioned canonical binary encoding.
+6. Hash the bytes with an algorithm named in the fingerprint, for example `sha256:runtime-package-canonical-v1:<digest>`.
 
 The algorithm name and schema version are part of the preimage.
 
@@ -249,6 +277,8 @@ If a tool is provider-visible, executable routing and policy must know how it wi
 - `run_request_can_select_but_not_loosen_child_lifecycle_policy`
 - `reserved_capability_variant_requires_sidecar_contract_before_execution`
 - `p0_p1_package_profile_builds_without_reserved_feature_variants`
+- `reserved_capability_readiness_table_names_owner_sidecar_fingerprint_events_journal_tests`
+- `fingerprint_manifest_records_included_excluded_and_reserved_feature_status`
 
 ## Ergonomics
 
