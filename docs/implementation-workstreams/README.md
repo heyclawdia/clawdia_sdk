@@ -15,11 +15,14 @@ Launch targets use short titles such as `typed-ids`, `event-frames`, or `text-ru
 | [02 Core Records](02-core-records/README.md) | all targets in parallel | Build package, event, journal, content/context, and provider-port records over the shared kernel. |
 | [03 Run Control](03-run-control/README.md) | all targets in parallel | Implement runtime ownership, loop state transitions, and reconnectable run handles. |
 | [04 P0 Text Run](04-p0-text-run/README.md) | one target | Integrate the first fake-provider text run through package, context, provider, events, and journal. |
-| [05 P1 Typed Output](05-p1-typed-output/README.md) | all targets in parallel | Add output contracts, local validation/repair, and typed result publication over the P0 loop. |
-| [06 P2 Side Effects](06-p2-side-effects/README.md) | all targets in parallel | Add approval, tool execution, output delivery, hooks, and core telemetry over the shared effect spine. |
-| [07 Feature Ports](07-feature-ports/README.md) | all targets in parallel | Add reserved feature-layer ports and optional crates without making them P0/P1 requirements. |
-| [08 Replay Hardening](08-replay-hardening/README.md) | all targets in parallel | Fill golden fixtures, replay/recovery coverage, performance, and privacy hardening. |
-| [09 Scenario Release](09-scenario-release/README.md) | all targets in parallel | Prove generic scenarios, public API readiness, docs, and release packaging. |
+| [05 Output Contract](05-output-contract/README.md) | one target | Add output contracts, schema refs, helper lowering, and package fingerprint normalization. |
+| [06 P1 Validation Result](06-p1-validation-result/README.md) | all targets in parallel | Add local validation/repair and typed result records over the output contract. |
+| [07 P1 Typed Run](07-p1-typed-run/README.md) | one target | Integrate P1 typed output over the P0 loop and prove typed result publication. |
+| [08 P2 Side Effects](08-p2-side-effects/README.md) | all targets in parallel | Add approval, tool execution, output delivery, hooks, and core telemetry over the shared effect spine. |
+| [09 Feature Ports](09-feature-ports/README.md) | all targets in parallel | Add reserved feature-layer ports and optional crates without making them P0/P1 requirements. |
+| [10 Replay Hardening](10-replay-hardening/README.md) | all targets in parallel | Fill golden fixtures, replay/recovery coverage, performance, and privacy hardening. |
+| [11 Scenario Verification](11-scenario-verification/README.md) | all targets in parallel | Prove generic scenarios and public API readiness after hardening. |
+| [12 Release Readiness](12-release-readiness/README.md) | one target | Run final packaging, feature flag, docs, verification-matrix, and release-handoff checks. |
 
 Do not start a later phase until the previous phase README exit gate is checked and the phase exit report records reviewer PASS.
 
@@ -32,11 +35,14 @@ The phase graph is shaped around test seams:
 - Phase 02 splits independent durable record families so package, event, journal, context, and provider DTOs can each get their own fixtures.
 - Phase 03 keeps runtime control independent from the first complete run so state-machine and reconnect tests can fail locally.
 - Phase 04 is the first integration gate: P0 must pass one fake-provider text run before typed output or side effects start.
-- Phase 05 proves typed output over the same run loop, with local validation and repair fixtures.
-- Phase 06 proves P2 side effects with policy matrices and intent-before-effect journal tests.
-- Phase 07 adds optional feature ports only after P2, keeping streaming, isolation, subagents, extensions, and tool packs out of the minimal core profiles.
-- Phase 08 exists specifically to close cross-cutting fixture, replay, privacy, and performance gaps before release scenarios.
-- Phase 09 runs scenario, API, and release checks in parallel after the hardening phase has made the evidence stable.
+- Phase 05 freezes output-contract DTOs and helper lowering before validators or typed results depend on them.
+- Phase 06 lets validation/repair and typed-result record work run in parallel because both depend only on the Phase 05 contract, not each other.
+- Phase 07 is the P1 integration gate: typed output must pass over the P0 loop before side effects start.
+- Phase 08 proves P2 side effects with policy matrices and intent-before-effect journal tests.
+- Phase 09 adds optional feature ports only after P2, keeping streaming, isolation, subagents, extensions, and tool packs out of the minimal core profiles.
+- Phase 10 exists specifically to close cross-cutting fixture, replay, privacy, and performance gaps before release scenarios.
+- Phase 11 runs scenario and API verification in parallel after the hardening phase has made the evidence stable.
+- Phase 12 is a final serialized release-readiness stitching phase that consumes all earlier verification evidence.
 
 If a future implementer finds a hidden dependency between two sibling launch targets, do not coordinate through shared mutable work. Move the dependent work into the next numbered phase and update this launch map.
 
@@ -48,11 +54,14 @@ flowchart TD
   P01 --> P02["02 Core Records<br/>parallel"]
   P02 --> P03["03 Run Control<br/>parallel"]
   P03 --> P04["04 P0 Text Run"]
-  P04 --> P05["05 P1 Typed Output<br/>parallel"]
-  P05 --> P06["06 P2 Side Effects<br/>parallel"]
-  P06 --> P07["07 Feature Ports<br/>parallel"]
-  P07 --> P08["08 Replay Hardening<br/>parallel"]
-  P08 --> P09["09 Scenario Release<br/>parallel"]
+  P04 --> P05["05 Output Contract"]
+  P05 --> P06["06 P1 Validation Result<br/>parallel"]
+  P06 --> P07["07 P1 Typed Run"]
+  P07 --> P08["08 P2 Side Effects<br/>parallel"]
+  P08 --> P09["09 Feature Ports<br/>parallel"]
+  P09 --> P10["10 Replay Hardening<br/>parallel"]
+  P10 --> P11["11 Scenario Verification<br/>parallel"]
+  P11 --> P12["12 Release Readiness"]
 ```
 
 ## Launch Protocol
@@ -60,7 +69,7 @@ flowchart TD
 For a phase folder, launch one Codex run per non-README markdown file directly inside that folder. Point each run at one launch target:
 
 ```text
-/goal Work in /Users/clawdia/clawdia_sdk using docs/implementation-workstreams/<NN-phase>/<short-title>.md as the launch doc.
+/goal Work in /Users/clawdia/clawdia_sdk using the exact launch file path, for example docs/implementation-workstreams/01-shared-kernel/01a-typed-ids.md, as the launch doc.
 Read README.md, docs/start-here.md, coding_standards.md, docs/implementation-workstreams/README.md, docs/workstreams/validation-gates.md, docs/reference/sdk-review-checklist.md, docs/architecture/primitive-map.md, the phase README, the launch doc, and all named contract inputs.
 Do not create a branch.
 Edit only the implementation surfaces named in the launch doc. If a named path does not exist yet, create it only when that launch doc owns it.

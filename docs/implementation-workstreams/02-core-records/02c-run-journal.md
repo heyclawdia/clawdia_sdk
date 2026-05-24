@@ -6,7 +6,7 @@
 
 ## Parallelism
 
-Parallel-safe with the other Phase 02 core-record launch targets. Keep reducer behavior local until Phase 08 hardening.
+Parallel-safe with the other Phase 02 core-record launch targets. Keep reducer behavior local until Phase 10 replay hardening.
 
 ## Contract Inputs
 
