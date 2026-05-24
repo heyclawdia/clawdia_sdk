@@ -1,0 +1,26 @@
+{
+  "candidate_content_ref": "content.validation.exhaust_retry",
+  "output_schema_version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "privacy": "content_refs_only",
+  "reason": "repair attempt budget exhausted",
+  "record_kind": "repair_exhausted",
+  "record_schema_version": 1,
+  "redacted_summary": "structured output validation failed after 2 validation attempt(s) and 1 repair attempt(s): structured output validation failed: required schema field is missing at /title",
+  "repair_attempts": [
+    "repair.validation.attempt.exhaust_initial.1"
+  ],
+  "retry_exhausted": true,
+  "schema_id": "schema.todo_validation",
+  "source_attempt_ids": [
+    "attempt.exhaust_initial",
+    "attempt.exhaust_retry"
+  ],
+  "validation_attempts": [
+    "validation.attempt.exhaust_initial",
+    "validation.attempt.exhaust_retry"
+  ]
+}

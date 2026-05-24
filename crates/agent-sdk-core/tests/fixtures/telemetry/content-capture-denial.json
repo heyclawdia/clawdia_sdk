@@ -1,0 +1,13 @@
+{
+  "allowed": false,
+  "effective_mode": "redacted_summary",
+  "policy_refs": [
+    {
+      "id": "policy.telemetry.raw",
+      "kind": "host"
+    }
+  ],
+  "reason": "raw telemetry content capture denied by source, sink, redaction, retention, sampling, or byte-limit policy",
+  "redaction_policy_id": "redaction.telemetry.repair",
+  "requested_mode": "raw_content"
+}

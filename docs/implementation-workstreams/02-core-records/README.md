@@ -14,7 +14,7 @@ Implement durable and observable record shapes over the shared kernel. All launc
 
 ## Exit Gate
 
-- [ ] Runtime package, events, journal, context, and provider records have compile and fixture coverage.
-- [ ] Live event frames and durable journal records stay distinct.
-- [ ] Runtime-package fingerprints are deterministic for implemented fields.
-- [ ] Phase exit report records reviewer PASS.
+- [x] Runtime package, events, journal, context, and provider records have compile and fixture coverage.
+- [x] Live event frames and durable journal records stay distinct.
+- [x] Runtime-package fingerprints are deterministic for implemented fields.
+- [x] Phase exit report records reviewer PASS.

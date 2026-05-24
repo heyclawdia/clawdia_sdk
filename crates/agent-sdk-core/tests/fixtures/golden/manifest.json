@@ -1,0 +1,844 @@
+{
+  "schema_version": 1,
+  "fixture_name": "phase11a.golden_coverage",
+  "redaction": "golden fixtures contain metadata, content refs, hashes, byte counts, and redacted summaries by default; raw content is absent unless a later policy opts in explicitly",
+  "contracts": [
+    "docs/contracts/event-schema.md",
+    "docs/contracts/journal-replay-schema.md",
+    "docs/contracts/runtime-package-schema.md",
+    "docs/contracts/otel-mapping-contract.md"
+  ],
+  "event_kinds": {
+    "covered": [
+      {
+        "kind": "run_started",
+        "fixtures": [
+          "tests/fixtures/events/run_started.json",
+          "tests/fixtures/p0/text-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/events/run_started.json"
+        ]
+      },
+      {
+        "kind": "run_completed",
+        "fixtures": [
+          "tests/fixtures/events/run_completed.json",
+          "tests/fixtures/p0/text-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/events/run_completed.json"
+        ]
+      },
+      {
+        "kind": "run_failed",
+        "fixtures": [
+          "tests/fixtures/p1/repair-exhausted-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p1/repair-exhausted-events.json"
+        ]
+      },
+      {
+        "kind": "provider_request_projected",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-events.json",
+          "tests/fixtures/provider/projected_request_redacted.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/provider/projected_request_redacted.json"
+        ]
+      },
+      {
+        "kind": "model_attempt_started",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p0/text-run-events.json"
+        ]
+      },
+      {
+        "kind": "model_stream_delta",
+        "fixtures": [
+          "tests/fixtures/events/model_stream_delta.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/events/model_stream_delta.json"
+        ]
+      },
+      {
+        "kind": "model_message_completed",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p0/text-run-events.json"
+        ]
+      },
+      {
+        "kind": "context_assembled",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-events.json",
+          "tests/fixtures/context/projection_audit_redacted.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/context/projection_audit_redacted.json"
+        ]
+      },
+      {
+        "kind": "structured_output_requested",
+        "fixtures": [
+          "tests/fixtures/p1/typed-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p1/typed-run-events.json"
+        ]
+      },
+      {
+        "kind": "structured_output_validation_started",
+        "fixtures": [
+          "tests/fixtures/p1/typed-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/validation/valid-output-record.json"
+        ]
+      },
+      {
+        "kind": "structured_output_validation_failed",
+        "fixtures": [
+          "tests/fixtures/p1/repair-exhausted-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/validation/invalid-output-record.json"
+        ]
+      },
+      {
+        "kind": "structured_output_repair_requested",
+        "fixtures": [
+          "tests/fixtures/p1/repair-success-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/validation/repair-request-record.json"
+        ]
+      },
+      {
+        "kind": "structured_output_validated",
+        "fixtures": [
+          "tests/fixtures/p1/typed-run-events.json",
+          "tests/fixtures/validated_output/validated-output-record.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/validated_output/validated-output-record.json"
+        ]
+      },
+      {
+        "kind": "structured_output_failed",
+        "fixtures": [
+          "tests/fixtures/p1/repair-exhausted-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/validation/repair-exhausted-record.json"
+        ]
+      },
+      {
+        "kind": "realtime_restart_requested",
+        "fixtures": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ]
+      },
+      {
+        "kind": "realtime_restart_started",
+        "fixtures": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ]
+      },
+      {
+        "kind": "realtime_restart_completed",
+        "fixtures": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ]
+      },
+      {
+        "kind": "realtime_backpressure_applied",
+        "fixtures": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ]
+      },
+      {
+        "kind": "subagent_started",
+        "fixtures": [
+          "tests/fixtures/subagents/supervision-records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/subagents/supervision-records.json"
+        ]
+      },
+      {
+        "kind": "subagent_handoff",
+        "fixtures": [
+          "tests/fixtures/subagents/supervision-records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/subagents/context-handoff-none.json"
+        ]
+      },
+      {
+        "kind": "extension_action_submitted",
+        "fixtures": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ]
+      },
+      {
+        "kind": "extension_action_started",
+        "fixtures": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ]
+      },
+      {
+        "kind": "extension_action_completed",
+        "fixtures": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ]
+      },
+      {
+        "kind": "output_dispatch_requested",
+        "fixtures": [
+          "tests/fixtures/output_delivery/events/output_delivery_requested_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/output_delivery/events/output_delivery_requested_v1.json"
+        ]
+      },
+      {
+        "kind": "output_dispatch_completed",
+        "fixtures": [
+          "tests/fixtures/output_delivery/events/output_delivery_completed_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/output_delivery/events/output_delivery_completed_v1.json"
+        ]
+      },
+      {
+        "kind": "output_dispatch_failed",
+        "fixtures": [
+          "tests/fixtures/output_delivery/events/output_delivery_failed_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/output_delivery/events/output_delivery_failed_v1.json"
+        ]
+      },
+      {
+        "kind": "output_dispatch_deduped",
+        "fixtures": [
+          "tests/fixtures/output_delivery/events/output_delivery_deduped_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/output_delivery/events/output_delivery_deduped_v1.json"
+        ]
+      },
+      {
+        "kind": "agent_pool_created",
+        "fixtures": [
+          "tests/fixtures/agent_pool/pool-lifecycle-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/pool-lifecycle-events.json"
+        ]
+      },
+      {
+        "kind": "agent_pool_run_joined",
+        "fixtures": [
+          "tests/fixtures/agent_pool/pool-lifecycle-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/pool-lifecycle-events.json"
+        ]
+      },
+      {
+        "kind": "run_message_accepted",
+        "fixtures": [
+          "tests/fixtures/agent_pool/run-message-accepted-delivered-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/run-message-accepted-delivered-events.json"
+        ]
+      },
+      {
+        "kind": "run_message_delivered",
+        "fixtures": [
+          "tests/fixtures/agent_pool/run-message-accepted-delivered-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/run-message-accepted-delivered-events.json"
+        ]
+      },
+      {
+        "kind": "wake_condition_registered",
+        "fixtures": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ]
+      },
+      {
+        "kind": "wake_condition_triggered",
+        "fixtures": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ]
+      },
+      {
+        "kind": "wake_condition_timed_out",
+        "fixtures": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ]
+      },
+      {
+        "kind": "wake_condition_cancelled",
+        "fixtures": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/wake-events.json"
+        ]
+      },
+      {
+        "kind": "run_cancelled",
+        "fixtures": [
+          "tests/fixtures/golden/run-cancelled-event-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/run-cancelled-event-v1.json"
+        ]
+      },
+      {
+        "kind": "replay_failed",
+        "fixtures": [
+          "tests/fixtures/golden/replay-failed-event-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/replay-failed-event-v1.json"
+        ]
+      },
+      {
+        "kind": "agent_pool_run_left",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "run_message_responded",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "run_message_failed",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "run_message_timed_out",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "run_message_expired",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "run_message_cancelled",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "wake_condition_failed",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      }
+    ],
+    "reserved": [],
+    "unimplemented": [
+      "run_checkpointed",
+      "run_cancel_requested",
+      "run_resume_requested",
+      "run_resume_failed",
+      "turn_started",
+      "turn_completed",
+      "turn_failed",
+      "message_accepted",
+      "message_committed",
+      "model_attempt_failed",
+      "tool_requested",
+      "tool_started",
+      "tool_completed",
+      "tool_failed",
+      "tool_denied",
+      "tool_recovery_required",
+      "approval_requested",
+      "approval_dispatched",
+      "approval_dispatch_unavailable",
+      "approval_responded",
+      "approval_denied",
+      "approval_timed_out",
+      "approval_cancelled",
+      "hook_registered",
+      "hook_invoked",
+      "hook_completed",
+      "hook_failed",
+      "hook_timed_out",
+      "hook_cancelled",
+      "hook_response_applied",
+      "hook_response_rejected",
+      "stream_rule_registered",
+      "stream_rule_compile_failed",
+      "stream_rule_matched",
+      "stream_intervention_requested",
+      "stream_intervention_applied",
+      "stream_rule_repeat_state_recorded",
+      "realtime_connect_requested",
+      "realtime_connected",
+      "realtime_input_send_requested",
+      "realtime_input_sent",
+      "realtime_output_receive_requested",
+      "realtime_output_received",
+      "realtime_interrupted",
+      "realtime_restart_failed",
+      "realtime_close_requested",
+      "realtime_closed",
+      "isolation_requested",
+      "isolation_adapter_health_checked",
+      "isolation_capability_matched",
+      "isolation_downgrade_denied",
+      "isolation_downgrade_approved",
+      "isolation_environment_prepared",
+      "isolation_process_started",
+      "isolation_process_io_captured",
+      "isolation_process_stats_recorded",
+      "isolation_cleanup_started",
+      "isolation_cleanup_completed",
+      "isolation_cleanup_failed",
+      "isolation_failed",
+      "child_lifecycle_requested",
+      "child_lifecycle_completed",
+      "child_lifecycle_detached",
+      "subagent_event_wrapped",
+      "subagent_usage_rolled_up",
+      "subagent_completed",
+      "extension_action_failed",
+      "extension_action_denied",
+      "telemetry_sink_failed",
+      "telemetry_sink_recovered",
+      "usage_recorded",
+      "cost_estimated",
+      "cost_corrected",
+      "replay_started",
+      "replay_completed"
+    ]
+  },
+  "journal_record_kinds": {
+    "covered": [
+      {
+        "kind": "run",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-journal.json",
+          "tests/fixtures/p1/typed-run-journal.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p0/text-run-journal.json"
+        ]
+      },
+      {
+        "kind": "context",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-journal.json",
+          "tests/fixtures/context/projection_audit_redacted.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/context/projection_audit_redacted.json"
+        ]
+      },
+      {
+        "kind": "message",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-journal.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p0/text-run-journal.json"
+        ]
+      },
+      {
+        "kind": "model_attempt",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-journal.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p0/text-run-journal.json"
+        ]
+      },
+      {
+        "kind": "structured_output",
+        "fixtures": [
+          "tests/fixtures/p1/typed-run-journal.json",
+          "tests/fixtures/validated_output/validated-output-record.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/validated_output/validated-output-record.json"
+        ]
+      },
+      {
+        "kind": "stream_rule",
+        "fixtures": [
+          "tests/fixtures/stream_realtime/stream_rule_match_record.json",
+          "tests/fixtures/stream_realtime/stream_intervention_effect_map.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/stream_realtime/stream_rule_match_record.json"
+        ]
+      },
+      {
+        "kind": "realtime_session",
+        "fixtures": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json"
+        ]
+      },
+      {
+        "kind": "hook",
+        "fixtures": [
+          "tests/fixtures/hooks/hook-response-accepted-record.json",
+          "tests/fixtures/hooks/hook-mutation-effect-intent.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/hooks/hook-mutation-effect-intent.json"
+        ]
+      },
+      {
+        "kind": "approval",
+        "fixtures": [
+          "tests/fixtures/approval/dispatch-intent-result.json",
+          "tests/fixtures/extensions/action-intent-result.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/approval/dispatch-intent-result.json"
+        ]
+      },
+      {
+        "kind": "tool",
+        "fixtures": [
+          "tests/fixtures/tools/read-tool-intent-result.json",
+          "tests/fixtures/tools/non-idempotent-write-recovery.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/tools/read-tool-intent-result.json"
+        ]
+      },
+      {
+        "kind": "isolation",
+        "fixtures": [
+          "tests/fixtures/isolation/lifecycle-intent-result.json",
+          "tests/fixtures/isolation/process-io-redaction.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/isolation/process-io-redaction.json"
+        ]
+      },
+      {
+        "kind": "child_lifecycle",
+        "fixtures": [
+          "tests/fixtures/subagents/lifecycle-records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/subagents/lifecycle-records.json"
+        ]
+      },
+      {
+        "kind": "agent_pool",
+        "fixtures": [
+          "tests/fixtures/agent_pool/pool-lifecycle-journal.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/pool-lifecycle-journal.json"
+        ]
+      },
+      {
+        "kind": "run_message",
+        "fixtures": [
+          "tests/fixtures/agent_pool/run-message-accepted-delivered-journal.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/run-message-accepted-delivered-journal.json"
+        ]
+      },
+      {
+        "kind": "wake",
+        "fixtures": [
+          "tests/fixtures/agent_pool/wake-records.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/agent_pool/wake-records.json"
+        ]
+      },
+      {
+        "kind": "output_dispatch",
+        "fixtures": [
+          "tests/fixtures/output_delivery/journal/output_delivery_intent_v1.json",
+          "tests/fixtures/output_delivery/journal/output_delivery_result_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/output_delivery/journal/output_delivery_intent_v1.json"
+        ]
+      },
+      {
+        "kind": "subagent",
+        "fixtures": [
+          "tests/fixtures/subagents/supervision-records.json",
+          "tests/fixtures/subagents/wrapped-event-usage.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/subagents/supervision-records.json"
+        ]
+      },
+      {
+        "kind": "extension_action",
+        "fixtures": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/extensions/action-intent-result.json"
+        ]
+      },
+      {
+        "kind": "telemetry",
+        "fixtures": [
+          "tests/fixtures/telemetry/usage-record.json",
+          "tests/fixtures/telemetry/sink-failure-record.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/telemetry/content-capture-denial.json"
+        ]
+      },
+      {
+        "kind": "recovery",
+        "fixtures": [
+          "tests/fixtures/journal/recovery-unsafe-pending.json",
+          "tests/fixtures/extensions/protocol-error-recovery.json",
+          "tests/fixtures/tools/non-idempotent-write-recovery.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/journal/recovery-unsafe-pending.json"
+        ]
+      },
+      {
+        "kind": "checkpoint",
+        "fixtures": [
+          "tests/fixtures/journal/checkpoint.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/journal/checkpoint.json"
+        ]
+      },
+      {
+        "kind": "effect_intent",
+        "fixtures": [
+          "tests/fixtures/journal/effect-intent.json",
+          "tests/fixtures/output_delivery/journal/output_delivery_intent_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/journal/effect-intent.json"
+        ]
+      },
+      {
+        "kind": "effect_result",
+        "fixtures": [
+          "tests/fixtures/extensions/action-intent-result.json",
+          "tests/fixtures/output_delivery/journal/output_delivery_result_v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/output_delivery/journal/output_delivery_result_v1.json"
+        ]
+      }
+    ],
+    "reserved": [],
+    "unimplemented": [
+      "turn"
+    ]
+  },
+  "runtime_package_snapshots": [
+    {
+      "name": "canonical_p0_runtime_package",
+      "fixture": "tests/fixtures/package/runtime-package-canonical-v1.json",
+      "schema": "runtime_package_snapshot"
+    },
+    {
+      "name": "canonical_p0_runtime_package_fingerprint",
+      "fixture": "tests/fixtures/package/runtime-package-fingerprint.json",
+      "schema": "runtime_package_fingerprint"
+    }
+  ],
+  "runtime_package_deltas": [
+    {
+      "name": "activate_hidden_discovery_candidate_next_package",
+      "fixture": "tests/fixtures/golden/runtime-package-delta-activation-v1.json",
+      "schema": "runtime_package_delta"
+    }
+  ],
+  "otel_projections": [
+    {
+      "name": "run_model_tool_projection",
+      "fixture": "tests/fixtures/golden/otel-run-model-tool-v1.json",
+      "schema": "otel_projection"
+    },
+    {
+      "name": "stream_realtime_projection",
+      "fixture": "tests/fixtures/stream_realtime/otel/stream_realtime_projection_v1.json",
+      "schema": "otel_projection"
+    }
+  ],
+  "extension_protocol_records": [
+    {
+      "name": "protocol_response_mismatch_recovery",
+      "fixture": "tests/fixtures/extensions/protocol-error-recovery.json",
+      "schema": "extension_protocol_recovery"
+    }
+  ],
+  "extension_action_records": [
+    {
+      "name": "host_action_intent_result",
+      "fixture": "tests/fixtures/extensions/action-intent-result.json",
+      "schema": "extension_action_records"
+    }
+  ],
+  "referenced_fixture_families": [
+    {
+      "family": "replay",
+      "owned_by": "docs/implementation-workstreams/11-replay-hardening/11b-replay-recovery.md",
+      "paths": [
+        "tests/fixtures/journal/checkpoint.json",
+        "tests/fixtures/journal/recovery-unsafe-pending.json",
+        "tests/fixtures/output_delivery/journal/output_delivery_reconciliation_v1.json",
+        "tests/fixtures/tools/non-idempotent-write-recovery.json"
+      ]
+    },
+    {
+      "family": "privacy",
+      "owned_by": "docs/implementation-workstreams/11-replay-hardening/11c-privacy-performance.md",
+      "paths": [
+        "tests/fixtures/context/projection_audit_redacted.json",
+        "tests/fixtures/isolation/process-io-redaction.json",
+        "tests/fixtures/provider/projected_request_redacted.json",
+        "tests/fixtures/stream_realtime/stream_rule_match_record.json",
+        "tests/fixtures/telemetry/content-capture-denial.json"
+      ]
+    }
+  ],
+  "redaction_cases": [
+    {
+      "family": "events",
+      "paths": [
+        "tests/fixtures/events/run_started.json",
+        "tests/fixtures/events/run_completed.json",
+        "tests/fixtures/events/model_stream_delta.json",
+        "tests/fixtures/p0/text-run-events.json",
+        "tests/fixtures/p1/typed-run-events.json"
+      ]
+    },
+    {
+      "family": "journal",
+      "paths": [
+        "tests/fixtures/journal/effect-intent.json",
+        "tests/fixtures/journal/checkpoint.json",
+        "tests/fixtures/journal/recovery-unsafe-pending.json"
+      ]
+    },
+    {
+      "family": "context_provider_output",
+      "paths": [
+        "tests/fixtures/context/projection_audit_redacted.json",
+        "tests/fixtures/provider/projected_request_redacted.json",
+        "tests/fixtures/validated_output/validated-output-record.json"
+      ]
+    },
+    {
+      "family": "stream_realtime_isolation",
+      "paths": [
+        "tests/fixtures/stream_realtime/stream_rule_match_record.json",
+        "tests/fixtures/stream_realtime/realtime_restart_backpressure_records.json",
+        "tests/fixtures/isolation/process-io-redaction.json"
+      ]
+    },
+    {
+      "family": "side_effects",
+      "paths": [
+        "tests/fixtures/tools/read-tool-intent-result.json",
+        "tests/fixtures/output_delivery/journal/output_delivery_intent_v1.json",
+        "tests/fixtures/extensions/action-intent-result.json"
+      ]
+    },
+    {
+      "family": "telemetry_otel",
+      "paths": [
+        "tests/fixtures/telemetry/content-capture-denial.json",
+        "tests/fixtures/golden/otel-run-model-tool-v1.json",
+        "tests/fixtures/stream_realtime/otel/stream_realtime_projection_v1.json"
+      ]
+    }
+  ]
+}

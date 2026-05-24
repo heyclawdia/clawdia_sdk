@@ -17,7 +17,8 @@ The architecture is feature-rich but mostly defensible because the hard parts ar
 | Isolation | `IsolationRequirement::at_least(IsolationClass::Sandbox).prefer("adapter.ref")` builder | capability reports, mount/network/secrets/process lifecycle |
 | Telemetry | default redacted usage/cost sink | OTel mapping, content policy, export health, cost correction |
 | Extensions | manifest plus typed SDK helpers | JSON-RPC protocol, capability gating, browser-safe subpaths |
-| Subagents | parent starts child with bounded request | topology, package stripping, mailbox, event wrapping, rollup |
+| Agent pools | run sends message and waits on event filter | membership, topics, delivery status, wake records, replay |
+| Subagents | parent starts child with bounded request | package stripping, agent-pool messages/wakes, event wrapping, rollup |
 | Output delivery | destination ref plus optional sink | delivery policy, dedupe key, intent/result records, host channel receipts |
 
 ## Opportunities To Simplify
@@ -141,7 +142,8 @@ Scenario examples are valuable because they stress the SDK. They must stay under
 | Stream rules | Provide literal/regex helpers; advanced channel/repeat/privacy options remain explicit. |
 | Tools/approval | Provide opt-in packs; never ambient tools. |
 | Isolation | Builder syntax is good; no silent downgrade. |
-| Subagents | Parent-owned child run is the primitive; no free-form agent society in core. |
+| Agent pools | Coordination scope is the primitive; no workflow/DAG/barrier engine in core. |
+| Subagents | Parent-owned child run is a helper over `AgentPool`; no free-form agent society in core. |
 | Extension SDK | Keep browser-safe helpers and Node ESM smoke tests; marketplace remains host-owned. |
 | Telemetry/privacy | Redacted defaults first; raw content and sink-specific settings advanced. |
 | Output delivery | Destination and sink are primitives; product channel UX stays host-owned. |

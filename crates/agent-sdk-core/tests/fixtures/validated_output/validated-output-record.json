@@ -1,0 +1,204 @@
+{
+  "canonical_value_ref": {
+    "artifact_ref": null,
+    "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content_id": "content.output.canonical.1",
+    "destination_ref": null,
+    "kind": "output_payload",
+    "mime": "application/json",
+    "privacy_class": "content_refs_only",
+    "producer_ref": {
+      "id": "attempt.model.todo.1",
+      "kind": "attempt",
+      "privacy": "content_refs_only"
+    },
+    "redacted_summary": "validated todo extraction canonical JSON",
+    "resolver_ref": "resolver.content.fake",
+    "retention_class": "run_scoped",
+    "scope": "run",
+    "size_bytes": 128,
+    "source_ref": {
+      "id": "source.structured_output.validator",
+      "kind": "sdk",
+      "privacy": "content_refs_only",
+      "trust": "host_provided"
+    },
+    "trust_class": "sdk_generated",
+    "version": "v1"
+  },
+  "content_refs": [
+    {
+      "artifact_ref": null,
+      "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "content_id": "content.output.canonical.1",
+      "destination_ref": null,
+      "kind": "output_payload",
+      "mime": "application/json",
+      "privacy_class": "content_refs_only",
+      "producer_ref": {
+        "id": "attempt.model.todo.1",
+        "kind": "attempt",
+        "privacy": "content_refs_only"
+      },
+      "redacted_summary": "validated todo extraction canonical JSON",
+      "resolver_ref": "resolver.content.fake",
+      "retention_class": "run_scoped",
+      "scope": "run",
+      "size_bytes": 128,
+      "source_ref": {
+        "id": "source.structured_output.validator",
+        "kind": "sdk",
+        "privacy": "content_refs_only",
+        "trust": "host_provided"
+      },
+      "trust_class": "sdk_generated",
+      "version": "v1"
+    },
+    {
+      "artifact_ref": null,
+      "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "content_id": "content.output.candidate.1",
+      "destination_ref": null,
+      "kind": "output_payload",
+      "mime": "application/json",
+      "privacy_class": "content_refs_only",
+      "producer_ref": {
+        "id": "attempt.model.todo.1",
+        "kind": "attempt",
+        "privacy": "content_refs_only"
+      },
+      "redacted_summary": "candidate JSON stored by content ref",
+      "resolver_ref": "resolver.content.fake",
+      "retention_class": "run_scoped",
+      "scope": "run",
+      "size_bytes": 128,
+      "source_ref": {
+        "id": "source.structured_output.validator",
+        "kind": "sdk",
+        "privacy": "content_refs_only",
+        "trust": "host_provided"
+      },
+      "trust_class": "sdk_generated",
+      "version": "v1"
+    },
+    {
+      "artifact_ref": null,
+      "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "content_id": "content.validation.report.1",
+      "destination_ref": null,
+      "kind": "document",
+      "mime": "application/json",
+      "privacy_class": "content_refs_only",
+      "producer_ref": {
+        "id": "attempt.model.todo.1",
+        "kind": "attempt",
+        "privacy": "content_refs_only"
+      },
+      "redacted_summary": "validation report with zero redacted errors",
+      "resolver_ref": "resolver.content.fake",
+      "retention_class": "run_scoped",
+      "scope": "run",
+      "size_bytes": 128,
+      "source_ref": {
+        "id": "source.structured_output.validator",
+        "kind": "sdk",
+        "privacy": "content_refs_only",
+        "trust": "host_provided"
+      },
+      "trust_class": "sdk_generated",
+      "version": "v1"
+    }
+  ],
+  "lineage": {
+    "derived_from": [
+      {
+        "id": "content.output.candidate.1",
+        "kind": "content",
+        "privacy": "content_refs_only"
+      }
+    ],
+    "lineage_ref": {
+      "destination": {
+        "id": "destination.typed.result",
+        "kind": "host",
+        "privacy": "content_refs_only",
+        "retention": "host_policy"
+      },
+      "lineage_id": "lineage.validated.output.todo.1",
+      "policy_refs": [
+        {
+          "id": "policy.output.refs_only",
+          "kind": "privacy"
+        }
+      ],
+      "source": {
+        "id": "source.structured_output.validator",
+        "kind": "sdk",
+        "privacy": "content_refs_only",
+        "trust": "host_provided"
+      }
+    },
+    "produced_by": {
+      "id": "attempt.model.todo.1",
+      "kind": "attempt",
+      "privacy": "content_refs_only"
+    }
+  },
+  "output_id": "validated.output.todo.1",
+  "policy_refs": [
+    {
+      "id": "policy.output.refs_only",
+      "kind": "privacy"
+    }
+  ],
+  "privacy": "content_refs_only",
+  "record_schema_version": 1,
+  "redacted_summary": "todo extraction validated with refs only",
+  "schema_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema_id": "schema.todo_extraction",
+  "schema_version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "source_attempt_ids": [
+    "attempt.model.todo.1"
+  ],
+  "validation_attempts": [
+    "validation.attempt.todo.1"
+  ],
+  "validation_report_refs": [
+    {
+      "redacted_summary": "local validation passed with zero redacted errors",
+      "report_ref": {
+        "artifact_ref": null,
+        "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "content_id": "content.validation.report.1",
+        "destination_ref": null,
+        "kind": "document",
+        "mime": "application/json",
+        "privacy_class": "content_refs_only",
+        "producer_ref": {
+          "id": "attempt.model.todo.1",
+          "kind": "attempt",
+          "privacy": "content_refs_only"
+        },
+        "redacted_summary": "validation report with zero redacted errors",
+        "resolver_ref": "resolver.content.fake",
+        "retention_class": "run_scoped",
+        "scope": "run",
+        "size_bytes": 128,
+        "source_ref": {
+          "id": "source.structured_output.validator",
+          "kind": "sdk",
+          "privacy": "content_refs_only",
+          "trust": "host_provided"
+        },
+        "trust_class": "sdk_generated",
+        "version": "v1"
+      },
+      "status": "passed",
+      "validation_attempt_id": "validation.attempt.todo.1"
+    }
+  ]
+}

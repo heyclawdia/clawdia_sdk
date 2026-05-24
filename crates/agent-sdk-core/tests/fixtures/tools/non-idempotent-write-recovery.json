@@ -1,0 +1,29 @@
+{
+  "records": [
+    {
+      "content_refs": [
+        "content.args.write.1"
+      ],
+      "effect_id": "effect.tool.call.write.1",
+      "effect_kind": "ToolExecution",
+      "journal_seq": 1,
+      "record_kind": "tool_intent",
+      "redacted_summary": "execute tool workspace_write with redacted arguments",
+      "subject_kind": "ToolCall"
+    },
+    {
+      "journal_seq": 2,
+      "record_kind": "recovery",
+      "recovery_reason": "tool terminal result append failed: injected result append failure",
+      "unsafe_pending": [
+        {
+          "dedupe_key": null,
+          "effect_id": "effect.tool.call.write.1",
+          "idempotency_key": null,
+          "intent_record_id": "journal.record.tool.tool.intent",
+          "unsafe_pending_reason": "terminal result append failed after potentially non-idempotent tool execution; policy_refs=policy.approval.write"
+        }
+      ]
+    }
+  ]
+}

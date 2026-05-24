@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "kind": "emitted_event_kind_matrix",
+  "privacy": "content_refs_only",
+  "content_capture": "off",
+  "raw_content_present": false,
+  "events": [
+    {
+      "family": "agent_pool",
+      "kind": "agent_pool_run_left",
+      "redacted_summary": "pool membership event redacted"
+    },
+    {
+      "family": "agent_pool",
+      "kind": "run_message_responded",
+      "redacted_summary": "run message status event redacted"
+    },
+    {
+      "family": "agent_pool",
+      "kind": "run_message_failed",
+      "redacted_summary": "run message status event redacted"
+    },
+    {
+      "family": "agent_pool",
+      "kind": "run_message_timed_out",
+      "redacted_summary": "run message status event redacted"
+    },
+    {
+      "family": "agent_pool",
+      "kind": "run_message_expired",
+      "redacted_summary": "run message status event redacted"
+    },
+    {
+      "family": "agent_pool",
+      "kind": "run_message_cancelled",
+      "redacted_summary": "run message status event redacted"
+    },
+    {
+      "family": "agent_pool",
+      "kind": "wake_condition_failed",
+      "redacted_summary": "wake condition status event redacted"
+    }
+  ]
+}

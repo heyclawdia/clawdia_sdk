@@ -1,0 +1,60 @@
+{
+  "content_capture": "off",
+  "failure_behavior": "emit_telemetry_sink_failed_and_continue",
+  "mcp_dedupe": "merge_or_link_single_usage_owner",
+  "raw_content_attributes_present": false,
+  "schema_url": "https://opentelemetry.io/schemas/1.41.0",
+  "spans": [
+    {
+      "attributes": {
+        "agent_sdk.content_capture": "off",
+        "agent_sdk.event.kind": "run_started",
+        "agent_sdk.privacy": "content_refs_only",
+        "agent_sdk.redaction.policy_id": "policy.redaction.default",
+        "agent_sdk.run.id": "run.golden.1",
+        "agent_sdk.runtime_package.fingerprint": "sha256:runtime-package-canonical-v1:0960749181be6a3b5f26945235cc3fb9a0f9120c9a2c557e5675d90468b06555",
+        "agent_sdk.source.kind": "sdk",
+        "gen_ai.agent.id": "agent.contract",
+        "gen_ai.agent.name": "contract agent",
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.provider.name": "fake"
+      },
+      "kind": "INTERNAL",
+      "name": "invoke_agent contract agent"
+    },
+    {
+      "attributes": {
+        "agent_sdk.attempt.id": "attempt.golden.1",
+        "agent_sdk.event.kind": "model_message_completed",
+        "agent_sdk.journal.cursor": "journal.6",
+        "agent_sdk.turn.id": "turn.golden.1",
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "fake",
+        "gen_ai.request.model": "model.fake.p0",
+        "gen_ai.response.model": "model.fake.p0",
+        "gen_ai.usage.input_tokens": 3,
+        "gen_ai.usage.output_tokens": 4
+      },
+      "kind": "CLIENT",
+      "name": "chat model.fake.p0",
+      "parent": "invoke_agent contract agent"
+    },
+    {
+      "attributes": {
+        "agent_sdk.event.kind": "tool_completed",
+        "agent_sdk.policy.decision_ids": [
+          "policy.approval.workspace_read"
+        ],
+        "agent_sdk.redaction.policy_id": "policy.redaction.default",
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.call.id": "tool.call.golden.1",
+        "gen_ai.tool.name": "workspace_read",
+        "gen_ai.tool.type": "function"
+      },
+      "kind": "INTERNAL",
+      "name": "execute_tool workspace_read",
+      "parent": "invoke_agent contract agent"
+    }
+  ],
+  "stability_opt_in": "gen_ai_latest_experimental"
+}

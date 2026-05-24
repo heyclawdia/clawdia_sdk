@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "bounded_capacity": 2,
+  "delivered_kinds": [
+    "model_stream_delta",
+    "run_completed"
+  ],
+  "overflow": {
+    "policy": "drop_non_terminal",
+    "dropped_count": 2,
+    "gap_start": {
+      "scope": {
+        "run": "run.privacy"
+      },
+      "event_seq": 2,
+      "event_id": "event.privacy.2"
+    },
+    "gap_end": {
+      "scope": {
+        "run": "run.privacy"
+      },
+      "event_seq": 3,
+      "event_id": "event.privacy.3"
+    },
+    "terminal_preserved": true,
+    "reason": "policy_dropped_non_terminal"
+  },
+  "raw_content_absent": true
+}

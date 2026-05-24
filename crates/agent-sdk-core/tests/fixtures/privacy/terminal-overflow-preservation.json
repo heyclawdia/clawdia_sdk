@@ -1,0 +1,35 @@
+{
+  "event_overflow": {
+    "dropped_count": 5,
+    "gap_end": {
+      "event_id": "event.privacy.9",
+      "event_seq": 9,
+      "journal_cursor": "journal.terminal.9",
+      "scope": {
+        "run": "run.privacy"
+      }
+    },
+    "policy": "drop_non_terminal",
+    "reason": "policy_dropped_non_terminal",
+    "repair_from": "journal.terminal.9",
+    "terminal_preserved": true
+  },
+  "queued_projection_kind": "run_terminal",
+  "telemetry_failure": {
+    "dropped_count": 1,
+    "failure_kind": "overflow",
+    "last_acknowledged_cursor": {
+      "export_seq": 0,
+      "sink_id": "telemetry.terminal.overflow"
+    },
+    "redacted_summary": "telemetry terminal projection preserved by dropping non-terminal progress",
+    "repair_cursor": {
+      "cursor": "journal.terminal.9",
+      "type": "journal"
+    },
+    "sink_id": "telemetry.terminal.overflow",
+    "sink_kind": "test",
+    "terminal_preserved": true,
+    "unsafe_pending_reason": null
+  }
+}

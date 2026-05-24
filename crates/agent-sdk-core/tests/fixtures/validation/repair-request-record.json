@@ -1,0 +1,48 @@
+{
+  "attempt_index": 1,
+  "max_repair_attempts": 2,
+  "output_schema_version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "privacy": "content_refs_only",
+  "prompt": {
+    "attempt_index": 1,
+    "candidate_content": {
+      "candidate_content_ref": "content.validation.repair_initial",
+      "type": "content_ref_only"
+    },
+    "include_schema_in_prompt": true,
+    "max_repair_attempts": 2,
+    "output_schema_version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    },
+    "prompt_summary": "repair structured output for schema schema.todo_validation using redacted validation errors",
+    "record_schema_version": 1,
+    "redacted_errors": [
+      {
+        "code": "missing_required_field",
+        "path": "/title",
+        "redacted_summary": "required schema field is missing"
+      }
+    ],
+    "repair_adapter_ref": "repair.output.provider_redacted.v1",
+    "repair_attempt_id": "repair.validation.attempt.repair_initial.1",
+    "schema_fingerprint": "sha256:9ab0baebea81acca5fedf196c57bf32d7dbf6ee542979c53614953f5fecaa9d8",
+    "schema_id": "schema.todo_validation",
+    "source_attempt_id": "attempt.repair_initial",
+    "validation_attempt_id": "validation.attempt.repair_initial"
+  },
+  "record_kind": "repair_requested",
+  "record_schema_version": 1,
+  "redacted_summary": "repair attempt 1 requested after validation failure",
+  "repair_adapter_ref": "repair.output.provider_redacted.v1",
+  "repair_attempt_id": "repair.validation.attempt.repair_initial.1",
+  "schema_fingerprint": "sha256:9ab0baebea81acca5fedf196c57bf32d7dbf6ee542979c53614953f5fecaa9d8",
+  "schema_id": "schema.todo_validation",
+  "source_attempt_id": "attempt.repair_initial",
+  "validation_attempt_id": "validation.attempt.repair_initial"
+}

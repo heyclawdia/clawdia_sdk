@@ -1,0 +1,46 @@
+{
+  "records": [
+    {
+      "backpressure_action": null,
+      "content_refs": [],
+      "kind": "realtime_restart_requested",
+      "raw_media_serialized": false,
+      "receive_cursor": 1,
+      "restart_count": 0,
+      "send_cursor": 1,
+      "status": "restart_requested"
+    },
+    {
+      "backpressure_action": null,
+      "content_refs": [],
+      "kind": "realtime_restart_started",
+      "raw_media_serialized": false,
+      "receive_cursor": 1,
+      "restart_count": 0,
+      "send_cursor": 1,
+      "status": "restart_started"
+    },
+    {
+      "backpressure_action": "gate",
+      "content_refs": [
+        "content.audio.gated"
+      ],
+      "kind": "realtime_backpressure_applied",
+      "raw_media_serialized": false,
+      "receive_cursor": 1,
+      "restart_count": 0,
+      "send_cursor": 1,
+      "status": "backpressure_applied"
+    },
+    {
+      "backpressure_action": "gate",
+      "content_refs": [],
+      "kind": "realtime_restart_completed",
+      "raw_media_serialized": false,
+      "receive_cursor": 1,
+      "restart_count": 1,
+      "send_cursor": 1,
+      "status": "restart_completed"
+    }
+  ]
+}

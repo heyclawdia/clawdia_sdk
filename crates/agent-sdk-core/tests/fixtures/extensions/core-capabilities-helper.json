@@ -1,0 +1,23 @@
+{
+  "actions": [
+    {
+      "action_id": "submit_ui_effect",
+      "action_kind": "host_action",
+      "idempotency": "idempotent_when_keyed",
+      "requested_destination": {
+        "id": "destination.host.ui",
+        "kind": "host",
+        "privacy": "content_refs_only",
+        "retention": "host_policy"
+      },
+      "risk_class": "Medium"
+    }
+  ],
+  "extension_id": "extension.reviewer",
+  "version": "1.2.0",
+  "tools": [
+    {
+      "name": "review_notes"
+    }
+  ]
+}

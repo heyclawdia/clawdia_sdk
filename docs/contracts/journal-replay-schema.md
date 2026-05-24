@@ -97,8 +97,11 @@ Cross-run, all-agent, or arbitrary filtered durable replay belongs to an optiona
 | `ToolRecord` | intent, idempotency key, approval ref, attempt, result, effect metadata |
 | `IsolationRecord` | environment, adapter, mounts, network, process, stats, cleanup |
 | `ChildLifecycleRecord` | child artifact ownership, shutdown intent/result, detach intent/ack, reclaim policy/result |
+| `AgentPoolRecord` | pool membership, topics, policy refs, and pool lifecycle state |
+| `RunMessageRecord` | run-to-run message delivery, reply correlation, delivery status, timeout, and idempotency |
+| `WakeRecord` | event-filter wake registration, trigger, timeout, cancellation, and resume input policy |
 | `OutputDispatchRecord` | destination, dedupe key, ack/failure, reconciliation state |
-| `SubagentRecord` | parent/child IDs, handoff, child policy, usage rollup, terminal state |
+| `SubagentRecord` | higher-order child-run supervision, handoff, child policy, usage rollup, terminal state |
 | `TelemetryRecord` | usage, cost, sink health, export cursor, corrections |
 | `RecoveryRecord` | invariant failures, replay mode, repair plan, repair status |
 
@@ -143,6 +146,7 @@ pub enum EffectKind {
     ProcessSignal,
     IsolatedProcessStart,
     ChildAgentStart,
+    RunMessageDelivery,
     ChildArtifactShutdown,
     DetachTransfer,
     HookMutation,
@@ -150,6 +154,12 @@ pub enum EffectKind {
 ```
 
 The common effect fields are required for idempotency, dedupe, policy review, privacy, replay, and anti-entropy. Feature contracts may add typed payload fields, but intent-before-effect remains the shared rule.
+
+`RunMessageDelivery` is used only when delivery mutates another run, wakes a
+parked run, crosses process/runtime boundaries, or has externally visible
+effects. Purely local bookkeeping can stay inside `RunMessageRecord`, but it
+must still preserve idempotency, policy refs, content refs, and replay
+semantics.
 
 Phase 05 feature layers use existing effect kinds unless stitching explicitly adds a new shared kind. Stream interventions are represented by `StreamRuleRecord` intent/result payloads and by the provider, approval, output-delivery, or realtime effect they trigger; they do not introduce a separate `EffectKind::StreamIntervention`. Isolation adapter operations use typed `IsolationRecord::*Intent/Result` payloads that map one-to-one to the common effect fields until implementation needs narrower shared `EffectKind` variants for image, rootfs, session, mount, network, secret, or cleanup work.
 
@@ -186,6 +196,7 @@ Required side-effect intent records:
 - accepted hook proposal lowered to a domain operation
 - hook response that mutates run behavior through an existing domain operation
 - memory write
+- run-message delivery when delivery mutates another run, wakes a parked run, or crosses a runtime boundary
 - extension action
 - process signal or termination
 - isolated process start

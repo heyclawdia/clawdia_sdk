@@ -1,0 +1,18 @@
+{
+  "content_store_lookup_count": 0,
+  "indexed_fields": [
+    "run_id",
+    "event_family",
+    "event_kind",
+    "privacy"
+  ],
+  "journal_scan_count": 0,
+  "matched_envelope": true,
+  "payload_access": "envelope_only",
+  "payload_parse_count": 0,
+  "queue": {
+    "capacity": 4,
+    "overflow": "drop_non_terminal",
+    "terminal_reserve": 1
+  }
+}

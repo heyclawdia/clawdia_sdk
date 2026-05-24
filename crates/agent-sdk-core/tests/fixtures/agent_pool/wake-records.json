@@ -1,0 +1,71 @@
+{
+  "records": [
+    {
+      "condition_id": "wake.agent_pool.trigger",
+      "event_kind": "wake_condition_registered",
+      "idempotency_key": "idem.wake.agent_pool.trigger",
+      "matched_event_id": null,
+      "record_kind": "wake",
+      "resume_policy": "matching_event_refs",
+      "run_id": "run.pool.parent",
+      "timeout_millis": null,
+      "trigger_status": "registered"
+    },
+    {
+      "condition_id": "wake.agent_pool.trigger",
+      "event_kind": "wake_condition_triggered",
+      "idempotency_key": "idem.wake.agent_pool.trigger",
+      "matched_event_id": "event.runtime.1",
+      "record_kind": "wake",
+      "resume_policy": "matching_event_refs",
+      "run_id": "run.pool.parent",
+      "timeout_millis": null,
+      "trigger_status": "triggered"
+    },
+    {
+      "condition_id": "wake.agent_pool.timeout",
+      "event_kind": "wake_condition_registered",
+      "idempotency_key": "idem.wake.agent_pool.timeout",
+      "matched_event_id": null,
+      "record_kind": "wake",
+      "resume_policy": "matching_event_refs",
+      "run_id": "run.pool.parent",
+      "timeout_millis": 0,
+      "trigger_status": "registered"
+    },
+    {
+      "condition_id": "wake.agent_pool.timeout",
+      "event_kind": "wake_condition_timed_out",
+      "idempotency_key": "idem.wake.agent_pool.timeout",
+      "matched_event_id": null,
+      "record_kind": "wake",
+      "resume_policy": "matching_event_refs",
+      "run_id": "run.pool.parent",
+      "timeout_millis": 0,
+      "trigger_status": "timed_out"
+    },
+    {
+      "condition_id": "wake.agent_pool.cancel",
+      "event_kind": "wake_condition_registered",
+      "idempotency_key": "idem.wake.agent_pool.cancel",
+      "matched_event_id": null,
+      "record_kind": "wake",
+      "resume_policy": "matching_event_refs",
+      "run_id": "run.pool.parent",
+      "timeout_millis": null,
+      "trigger_status": "registered"
+    },
+    {
+      "condition_id": "wake.agent_pool.cancel",
+      "event_kind": "wake_condition_cancelled",
+      "idempotency_key": "idem.wake.agent_pool.cancel",
+      "matched_event_id": null,
+      "record_kind": "wake",
+      "resume_policy": "matching_event_refs",
+      "run_id": "run.pool.parent",
+      "timeout_millis": null,
+      "trigger_status": "cancelled"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,12 @@
+{
+  "records": [
+    {
+      "policy_refs": [
+        "policy.extension.protocol"
+      ],
+      "reason": "extension protocol response id mismatch",
+      "record_kind": "recovery",
+      "unsafe_pending_count": 0
+    }
+  ]
+}

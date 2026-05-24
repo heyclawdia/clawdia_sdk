@@ -12,7 +12,7 @@ Implement runtime control surfaces after core records exist. All launch targets 
 
 ## Exit Gate
 
-- [ ] Runtime, state-machine, and handle tests pass independently.
-- [ ] Cancellation/status/reconnect surfaces compile without a provider run loop.
-- [ ] No duplicate event, journal, package, or policy path appears.
-- [ ] Phase exit report records reviewer PASS.
+- [x] Runtime, state-machine, and handle tests pass independently.
+- [x] Cancellation/status/reconnect surfaces compile without a provider run loop.
+- [x] No duplicate event, journal, package, or policy path appears.
+- [x] Phase exit report records reviewer PASS.

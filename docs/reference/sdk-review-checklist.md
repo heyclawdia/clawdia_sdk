@@ -49,6 +49,8 @@ The review goal is to protect the SDK as a long-lived developer platform: simple
 | Optional layers | Should the behavior live in toolkit, isolation, OTel, workflow, or host adapter instead of core? |
 | Public API stability | Are public Rust types future-proof and SemVer-conscious? |
 | Testability | Are fake adapters, golden events, journal fixtures, smoke tests, and acceptance tests named? |
+| Package topology | Does the code follow the SDK responsibility layout (`domain`, `package`, `records`, `ports`, `application`/`runtime`, `testing`), with only facade/shim files at package roots? Are generated/spec-derived surfaces separated from hand-written runtime logic? |
+| Public facade | Are new public modules, deep-import paths, and re-exports reviewed for SemVer/API stability? Is downstream test-kit support exposed through `agent_sdk_core::testing`? |
 | Documentation | Does the contract say SDK owns and host owns? Are open questions decisions or deferrals? |
 
 ## Review Output Format
@@ -75,6 +77,8 @@ Suggested fix:
 - Core:
 - Optional crate:
 - Host-owned:
+- Package topology / DDD ownership:
+- Public facade / test-kit namespace:
 
 ## Event/Journal Pass
 

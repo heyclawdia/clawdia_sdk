@@ -1,0 +1,22 @@
+{
+  "child_agent_id": "agent.subagent.worker",
+  "handoff_policy_variant": "none",
+  "lifecycle_policy_ref": {
+    "id": "policy.child.parent_owned",
+    "kind": "runtime_package"
+  },
+  "recursive_subagent_strip": true,
+  "redaction_policy_ref": {
+    "id": "policy.redaction.subagent.default",
+    "kind": "redaction"
+  },
+  "retained_capability_ids": [
+    "tool.workspace_read"
+  ],
+  "schema_version": 1,
+  "selected_provider_route_id": "provider.fake",
+  "stripped_capability_ids": [
+    "agent_as_tool.reviewer",
+    "tool.subagent_send_message"
+  ]
+}

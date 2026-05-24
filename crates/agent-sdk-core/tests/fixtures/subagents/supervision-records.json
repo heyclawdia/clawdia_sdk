@@ -1,0 +1,56 @@
+{
+  "journal": {
+    "effect_intents": [
+      {
+        "content_refs": [
+          "content.subagent.initial.one"
+        ],
+        "destination_kind": "subagent",
+        "effect_kind": "child_agent_start",
+        "record_kind": "effect_intent",
+        "subject_kind": "subagent_run"
+      }
+    ],
+    "run_messages": [
+      {
+        "content_ref": "content.subagent.initial.one",
+        "delivered_to": [
+          "run.subagent.one.child"
+        ],
+        "delivery_status": "accepted",
+        "effect_intent_kind": "run_message_delivery",
+        "effect_result_status": null,
+        "event_kind": "run_message_accepted",
+        "message_id": "message.subagent.request.one.initial"
+      },
+      {
+        "content_ref": "content.subagent.initial.one",
+        "delivered_to": [
+          "run.subagent.one.child"
+        ],
+        "delivery_status": "delivered",
+        "effect_intent_kind": null,
+        "effect_result_status": "completed",
+        "event_kind": "run_message_delivered",
+        "message_id": "message.subagent.request.one.initial"
+      }
+    ],
+    "wake_records": [
+      {
+        "condition_id": "wake.subagent.child.done",
+        "event_kind": "wake_condition_registered",
+        "trigger_status": "registered"
+      },
+      {
+        "condition_id": "wake.subagent.child.done",
+        "event_kind": "wake_condition_triggered",
+        "trigger_status": "triggered"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "subagent_records": [
+    "subagent_started",
+    "subagent_handoff"
+  ]
+}

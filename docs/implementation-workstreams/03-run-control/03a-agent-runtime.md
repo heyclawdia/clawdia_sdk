@@ -20,10 +20,11 @@ Implement `Agent`, `AgentBuilder`, `AgentRuntime`, run registry shell, port regi
 
 ## Owned Implementation Surface
 
-- `crates/agent-sdk-core/src/agent.rs`
-- `crates/agent-sdk-core/src/runtime.rs`
-- `crates/agent-sdk-core/src/ports.rs`
-- `crates/agent-sdk-core/tests/runtime_contract.rs`
+- `crates/agent-sdk-core/src/application/agent.rs`
+- `crates/agent-sdk-core/src/application/runtime.rs`
+- `crates/agent-sdk-core/src/ports/mod.rs`
+- `crates/agent-sdk-core/tests/runtime/runtime_contract.rs`
+- root Cargo test-target shim `crates/agent-sdk-core/tests/runtime_contract.rs`
 
 ## Must Deliver
 
@@ -36,6 +37,7 @@ Implement `Agent`, `AgentBuilder`, `AgentRuntime`, run registry shell, port regi
 
 - `cargo test -p agent-sdk-core --test runtime_contract`
 - compile test for core without optional crates
+- SDK package architecture audit for root facades and runtime test shims
 - test that missing required ports return typed `AgentError` and fail closed
 
 ## Must Not

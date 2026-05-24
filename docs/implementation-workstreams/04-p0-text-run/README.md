@@ -10,7 +10,7 @@ Integrate the first fake-provider text run. This phase is intentionally single-t
 
 ## Exit Gate
 
-- [ ] P0 fake-provider text run passes through the canonical loop.
-- [ ] P0 does not require tools, approvals, isolation, extensions, subagents, realtime, telemetry exporters, or typed output.
-- [ ] Events and journal records prove durable lifecycle and terminal result.
-- [ ] Phase exit report records reviewer PASS.
+- [x] P0 fake-provider text run passes through the canonical loop.
+- [x] P0 does not require tools, approvals, isolation, extensions, subagents, realtime, telemetry exporters, or typed output.
+- [x] Events and journal records prove durable lifecycle and terminal result.
+- [x] Phase exit report records reviewer PASS.

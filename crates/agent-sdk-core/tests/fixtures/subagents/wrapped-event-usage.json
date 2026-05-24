@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "usage_records": [
+    {
+      "child_run_id": "run.subagent.wrap.child",
+      "child_usage_ref": "usage.child.1",
+      "cost_micros": 12,
+      "parent_run_id": "run.subagent.wrap.parent",
+      "terminal_status": "completed",
+      "total_tokens": 8
+    }
+  ],
+  "wrapped": {
+    "child_run_id": "run.subagent.wrap.child",
+    "cursor": "journal.child.9",
+    "journal_ref": {
+      "journal_partition_ref": "journal.run.run.subagent.wrap.child",
+      "run_id": "run.subagent.wrap.child"
+    },
+    "original_kind": "run_completed",
+    "privacy": "content_refs_only"
+  }
+}

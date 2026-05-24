@@ -1,0 +1,23 @@
+{
+  "effect_id": "effect.hook.audit.before_tool.hook.invocation.1",
+  "kind": "hook_mutation",
+  "policy_refs": [
+    {
+      "id": "policy.hooks.before_tool",
+      "kind": "runtime_package"
+    }
+  ],
+  "redacted_summary": "accepted hook response Deny",
+  "source": {
+    "id": "audit.before_tool",
+    "kind": "hook",
+    "privacy": "content_refs_only",
+    "trust": "host_provided"
+  },
+  "subject_ref": {
+    "id": "audit.before_tool",
+    "kind": "hook",
+    "privacy": "content_refs_only"
+  },
+  "type": "effect_intent"
+}

@@ -1,0 +1,19 @@
+{
+  "hook_id": "audit.before_tool",
+  "payload": {
+    "decision": "accepted_journaled_before_apply",
+    "invocation_id": "hook.invocation.1",
+    "mutation_right_decision": "checked_against_point_and_spec_rights",
+    "response_class": "deny",
+    "target_domain_refs": [
+      {
+        "id": "audit.before_tool",
+        "kind": "hook",
+        "privacy": "content_refs_only"
+      }
+    ],
+    "type": "response_decision"
+  },
+  "point": "before_tool_call",
+  "schema_version": 1
+}

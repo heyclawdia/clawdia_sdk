@@ -1,0 +1,498 @@
+{
+  "matrix": [
+    {
+      "destination_kind": "output_sink",
+      "effect_kinds": [
+        "provider_request",
+        "approval_dispatch",
+        "tool_execution",
+        "output_delivery"
+      ],
+      "event_families": [
+        "run",
+        "context",
+        "model",
+        "approval",
+        "tool",
+        "output_delivery"
+      ],
+      "event_kinds": [
+        "run_started",
+        "provider_request_projected",
+        "approval_requested",
+        "tool_started",
+        "output_dispatch_completed"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_journal",
+        "in_memory_journal",
+        "fake_provider",
+        "in_memory_journal",
+        "scripted_approval_dispatcher",
+        "in_memory_journal",
+        "scripted_tool_executor",
+        "in_memory_journal",
+        "scripted_output_sink",
+        "in_memory_event_bus"
+      ],
+      "host_owned_boundaries": [
+        "desktop or web chat UI",
+        "approval prompt copy",
+        "conversation store",
+        "display event transport"
+      ],
+      "journal_records": [
+        "run",
+        "context",
+        "model_attempt",
+        "approval",
+        "tool",
+        "output_dispatch"
+      ],
+      "sdk_primitives": [
+        "AgentRuntime",
+        "RunRequest",
+        "ContextAssembler",
+        "RuntimePackage",
+        "ProviderAdapter",
+        "ApprovalBroker",
+        "ToolExecutor",
+        "OutputSink"
+      ],
+      "source_kind": "host",
+      "workflow": "desktop_web_chat_approval"
+    },
+    {
+      "destination_kind": "output_sink",
+      "effect_kinds": [
+        "approval_dispatch"
+      ],
+      "event_families": [
+        "run",
+        "approval",
+        "tool"
+      ],
+      "event_kinds": [
+        "approval_dispatch_unavailable",
+        "approval_denied",
+        "tool_denied"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_journal",
+        "scripted_approval_dispatcher",
+        "in_memory_journal",
+        "scripted_approval_dispatcher"
+      ],
+      "host_owned_boundaries": [
+        "terminal prompt",
+        "scheduler",
+        "escalation manager",
+        "approval transport"
+      ],
+      "journal_records": [
+        "run",
+        "approval",
+        "tool"
+      ],
+      "sdk_primitives": [
+        "SourceRef",
+        "DestinationRef",
+        "EscalationPolicy",
+        "ApprovalBroker",
+        "ToolExecutor",
+        "OutputSink"
+      ],
+      "source_kind": "scheduled_task",
+      "workflow": "cli_headless_approval"
+    },
+    {
+      "destination_kind": "remote_channel",
+      "effect_kinds": [
+        "output_delivery"
+      ],
+      "event_families": [
+        "run",
+        "output_delivery"
+      ],
+      "event_kinds": [
+        "output_dispatch_requested",
+        "output_dispatch_deduped",
+        "output_dispatch_completed"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_journal",
+        "fake_remote_channel",
+        "in_memory_journal",
+        "fake_remote_channel"
+      ],
+      "host_owned_boundaries": [
+        "remote channel transport",
+        "message database",
+        "ack lookup",
+        "retry scheduler"
+      ],
+      "journal_records": [
+        "run",
+        "output_dispatch",
+        "recovery"
+      ],
+      "sdk_primitives": [
+        "RemoteChannelAdapter",
+        "RunRequest",
+        "DestinationRef",
+        "OutputSink",
+        "DedupeKey",
+        "RunJournal"
+      ],
+      "source_kind": "remote_channel",
+      "workflow": "remote_output_dedupe"
+    },
+    {
+      "destination_kind": "output_sink",
+      "effect_kinds": [
+        "provider_request",
+        "output_delivery"
+      ],
+      "event_families": [
+        "realtime",
+        "stream_rule",
+        "approval",
+        "output_delivery"
+      ],
+      "event_kinds": [
+        "realtime_restart_requested",
+        "realtime_restart_started",
+        "stream_rule_matched",
+        "stream_intervention_applied",
+        "realtime_restart_completed"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_journal",
+        "scripted_realtime_adapter",
+        "in_memory_journal",
+        "scripted_output_sink",
+        "scripted_realtime_adapter"
+      ],
+      "host_owned_boundaries": [
+        "microphone permission",
+        "wake or listening UI",
+        "audio rendering",
+        "approval token transport"
+      ],
+      "journal_records": [
+        "realtime_session",
+        "stream_rule",
+        "approval",
+        "output_dispatch"
+      ],
+      "sdk_primitives": [
+        "RealtimeSessionSidecar",
+        "RealtimeProviderAdapter",
+        "StreamDelta",
+        "StreamRuleEngine",
+        "StreamIntervention",
+        "ApprovalBroker",
+        "ContentRef"
+      ],
+      "source_kind": "extension",
+      "workflow": "realtime_stream_safeguard"
+    },
+    {
+      "destination_kind": "output_sink",
+      "effect_kinds": [
+        "provider_request",
+        "output_delivery"
+      ],
+      "event_families": [
+        "structured_output",
+        "stream_rule",
+        "output_delivery"
+      ],
+      "event_kinds": [
+        "structured_output_validation_started",
+        "structured_output_repair_requested",
+        "structured_output_validated",
+        "output_dispatch_completed"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_journal",
+        "in_memory_journal",
+        "in_memory_journal",
+        "scripted_output_sink",
+        "scripted_output_sink"
+      ],
+      "host_owned_boundaries": [
+        "schema authoring UI",
+        "business scoring",
+        "form rendering",
+        "sink credentials"
+      ],
+      "journal_records": [
+        "structured_output",
+        "stream_rule",
+        "output_dispatch"
+      ],
+      "sdk_primitives": [
+        "OutputContract",
+        "StructuredOutputValidator",
+        "ValidatedOutput",
+        "StreamRuleEngine",
+        "OutputSink",
+        "EffectIntent"
+      ],
+      "source_kind": "host",
+      "workflow": "structured_output"
+    },
+    {
+      "destination_kind": "provider",
+      "effect_kinds": [
+        "provider_request",
+        "memory_write"
+      ],
+      "event_families": [
+        "context",
+        "recovery",
+        "model"
+      ],
+      "event_kinds": [
+        "context_assembled",
+        "run_checkpointed",
+        "replay_completed",
+        "provider_request_projected"
+      ],
+      "fake_ports": [
+        "fake_memory_port",
+        "in_memory_journal",
+        "in_memory_checkpoint_store",
+        "in_memory_journal",
+        "in_memory_journal",
+        "fake_provider",
+        "fake_memory_port"
+      ],
+      "host_owned_boundaries": [
+        "memory backend",
+        "memory browsing UI",
+        "memory ingestion product",
+        "extension proposal source"
+      ],
+      "journal_records": [
+        "context",
+        "checkpoint",
+        "recovery",
+        "model_attempt"
+      ],
+      "sdk_primitives": [
+        "ContextContribution",
+        "ContextAssembler",
+        "ContextProjection",
+        "ContextProjectionAudit",
+        "MemoryPort",
+        "CheckpointStore"
+      ],
+      "source_kind": "memory",
+      "workflow": "memory_context_compaction"
+    },
+    {
+      "destination_kind": "external_runtime",
+      "effect_kinds": [
+        "file_write",
+        "isolated_process_start"
+      ],
+      "event_families": [
+        "tool",
+        "isolation",
+        "recovery",
+        "telemetry"
+      ],
+      "event_kinds": [
+        "tool_started",
+        "isolation_environment_prepared",
+        "isolation_process_started",
+        "tool_recovery_required",
+        "usage_recorded"
+      ],
+      "fake_ports": [
+        "scripted_tool_executor",
+        "in_memory_journal",
+        "fake_isolation_runtime",
+        "fake_anti_entropy_scanner",
+        "scripted_telemetry_sink",
+        "fake_isolation_runtime"
+      ],
+      "host_owned_boundaries": [
+        "installed tool packs",
+        "workspace policy",
+        "concrete runtime",
+        "repair scheduler"
+      ],
+      "journal_records": [
+        "tool",
+        "isolation",
+        "effect_intent",
+        "effect_result",
+        "recovery",
+        "telemetry"
+      ],
+      "sdk_primitives": [
+        "ToolPack",
+        "CapabilitySpec",
+        "HookSpec",
+        "IsolationRuntime",
+        "EffectIntent",
+        "EffectResult",
+        "AntiEntropyJob"
+      ],
+      "source_kind": "tool",
+      "workflow": "tool_pack_isolation_repair"
+    },
+    {
+      "destination_kind": "agent_pool",
+      "effect_kinds": [
+        "child_agent_start",
+        "run_message_delivery"
+      ],
+      "event_families": [
+        "agent_pool",
+        "subagent",
+        "child_lifecycle"
+      ],
+      "event_kinds": [
+        "subagent_started",
+        "run_message_delivered",
+        "subagent_event_wrapped",
+        "subagent_usage_rolled_up"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_journal",
+        "fake_subagent_runtime",
+        "in_memory_journal",
+        "in_memory_event_bus",
+        "in_memory_event_bus"
+      ],
+      "host_owned_boundaries": [
+        "child progress display",
+        "conversation promotion",
+        "provider route registry",
+        "detached-child dashboard"
+      ],
+      "journal_records": [
+        "subagent",
+        "agent_pool",
+        "run_message",
+        "wake",
+        "child_lifecycle"
+      ],
+      "sdk_primitives": [
+        "AgentPool",
+        "RunMessage",
+        "WakeCondition",
+        "SubagentSupervisor",
+        "SubagentRequest",
+        "RuntimePackage",
+        "ContextHandoffPolicy"
+      ],
+      "source_kind": "subagent",
+      "workflow": "subagent_supervision"
+    },
+    {
+      "destination_kind": "host",
+      "effect_kinds": [
+        "approval_dispatch",
+        "extension_action"
+      ],
+      "event_families": [
+        "extension",
+        "approval"
+      ],
+      "event_kinds": [
+        "extension_action_submitted",
+        "approval_requested",
+        "extension_action_started",
+        "extension_action_completed"
+      ],
+      "fake_ports": [
+        "scripted_extension_action_executor",
+        "in_memory_journal",
+        "scripted_approval_dispatcher",
+        "in_memory_journal",
+        "scripted_extension_action_executor",
+        "in_memory_journal"
+      ],
+      "host_owned_boundaries": [
+        "host manifest",
+        "extension runtime",
+        "trust store",
+        "host action adapter"
+      ],
+      "journal_records": [
+        "extension_action",
+        "approval",
+        "effect_intent",
+        "effect_result",
+        "recovery"
+      ],
+      "sdk_primitives": [
+        "CoreExtensionCapabilities",
+        "CapabilityCatalogSnapshot",
+        "ApprovalBroker",
+        "EffectIntent",
+        "EffectResult",
+        "ExtensionActionRecord"
+      ],
+      "source_kind": "extension",
+      "workflow": "extension_action_boundary"
+    },
+    {
+      "destination_kind": "telemetry",
+      "effect_kinds": [
+        "tool_execution"
+      ],
+      "event_families": [
+        "tool",
+        "telemetry",
+        "recovery"
+      ],
+      "event_kinds": [
+        "tool_started",
+        "tool_completed",
+        "usage_recorded",
+        "replay_completed"
+      ],
+      "fake_ports": [
+        "in_memory_journal",
+        "in_memory_event_bus",
+        "in_memory_event_bus",
+        "scripted_telemetry_sink",
+        "in_memory_journal"
+      ],
+      "host_owned_boundaries": [
+        "display event bridge",
+        "bounded display event store",
+        "trace store",
+        "UI selectors"
+      ],
+      "journal_records": [
+        "tool",
+        "telemetry",
+        "recovery"
+      ],
+      "sdk_primitives": [
+        "AgentEventBus",
+        "EventFrame",
+        "EventCursor",
+        "RunJournal",
+        "TelemetrySink",
+        "EventArchive"
+      ],
+      "source_kind": "sdk",
+      "workflow": "live_vs_durable_event_flow"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,79 @@
+{
+  "content_mode": "content_refs_only",
+  "content_refs": [
+    "content.ref.output.final.v1"
+  ],
+  "dedupe_key": "dedupe.output_delivery.cdb2c095339bf84b18c212d8ec0bc8bbfdd656b8dc508ff773af2fb0a462d168",
+  "delivery_id": "output.delivery.39c4ee3054db.final.message",
+  "delivery_kind": {
+    "type": "final_message"
+  },
+  "desired_sink_ref": "sink.output.fixture",
+  "destination": {
+    "id": "destination.output.chat",
+    "kind": "output_sink",
+    "privacy": "content_refs_only",
+    "retention": "host_policy"
+  },
+  "effect_intent": {
+    "content_refs": [
+      "content.ref.output.final.v1"
+    ],
+    "dedupe_key": "dedupe.output_delivery.cdb2c095339bf84b18c212d8ec0bc8bbfdd656b8dc508ff773af2fb0a462d168",
+    "destination": {
+      "id": "destination.output.chat",
+      "kind": "output_sink",
+      "privacy": "content_refs_only",
+      "retention": "host_policy"
+    },
+    "effect_id": "effect.output.delivery.39c4ee3054db.final.message",
+    "idempotency_key": "idempotency.output.delivery.39c4ee3054db.final.message",
+    "kind": "output_delivery",
+    "policy_refs": [
+      {
+        "id": "policy.output.delivery.required",
+        "kind": "host"
+      },
+      {
+        "id": "policy.output.delivery.retry.host-owned",
+        "kind": "host"
+      },
+      {
+        "id": "policy.output.delivery.reconcile.host-owned",
+        "kind": "host"
+      }
+    ],
+    "redacted_summary": "final assistant message ready for output delivery",
+    "source": {
+      "id": "source.sdk.output_delivery",
+      "kind": "sdk",
+      "privacy": "content_refs_only",
+      "trust": "host_provided"
+    },
+    "subject_ref": {
+      "id": "output.delivery.39c4ee3054db.final.message",
+      "kind": "output_delivery",
+      "privacy": "content_refs_only"
+    }
+  },
+  "idempotency_key": "idempotency.output.delivery.39c4ee3054db.final.message",
+  "policy_refs": [
+    {
+      "id": "policy.output.delivery.required",
+      "kind": "host"
+    },
+    {
+      "id": "policy.output.delivery.retry.host-owned",
+      "kind": "host"
+    },
+    {
+      "id": "policy.output.delivery.reconcile.host-owned",
+      "kind": "host"
+    }
+  ],
+  "privacy": "content_refs_only",
+  "redacted_summary": "final assistant message ready for output delivery",
+  "retention": "run_scoped",
+  "runtime_package_fingerprint": "runtime.package.output.delivery.v1",
+  "sink_ref": "sink.output.fixture"
+}

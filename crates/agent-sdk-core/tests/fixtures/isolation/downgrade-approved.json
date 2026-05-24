@@ -1,0 +1,13 @@
+{
+  "capability_gaps": [
+    "ProcessStats",
+    "SecretIsolation"
+  ],
+  "policy_decision_scope": "IsolationDowngrade",
+  "requested_class": "Sandbox",
+  "selected_class": "Sandbox",
+  "status": "DowngradeApproved",
+  "trust_gaps": [
+    "SecretIsolation"
+  ]
+}

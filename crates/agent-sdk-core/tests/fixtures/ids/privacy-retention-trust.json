@@ -1,0 +1,25 @@
+{
+  "privacy": [
+    "public",
+    "internal",
+    "content_refs_only",
+    "sensitive",
+    "secret"
+  ],
+  "retention": [
+    "ephemeral",
+    "run_scoped",
+    "session_scoped",
+    "durable",
+    "persistent",
+    "host_policy"
+  ],
+  "trust": [
+    "trusted",
+    "sdk_generated",
+    "host_provided",
+    "user_provided",
+    "external",
+    "untrusted"
+  ]
+}

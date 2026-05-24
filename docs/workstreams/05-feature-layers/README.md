@@ -2,7 +2,8 @@
 
 Run every goal in this folder in parallel after [Phase 04](../04-side-effects-policy/README.md) exits.
 
-This phase layers streaming, realtime, isolation, subagents, and extensions over the kernel and side-effect spine.
+This phase layers streaming, realtime, isolation, agent-pool/subagent
+coordination, and extensions over the kernel and side-effect spine.
 
 ## Goals
 
@@ -10,7 +11,7 @@ This phase layers streaming, realtime, isolation, subagents, and extensions over
 | --- | --- | --- | --- |
 | [05a Streaming Realtime](05a-streaming-realtime.md) | yes | [05 Streaming](../_roles/05-streaming-realtime-rules.md) | Stream rules, interruptions, realtime lifecycle, and completion semantics. |
 | [05b Isolation Execution](05b-isolation-execution.md) | yes | [06 Isolation](../_roles/06-isolation-execution.md) | Execution environments, adapter capability, process lifecycle, and cleanup. |
-| [05c Subagents](05c-subagents.md) | yes | [07 Subagents](../_roles/07-subagents-coordination.md) | Parent-owned child runs, handoff policy, mailbox, and usage rollup. |
+| [05c Subagents](05c-subagents.md) | yes | [07 Subagents](../_roles/07-subagents-coordination.md) | AgentPool coordination, parent-owned child runs, handoff policy, run-message/wake lowering, and usage rollup. |
 | [05d Extension SDK](05d-extension-sdk.md) | yes | [08 Extension SDK](../_roles/08-extension-sdk-packaging.md) | Extension manifests, core capability mapping, browser-safe exports, and action policy. |
 
 ## Exit Gate

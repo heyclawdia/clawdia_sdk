@@ -1,31 +1,37 @@
 # Subagent Contract
 
-Subagents are parent-owned child runs. They lower into `RunRequest`, stripped child
-`RuntimePackage` snapshots, `RunJournal`, `AgentEvent`, `PolicyRef`, `ContentRef`,
-usage/cost records, and typed refs. They are not user-chatable conversations unless
-a host explicitly promotes them outside the core SDK contract.
+Subagents are parent-owned child-run presets over the generic `AgentPool`
+coordination contract. They lower into `AgentPool`, `RunMessage`,
+`WakeCondition`, child `RunRequest`, stripped child `RuntimePackage` snapshots,
+`RunJournal`, `AgentEvent`, `PolicyRef`, `ContentRef`, usage/cost records, and
+typed refs. They are not user-chatable conversations unless a host explicitly
+promotes them outside the core SDK contract.
 
-This is a feature-layer primitive over the kernel. It must not create a second run
-loop, package registry, event stream, journal, policy path, context pipeline,
-runtime ledger, recursive agent societies, or product UI.
+This is a higher-order feature over agent-pool coordination. It must not create a
+second run loop, package registry, event stream, journal, policy path, context
+pipeline, runtime ledger, recursive agent societies, or product UI.
 
 ## External Lessons
 
 - Strands has multi-agent lifecycle and node stream events. The SDK should adopt explicit lineage and events.
 - Cursor names subagents with prompts/models, but product routing stays outside the core run.
 - The SDK requires stricter safety than free-form agent societies: no direct user chat, no recursive subagent tools by default, route validation, parent-owned cancellation, and child usage rollup.
+- Agent-pool communication is the primitive. Subagent parent-child messaging and
+  clarification behavior are semantic helpers over generic run messages,
+  replies, and wake conditions.
 
 ## Public Shape And Canonical Lowering
 
 ```rust
 // Non-compiling contract sketch.
 pub struct SubagentSupervisor {
-    topology: AgentTopology,
+    pool: AgentPool,
     depth_budget: DepthBudget,
     route_policy: SubagentRoutePolicy,
     default_handoff_policy: ContextHandoffPolicy,
     child_package_policy: ChildRuntimePackagePolicy,
-    mailbox_policy: SubagentMailboxPolicy,
+    message_policy: AgentPoolMessagePolicy,
+    wake_policy: AgentPoolWakePolicy,
     lifecycle_policy: RunChildLifecyclePolicy,
 }
 
@@ -37,10 +43,8 @@ impl SubagentSupervisor {
     ) -> Result<ChildRunHandle, AgentError>;
 
     pub async fn cancel_child(&self, child_run_id: RunId) -> Result<(), AgentError>;
-    pub async fn send_parent_message(&self, message: SubagentParentMessage) -> Result<ParentMessageReceipt, AgentError>;
-    pub async fn ask_parent_for_clarification(&self, request: SubagentClarificationRequest) -> Result<SubagentClarificationResponse, AgentError>;
-    pub async fn answer_child_clarification(&self, reply: SubagentClarificationReply) -> Result<(), AgentError>;
-    pub async fn read_parent_messages(&self, fetch: SubagentParentMessageFetch) -> Result<Vec<SubagentParentMessage>, AgentError>;
+    pub async fn send_message(&self, message: RunMessage) -> Result<MessageReceipt, AgentError>;
+    pub async fn suspend_until(&self, run_id: RunId, condition: WakeCondition) -> Result<WakeRegistration, AgentError>;
     pub fn wrap_child_event(&self, event: AgentEvent) -> Result<AgentEvent, AgentError>;
 }
 
@@ -56,7 +60,8 @@ pub struct SubagentRequest {
     pub context_handoff: ContextHandoffPolicy,
     pub child_package_policy: ChildRuntimePackagePolicy,
     pub child_tool_policy: SubagentToolPolicy,
-    pub mailbox_policy: SubagentMailboxPolicy,
+    pub message_policy_ref: AgentPoolMessagePolicyRef,
+    pub wake_policy_ref: AgentPoolWakePolicyRef,
     pub lifecycle_policy_ref: Option<RunChildLifecyclePolicyRef>,
     pub depth_budget: DepthBudget,
     pub idempotency_key: IdempotencyKey,
@@ -101,13 +106,6 @@ pub struct ChildRuntimePackagePolicy {
     pub child_lifecycle_bounds: RunChildLifecyclePolicyRef,
     pub redaction_policy_ref: PolicyRef,
 }
-
-pub struct SubagentMailboxPolicy {
-    pub max_parent_messages: u32,
-    pub read_scope: ParentMailboxReadScope,
-    pub clarification_timeout_ms: u64,
-    pub parent_reply_policy_ref: PolicyRef,
-}
 ```
 
 `ContextHandoffPolicy::None` is the default. It passes no parent transcript,
@@ -118,21 +116,27 @@ flow through `ContextContribution`, `ContextAssembler`, `ContextItem`, and
 
 `SubagentSupervisor::start_child` is the canonical lowering point:
 
-1. Validate topology, depth, max child count, cycle prevention, route policy,
-   child lifecycle policy, and mailbox policy.
+1. Validate agent-pool membership, depth, max child count, cycle prevention,
+   route policy, child lifecycle policy, message policy, and wake policy.
 2. Build a child `RuntimePackage` snapshot from the parent package by stripping
    recursive subagent capabilities and disallowed tools, then validating every
    provider-visible capability has an executor and policy ref.
 3. Convert allowed handoff content into `ContextContribution` candidates. Only
    policy-admitted items become child `ContextItem` values.
-4. Create a child `RunRequest` with `source = SourceRef::subagent(parent_run_id)`,
+4. Create or join an `AgentPool` scoped to the parent run and child run.
+5. Create a child `RunRequest` with `source = SourceRef::subagent(parent_run_id)`,
    `destination = DestinationRef::child_agent(child_run_id)`, and the stripped
    child package ref.
-5. Append the child-start `EffectIntent` and subagent journal records before the
+6. Append the child-start `EffectIntent` and subagent journal records before the
    child run starts.
-6. Start the child through `AgentRuntime::start_run` or a host-provided child-run
+7. Start the child through `AgentRuntime::start_run` or a host-provided child-run
    adapter that honors the same `RunRequest`, package, journal, event, policy,
    and cancellation contracts.
+8. Deliver parent instructions, child replies, and clarification round trips as
+   `RunMessage` values with `reply_to`, `response_contract`, policy refs, and
+   idempotency keys.
+9. Suspend or resume the parent and child through `WakeCondition` values over
+   message responses, terminal child events, failure, cancellation, or timeout.
 
 Helpers such as `Agent::as_tool` and `RunContext::spawn_child` are only thin
 lowering layers into `CapabilityKind::AgentAsTool` sidecars and
@@ -140,85 +144,61 @@ lowering layers into `CapabilityKind::AgentAsTool` sidecars and
 checks, telemetry projections, failures, package fingerprints, and lifecycle
 records as an explicit advanced request.
 
-The SDK parent-control tool shape:
+The SDK parent-control tool shape remains ergonomic, but each tool lowers to the
+generic agent-pool message/wake contract:
 
-- `subagent_send_message`
-- `subagent_reply_to_clarification`
-- `subagent_ask_parent`
-- `subagent_read_parent_messages`
+- `subagent_send_message` -> `AgentPool::send(RunMessage)`
+- `subagent_reply_to_clarification` -> `AgentPool::send(RunMessage { reply_to })`
+- `subagent_ask_parent` -> `RunMessage { response_contract }` plus `WakeCondition`
+- `subagent_read_parent_messages` -> agent-pool subscription over scoped
+  `RunMessage*` events
 
 The SDK contract must preserve the capability while making the authority boundary explicit. A child can ask the parent for clarification and read scoped parent messages, but it does not become a user-chatable session and does not gain ambient access to the parent transcript.
 
-## Parent Message And Clarification Primitives
+## Agent-Pool Message And Clarification Lowering
 
 ```rust
 // Non-compiling contract sketch.
-pub struct SubagentParentMessage {
-    pub parent_message_id: ParentMessageId,
-    pub parent_run_id: RunId,
-    pub child_run_id: RunId,
-    pub parent_tool_call_id: ToolCallId,
-    pub source: SourceRef,
-    pub destination: DestinationRef,
-    pub content_ref: ContentRef,
-    pub visibility: ParentMessageVisibility,
-    pub policy_refs: Vec<PolicyRef>,
-    pub idempotency_key: IdempotencyKey,
-    pub created_at: Timestamp,
-}
+let question = RunMessage::builder(MessageId::new())
+    .from(child_run_id)
+    .to(RunAddress::run(parent_run_id))
+    .content_ref(ContentRef::new("content/clarification_question_1"))
+    .correlation(EventCorrelation::new("clarification.1"))
+    .response_contract(MessageResponseContract::one_response(Duration::from_secs(300)))
+    .idempotency_key(IdempotencyKey::new("clarification-question-1"))
+    .policy(PolicyRef::new("policy.agent_pool.subagent_message"))
+    .build()?;
 
-pub struct SubagentClarificationRequest {
-    pub clarification_id: ClarificationId,
-    pub parent_run_id: RunId,
-    pub child_run_id: RunId,
-    pub parent_tool_call_id: ToolCallId,
-    pub agent_name: String,
-    pub question_ref: ContentRef,
-    pub policy_refs: Vec<PolicyRef>,
-    pub idempotency_key: IdempotencyKey,
-    pub timeout_ms: u64,
-}
-
-pub struct SubagentClarificationResponse {
-    pub clarification_id: ClarificationId,
-    pub parent_run_id: RunId,
-    pub child_run_id: RunId,
-    pub response_status: ClarificationResponseStatus,
-    pub answer_ref: Option<ContentRef>,
-    pub actor: Option<ActorRef>,
-    pub policy_refs: Vec<PolicyRef>,
-}
-
-pub struct SubagentClarificationReply {
-    pub clarification_id: ClarificationId,
-    pub parent_run_id: RunId,
-    pub child_run_id: RunId,
-    pub parent_tool_call_id: ToolCallId,
-    pub answer_ref: ContentRef,
-    pub actor: ActorRef,
-    pub policy_refs: Vec<PolicyRef>,
-    pub idempotency_key: IdempotencyKey,
-}
+let wake = WakeCondition::message_response(
+    child_run_id,
+    question.message_id,
+    Duration::from_secs(300),
+)?;
 ```
 
 Rules:
 
-- Parent messages are source-scoped to a parent tool call or explicit host action.
-- Child reads require an explicit parent mailbox policy. Selected refs are handoff
-  content, not mailbox authorization. The default handoff is isolated child
-  context with `ContextHandoffPolicy::None`.
-- A child clarification request pauses only the child step unless parent policy escalates it.
-- Parent answers are delivered as child context items with lineage, not as direct user messages.
-- Clarification IDs are unique per parent run and stable across resume.
-- Duplicate parent messages, reads, clarification requests, and replies with the
-  same idempotency key are deduped.
-- Parent-message content uses content refs; raw bodies are omitted from events unless content-capture policy explicitly allows them.
+- Parent-child messages are source-scoped to a parent tool call, child run, or
+  explicit host action through `SourceRef`, `DestinationRef`, and `EntityRef`.
+- Child reads require explicit agent-pool message policy. Selected refs are
+  handoff content, not message authorization. The default handoff is isolated
+  child context with `ContextHandoffPolicy::None`.
+- A child clarification request is just a `RunMessage` with a response contract;
+  it pauses only the child step unless parent policy escalates it.
+- Parent answers are delivered as child context contributions or message refs
+  with lineage, not as direct user messages.
+- Message IDs and wake condition IDs are stable across resume.
+- Duplicate messages, reads, clarification requests, replies, and wake
+  registrations with the same idempotency key are deduped.
+- Message content uses content refs; raw bodies are omitted from events unless
+  content-capture policy explicitly allows them.
 - Clarification question and answer bodies use `ContentRef`; live events and OTel
   projections carry refs, bounded summaries, policy refs, privacy, retention, and
   redaction policy IDs by default.
-- The parent mailbox is not a user-chat transport. It is a parent-owned control
-  surface addressed by typed parent/child refs and replayed from `RunJournal`.
-- A parent may deny, narrow, summarize, or redact a child handoff or clarification
+- The agent-pool message surface is not a user-chat transport. It is a
+  policy-scoped control surface addressed by typed refs and replayed from
+  `RunJournal`.
+- A parent may deny, narrow, summarize, or redact a child handoff or message
   reply. Denial is journaled as a typed policy outcome and returns a typed child
   result, not provider narrative promotion.
 
@@ -268,7 +248,7 @@ Child package fingerprint inputs:
 | `ContextHandoffPolicy` variant and policy refs | included; selected ref IDs are included, raw content is not |
 | child tool policy and retained capability IDs | included |
 | recursive subagent strip manifest | included |
-| mailbox policy | included when mailbox tools are available |
+| agent-pool message/wake policy refs | included when subagent messaging helpers are available |
 | lifecycle policy ref and detach bounds | included |
 | isolation requirements | included when child execution requests isolation |
 | redaction/content-capture/retention refs | included |
@@ -309,10 +289,13 @@ Package-diff fixture names for future implementation:
 - Child events are wrapped as `SubagentEvent` with parent run ID, child run ID,
   child agent ID, child package fingerprint, handoff policy, policy refs,
   source/destination refs, and the original child event kind.
-- Parent appends `SubagentParentMessageSent` before delivering a parent message to a child.
-- Child reads append `SubagentParentMessageRead` with message IDs and read cursor, not raw bodies.
-- Child clarification requests append `SubagentClarificationRequested` before waiting.
-- Parent replies append `SubagentClarificationResponded` before delivery to the child.
+- Parent-to-child instructions, child-to-parent questions, and parent replies
+  use `RunMessageRecord` plus `RunMessage*` events. Subagent records link to
+  those message IDs; they do not define a separate subagent communication
+  protocol.
+- Child clarification waits use `WakeRecord` plus `WakeCondition*` events. The
+  wake filter matches message response, terminal child state, cancellation,
+  failure, or timeout from envelope/index fields.
 - Child journal is a normal SDK `RunJournal` for the child run, linked to the
   parent by typed refs. It is not a separate runtime ledger and cannot introduce
   facts absent from SDK journal records.
@@ -340,21 +323,20 @@ Journal records:
 | `SubagentStartedRecord` | parent run ID, child run ID, parent tool call ID, child package fingerprint, handoff policy, tool policy |
 | `SubagentHandoffRecord` | handoff policy variant, contribution IDs, selected content refs, projection audit ref, policy refs, redaction policy ID |
 | `SubagentWrappedEventRecord` | parent run ID, child run ID, child agent ID, original child event ID/kind, wrapped event ID, child journal cursor, privacy |
-| `SubagentParentMessageRecord` | parent message ID, parent run ID, child run ID, content ref, visibility, delivery status, idempotency key |
-| `SubagentParentMessageReadRecord` | child run ID, read cursor, message IDs returned, policy ref |
-| `SubagentClarificationRequestedRecord` | clarification ID, parent/child run IDs, parent tool call ID, question ref, timeout |
-| `SubagentClarificationRespondedRecord` | clarification ID, actor ref, answer ref, delivery status, idempotency key |
+| `RunMessageRecord` | message ID, source run ID, target run/address, content ref, correlation, reply-to ID, delivery status, policy refs, idempotency key |
+| `WakeRecord` | condition ID, run ID, event filter fingerprint, timeout, resume policy, trigger status, policy refs, idempotency key |
 | `SubagentUsageRolledUpRecord` | child usage ref, parent usage ref, cost/currency, terminal status |
 | `SubagentCompletedRecord` | child terminal status, result ref, error ref, policy outcome |
 | `ChildLifecycleRecord` | child shutdown intent/result or detach intent/ack/reclaim policy |
 
-`SubagentStartedRecord`, `SubagentCompletedRecord`, and `ChildLifecycleRecord` must embed or map one-to-one to the shared effect fields. Child start uses `EffectKind::ChildAgentStart`; parent-driven shutdown uses `EffectKind::ChildArtifactShutdown`; detach uses `EffectKind::DetachTransfer`. Feature-specific records can add child package, mailbox, clarification, and usage fields, but they cannot bypass intent-before-effect or terminal `EffectResult`.
+`SubagentStartedRecord`, `SubagentCompletedRecord`, and `ChildLifecycleRecord` must embed or map one-to-one to the shared effect fields. Child start uses `EffectKind::ChildAgentStart`; parent-driven shutdown uses `EffectKind::ChildArtifactShutdown`; detach uses `EffectKind::DetachTransfer`. Subagent records can add child package, handoff, message IDs, wake IDs, and usage fields, but they cannot bypass intent-before-effect or terminal `EffectResult`.
 
-## Phase 05 Emitted-Kind And Redaction Matrix
+## Subagent Emitted-Kind And Redaction Matrix
 
-Phase 05c may activate only the subagent event kinds that have per-kind payload
-fixtures and redaction cases. These names are the handoff to stitching for
-closing the Phase 04 OTel subagent deferral.
+The subagent helper may activate only subagent event kinds that have per-kind
+payload fixtures and redaction cases. Agent-pool message/wake events are owned by
+the agent-pool contract and linked from subagent records when parent-child
+communication occurs.
 
 | Workstream adapter | Emitted event kind | Future fixture name | Default redaction case |
 | --- | --- | --- | --- |
@@ -364,10 +346,6 @@ closing the Phase 04 OTel subagent deferral.
 | fake subagent runner | `SubagentHandoff` | `events/subagent_handoff_selected_refs_v1.json` | selected `ContentRef` IDs only, no raw content |
 | fake subagent runner | `SubagentHandoff` | `events/subagent_handoff_full_history_policy_v1.json` | projection audit ref, redaction policy ID, no raw transcript |
 | fake subagent runner | `SubagentEvent` | `events/subagent_event_wrapped_child_event_v1.json` | child event envelope refs and redacted child summary only |
-| fake subagent runner | `SubagentParentMessageSent` | `events/subagent_parent_message_sent_v1.json` | parent message `ContentRef`, visibility, policy refs only |
-| fake subagent runner | `SubagentParentMessageRead` | `events/subagent_parent_message_read_v1.json` | read cursor and message IDs only |
-| fake subagent runner | `SubagentClarificationRequested` | `events/subagent_clarification_requested_v1.json` | question `ContentRef`, timeout, policy refs only |
-| fake subagent runner | `SubagentClarificationResponded` | `events/subagent_clarification_responded_v1.json` | answer `ContentRef`, actor ref, policy refs only |
 | fake subagent runner | `SubagentCompleted` | `events/subagent_completed_v1.json` | result/error refs and terminal status only |
 | fake subagent runner | `SubagentFailed` | `events/subagent_failed_v1.json` | typed error ref and retry classification only |
 | fake subagent runner | `SubagentCancelled` | `events/subagent_cancelled_v1.json` | cancellation reason, lifecycle refs, no transcript |
@@ -383,6 +361,9 @@ OTel projection inputs for stitching:
 - `SubagentStarted` opens or links a child run span under the parent run span.
 - `SubagentHandoff` adds span events with handoff policy variant, counts,
   selected content-ref count, projection audit ref, and redaction policy ID.
+- Agent-pool `RunMessage*` and `WakeCondition*` events carry parent-child
+  message and clarification telemetry; subagent spans link to those message and
+  wake IDs instead of exporting separate subagent communication events.
 - `SubagentEvent` links child event IDs/kinds and child journal cursors without
   exporting raw child payload content by default.
 - `SubagentCompleted`, `SubagentFailed`, and `SubagentCancelled` close the child
@@ -436,12 +417,12 @@ The core SDK does not own:
 - `selected_refs_handoff_requires_policy_and_content_refs`
 - `full_history_handoff_requires_policy_projection_audit_and_redaction`
 - `child_can_ask_parent_without_becoming_user_chat`
-- `clarification_round_trip_is_parent_owned`
+- `clarification_round_trip_lowers_to_run_message_and_wake`
 - `duplicate_clarification_reply_is_deduped`
-- `child_read_parent_messages_is_policy_scoped`
-- `parent_message_events_use_content_refs_by_default`
-- `subagent_parent_message_events_are_wrapped`
-- `subagent_clarification_records_replay_after_resume`
+- `child_read_parent_messages_is_policy_scoped_through_agent_pool`
+- `run_message_events_use_content_refs_by_default`
+- `subagent_message_events_link_agent_pool_records`
+- `subagent_clarification_replays_from_run_message_and_wake_records`
 - `agent_as_tool_lowers_to_subagent_request`
 - `simple_spawn_and_explicit_subagent_request_emit_equivalent_events`
 - `subagent_request_lowers_to_child_run_request`
@@ -457,11 +438,11 @@ The core SDK does not own:
 
 Future fixture groups:
 
-- topology matrix: `subagents/topology_depth_cycle_matrix_v1.json`
+- agent-pool/depth matrix: `subagents/agent_pool_depth_cycle_matrix_v1.json`
 - package diffs: `packages/subagent_child_package_diff_strips_recursive_tools_v1.json`
 - handoff policy matrix: `subagents/context_handoff_policy_matrix_v1.json`
-- mailbox flow: `subagents/mailbox_parent_message_flow_v1.json`
-- clarification flow: `subagents/clarification_round_trip_v1.json`
+- agent-pool message flow: `agent_pool/run_message_parent_child_flow_v1.json`
+- wake flow: `agent_pool/wake_condition_clarification_round_trip_v1.json`
 - event wrapping: `events/subagent_event_wrapped_child_event_v1.json`
 - usage rollup: `telemetry/subagent_usage_rollup_v1.json`
 - OTel span: `otel/subagent_child_run_span_v1.json`
@@ -504,7 +485,8 @@ let request = SubagentRequestBuilder::new(AgentId::new("reviewer"))
     .parent_tool_call(parent_tool_call_id)
     .handoff_context(ContextHandoffPolicy::None)
     .route_policy(SubagentRoutePolicy::InheritParentUnlessAllowed)
-    .mailbox_policy(SubagentMailboxPolicy::bounded(20))
+    .message_policy(AgentPoolMessagePolicyRef::new("policy.agent_pool.subagent_message"))
+    .wake_policy(AgentPoolWakePolicyRef::new("policy.agent_pool.subagent_wake"))
     .tool_policy(SubagentToolPolicy::ReadOnly)
     .depth_budget(DepthBudget::max_depth(1))
     .build()?;
@@ -514,8 +496,9 @@ Canonical lowering:
 
 - `Agent::as_tool` lowers into a subagent capability in `RuntimePackage`.
 - `spawn_child("reviewer")` lowers into `SubagentRequest`.
-- `SubagentRequest` lowers into a child `RunRequest` with a stripped
-  `RuntimePackage` snapshot.
+- `SubagentRequest` lowers into `AgentPool` membership, generic `RunMessage`
+  communication, `WakeCondition` waiting, and a child `RunRequest` with a
+  stripped `RuntimePackage` snapshot.
 - Child package construction still strips recursive subagent tools and validates route/model policy.
 - Default handoff remains `ContextHandoffPolicy::None` unless the caller
   explicitly chooses a broader policy.
@@ -523,11 +506,13 @@ Canonical lowering:
 Equivalence:
 
 - Simple and advanced spawn paths emit the same subagent events and journal records.
-- Parent mailbox, clarification, cancellation, and usage rollup behavior are identical.
+- Parent-child messaging, clarification, cancellation, and usage rollup behavior
+  are identical.
 
 SDK owns / Host owns:
 
-- SDK owns helper lowering, child package stripping, parent-owned supervision, mailbox/clarification records, and event wrapping.
+- SDK owns helper lowering, child package stripping, parent-owned supervision,
+  links to agent-pool message/wake records, and event wrapping.
 - Host owns inspector UI, promotion to conversation, concrete child runner, and user-facing names/descriptions.
 - SDK owns child usage/cost rollup records and derived telemetry inputs.
 - Host owns rate tables, billing UI, detached-child dashboards, and product
@@ -562,7 +547,8 @@ let request = SubagentRequest {
     },
     child_package_policy: ChildRuntimePackagePolicy::strip_recursive_defaults(parent_package_fingerprint),
     child_tool_policy: SubagentToolPolicy::ReadOnly,
-    mailbox_policy: SubagentMailboxPolicy::bounded(20),
+    message_policy_ref: AgentPoolMessagePolicyRef::new("policy.agent_pool.subagent_message"),
+    wake_policy_ref: AgentPoolWakePolicyRef::new("policy.agent_pool.subagent_wake"),
     lifecycle_policy_ref: Some(RunChildLifecyclePolicyRef::new("policy.child.parent_owned")),
     depth_budget: DepthBudget::max_depth(1),
     idempotency_key: IdempotencyKey::new("subagent-start-reviewer-1"),
@@ -570,18 +556,17 @@ let request = SubagentRequest {
 
 let child = supervisor.start_child(&parent_context, request).await?;
 
-supervisor.send_parent_message(SubagentParentMessage {
-    parent_message_id: ParentMessageId::new(),
-    parent_run_id,
-    child_run_id: child.child_run_id,
-    parent_tool_call_id,
-    source: SourceRef::parent_agent(parent_run_id),
-    destination: DestinationRef::child_agent(child.child_run_id),
+supervisor.send_message(RunMessage {
+    message_id: MessageId::new(),
+    from: parent_run_id,
+    to: RunAddress::run(child.child_run_id),
     content_ref: ContentRef::new("parent_message/ref_1"),
-    visibility: ParentMessageVisibility::ChildOnly,
-    policy_refs: vec![PolicyRef::new("policy.subagent.mailbox")],
-    idempotency_key: IdempotencyKey::new("parent-message-reviewer-1"),
-    created_at: Timestamp::now(),
+    correlation: EventCorrelation::new("subagent.review.1"),
+    reply_to: None,
+    response_contract: Some(MessageResponseContract::one_response(Duration::from_secs(600))),
+    expires_at: Some(Timestamp::now_plus_secs(600)),
+    policy_refs: vec![PolicyRef::new("policy.agent_pool.subagent_message")],
+    idempotency_key: IdempotencyKey::new("run-message-reviewer-1"),
 }).await?;
 ```
 
@@ -589,7 +574,8 @@ Replaceable ports:
 
 - `SubagentSupervisor` can dispatch to an in-process runner, external agent adapter, or host child-run manager.
 - Child package construction uses runtime package rules and strips recursive subagent tools by default.
-- Parent mailbox and clarification channels are ports, not user chat sessions.
+- Parent-child messages and clarification round trips use `AgentPool`; they are
+  not user chat sessions.
 
 Wiring:
 
@@ -598,18 +584,16 @@ Wiring:
 3. Parent appends child-start `EffectIntent`, `SubagentStartedRecord`, and `SubagentStarted`; child begins only after durable append succeeds.
 4. Handoff content, if any, moves through `SubagentHandoff`, `ContextContribution`, and `ContextProjection` with content refs and redaction policy.
 5. Child events are wrapped into the parent stream as `SubagentEvent` while the child journal remains the durable child-run truth.
-6. Child can ask parent for clarification through `SubagentClarificationRequested`.
+6. Child can ask parent for clarification through `RunMessage { response_contract }`
+   and wait through `WakeCondition`.
 7. Parent rolls up child usage and terminal status once.
 
 Events:
 
 - `SubagentStarted`
 - `SubagentHandoff`
+- agent-pool `RunMessage*` and `WakeCondition*` events
 - wrapped `SubagentEvent`
-- `SubagentParentMessageSent`
-- `SubagentParentMessageRead`
-- `SubagentClarificationRequested`
-- `SubagentClarificationResponded`
 - `SubagentCompleted`, `SubagentFailed`, or `SubagentCancelled`
 - `SubagentUsageRolledUp`
 
@@ -618,10 +602,8 @@ Journal:
 - `SubagentStartedRecord`
 - `SubagentHandoffRecord`
 - `SubagentWrappedEventRecord`
-- `SubagentParentMessageRecord`
-- `SubagentParentMessageReadRecord`
-- `SubagentClarificationRequestedRecord`
-- `SubagentClarificationRespondedRecord`
+- `RunMessageRecord`
+- `WakeRecord`
 - `SubagentUsageRolledUpRecord`
 - `SubagentCompletedRecord`
 - `ChildLifecycleRecord`
@@ -632,18 +614,21 @@ Policies and failures:
 - Child cannot be addressed as a normal user chat.
 - Parent cancellation cancels child.
 - Parent completion requires terminal child state, usage rollup, or explicit detach records.
-- Duplicate clarification replies are deduped by idempotency key.
+- Duplicate clarification replies are deduped by run-message idempotency key.
 - Recursive subagent tools are stripped by default.
 - Raw child or parent transcript content is not emitted by default.
 
 SDK owns / Host owns:
 
-- SDK owns parent/child IDs, `SubagentRequest` to child `RunRequest` lowering, stripped package snapshots, supervision rules, lifecycle policy, mailbox/clarification records, event wrapping, and usage rollup contract.
+- SDK owns parent/child IDs, `SubagentRequest` to `AgentPool` and child
+  `RunRequest` lowering, stripped package snapshots, supervision rules,
+  lifecycle policy, links to run-message/wake records, event wrapping, and usage
+  rollup contract.
 - Host owns subagent inspector UI, promotion to conversation, concrete child runner adapter/process management, rate tables/billing UI, and continued supervision of explicitly detached child runs.
 
 Tests:
 
 - `child_package_strips_subagent_tools`
 - `child_can_ask_parent_without_becoming_user_chat`
-- `subagent_clarification_records_replay_after_resume`
+- `subagent_clarification_replays_from_run_message_and_wake_records`
 - `child_run_cannot_outlive_parent_without_detach_policy`

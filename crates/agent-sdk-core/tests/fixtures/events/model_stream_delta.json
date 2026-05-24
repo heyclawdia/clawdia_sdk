@@ -1,0 +1,44 @@
+{
+  "envelope": {
+    "schema_version": 1,
+    "event_id": "event.3",
+    "event_seq": 3,
+    "event_family": "model",
+    "event_kind": "model_stream_delta",
+    "payload_schema_version": 1,
+    "timestamp": "2026-05-24T12:00:00Z",
+    "recorded_at": "2026-05-24T12:00:00Z",
+    "run_id": "run.event.contract",
+    "agent_id": "agent.event.contract",
+    "turn_id": "turn.event.contract",
+    "trace_id": "trace.event.contract",
+    "span_id": "span.3",
+    "subject_ref": {
+      "kind": "run",
+      "id": "run.event.contract",
+      "privacy": "content_refs_only"
+    },
+    "correlation": {},
+    "source": {
+      "kind": "sdk",
+      "id": "source.sdk.event",
+      "trust": "host_provided",
+      "privacy": "content_refs_only"
+    },
+    "destination": {
+      "kind": "event_stream",
+      "id": "destination.event.stream",
+      "privacy": "content_refs_only",
+      "retention": "host_policy"
+    },
+    "delivery_semantics": "best_effort_live",
+    "privacy": "content_refs_only",
+    "content_capture": "off",
+    "redaction_policy_id": "policy.redaction.default",
+    "runtime_package_fingerprint": "sha256:event-contract-package"
+  },
+  "payload": {
+    "mode": "redacted_summary",
+    "redacted_summary": "model delta redacted"
+  }
+}

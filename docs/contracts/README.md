@@ -15,6 +15,7 @@ They are still documentation. They are not Rust source, executable tests, or fix
 | [runtime-package-schema.md](runtime-package-schema.md) | Runtime package snapshot, typed capability/sidecar boundaries, catalog provenance, canonical fingerprinting, package deltas, and projection/execution alignment. |
 | [content-artifact-ref-contract.md](content-artifact-ref-contract.md) | Artifact/content ref lifecycle, resolver boundaries, missing-ref recovery, retention, privacy, and no-raw-content defaults. |
 | [context-memory-contract.md](context-memory-contract.md) | Messages, artifacts/content refs, context contributions, admitted context items, context projection, memory ports, compaction, and projection audit boundaries. |
+| [agent-pool-contract.md](agent-pool-contract.md) | Generic agent-run coordination scope, run messages, delivery receipts, wake conditions, and the boundary between pools and workflow engines. |
 | [hook-lifecycle-contract.md](hook-lifecycle-contract.md) | First-class lifecycle hooks, config/code registration, typed mutation rights, ordering, timeout, cancellation, and extension boundaries. |
 | [journal-replay-schema.md](journal-replay-schema.md) | Append-only journal record schemas, replay modes, checkpoints, side-effect atomicity, resume, cancel, and anti-entropy. |
 | [tool-approval-contract.md](tool-approval-contract.md) | Permission, sandbox, approval, escalation, autonomy, source-scoped approval, and compatibility rules. |
@@ -22,7 +23,7 @@ They are still documentation. They are not Rust source, executable tests, or fix
 | [stream-rule-contract.md](stream-rule-contract.md) | Literal/regex stream matching, channels, cursor semantics, interventions, privacy, and resume behavior. |
 | [tool-pack-contract.md](tool-pack-contract.md) | Built-in optional tool packs for read/search/edit/write/shell/resource/tool discovery and effect lineage. |
 | [isolation-runtime-contract.md](isolation-runtime-contract.md) | Portable isolated execution contract, adapter capabilities, mounts, network, secrets, process lifecycle, cleanup, and fallback. |
-| [subagent-contract.md](subagent-contract.md) | Parent-owned subagent supervision, package stripping, route validation, event wrapping, usage rollup, and no-chat promotion rules. |
+| [subagent-contract.md](subagent-contract.md) | Higher-order subagent supervision over AgentPool, package stripping, route validation, event wrapping, usage rollup, and no-chat promotion rules. |
 | [extension-sdk-contract.md](extension-sdk-contract.md) | Host manifest/JSON-RPC contracts, SDK-facing core capability boundaries, browser-safe helper exports, and packaging smoke tests. |
 | [output-delivery-contract.md](output-delivery-contract.md) | Destination refs, output sink dispatch, dedupe, intent-before-delivery, and host channel boundaries. |
 | [otel-mapping-contract.md](otel-mapping-contract.md) | SDK-to-OpenTelemetry mapping, semconv stability, MCP dedupe, content opt-in, and exporter failure behavior. |

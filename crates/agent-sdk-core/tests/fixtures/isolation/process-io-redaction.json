@@ -1,0 +1,22 @@
+{
+  "frames": [
+    {
+      "byte_count": 23,
+      "content_hash": "sha256:fake.stdout",
+      "content_refs": [
+        "content.isolation.stdout"
+      ],
+      "raw_content_present": false,
+      "redacted_summary": "stdout captured as content ref",
+      "stream": "Stdout"
+    },
+    {
+      "byte_count": 0,
+      "content_hash": "sha256:fake.stderr.empty",
+      "content_refs": [],
+      "raw_content_present": false,
+      "redacted_summary": "stderr empty",
+      "stream": "Stderr"
+    }
+  ]
+}

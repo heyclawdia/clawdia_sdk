@@ -116,7 +116,10 @@ Accepted decisions:
 - Treat host/user approval dispatcher calls as `EffectKind::ApprovalDispatch` records wrapped by `ApprovalRecord { dispatch_intent }` and `ApprovalRecord { dispatch_result }` before any dispatcher access can release a tool execution.
 - Include active tool-pack sidecar version/source, executor refs, policy refs, isolation/detach policy, redaction refs, and reconciliation requirements in runtime-package fingerprint inputs when those features are active.
 - Keep telemetry overflow represented as `TelemetrySinkFailed` with `failure_kind = overflow` for the first slice. A future separate `TelemetryOverflowed` event kind would require an event-schema update and emitted-kind fixture.
-- Defer Phase 05 OTel mappings for stream/realtime, isolation/child-lifecycle, subagent, and extension families to their respective Phase 05 owners; those owners must provide emitted-kind fixtures and redaction cases before activation.
+- Defer Phase 05 OTel mappings for stream/realtime, isolation/child-lifecycle,
+  agent-pool/subagent, and extension families to their respective Phase 05
+  owners; those owners must provide emitted-kind fixtures and redaction cases
+  before activation.
 
 Why this is cross-cutting:
 
@@ -141,7 +144,11 @@ Decision owner: 00-integration-stitching
 
 Problem:
 
-Phase 05 workers supplied feature-layer contracts for streaming/realtime, isolation, subagents, and extensions. Their handoffs raised shared decisions about event taxonomy, journal record names, runtime-package fingerprint inputs, effect-kind granularity, child-lifecycle ownership, and whether Phase 04 OTel deferrals could close.
+Phase 05 workers supplied feature-layer contracts for streaming/realtime,
+isolation, agent-pool/subagent coordination, and extensions. Their handoffs
+raised shared decisions about event taxonomy, journal record names,
+runtime-package fingerprint inputs, effect-kind granularity, child-lifecycle
+ownership, and whether Phase 04 OTel deferrals could close.
 
 Proposed change:
 
@@ -153,7 +160,10 @@ Accepted decisions:
 - Accept `ChildLifecycle*` event names for child artifact shutdown, detach, acknowledgement, denial, reclaim, and failure. Isolation owns isolated-process child-artifact lifecycle use; subagents reference the shared child-lifecycle records for child-run cancellation and detach.
 - Defer dedicated shared `EffectKind` variants for isolation image/rootfs/session/mount/network/secret/environment steps. Typed `IsolationRecord::*Intent/Result` payloads must map one-to-one to common effect fields until code proves narrower effect kinds are needed.
 - Accept `ExtensionActionStarted`, `ExtensionActionCompleted`, and `ExtensionActionFailed` so extension action telemetry has explicit live projections in addition to journal-backed `EffectResult`.
-- Close the Phase 04 OTel deferrals for `stream_rule`, `realtime`, `isolation`, `child_lifecycle`, `subagent`, and `extension` families by naming mappings, redaction defaults, journal records, and fixture gates in the Phase 05 contracts and OTel contract.
+- Close the Phase 04 OTel deferrals for `stream_rule`, `realtime`, `isolation`,
+  `child_lifecycle`, `agent_pool`, `subagent`, and `extension` families by
+  naming mappings, redaction defaults, journal records, and fixture gates in the
+  Phase 05 contracts and OTel contract.
 - Include Phase 05 feature sidecars and SDK-facing capability snapshots in runtime-package fingerprint inputs when their reserved feature is activated; continue excluding host manifest/runtime/install/marketplace/trust/browser-safe/app-event transport details unless represented as SDK-facing refs or policy decisions.
 
 Why this is cross-cutting:

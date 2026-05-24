@@ -73,7 +73,7 @@ Rules:
 
 | Pack | Required semantics |
 | --- | --- |
-| `workspace_readonly` | path policy, symlink policy, hidden-file policy, max bytes, truncation, anchors, hashes, MIME type |
+| `workspace_readonly` | path policy, symlink policy, hidden-file policy, max bytes, file-kind detection, parser pipeline, bounded-prefix behavior for oversized safe files, truncation guidance, anchors, hashes, MIME type, media/document/archive/SQLite/resource metadata, safe binary summaries |
 | `workspace_search` | regex dialect, glob rules, gitignore behavior, max matches, context lines, pagination cursor |
 | `workspace_edit` | read snapshot ref, hashline-style anchor validation, preview diff, apply phase, stale-anchor handling, inverse candidate |
 | `workspace_write` | create/overwrite scope, parent dir policy, before/after hash, destructive approval |
@@ -107,7 +107,24 @@ The core must leave room for hosts or later optional crates to add those, but im
 | MCP resource | MCP allowlist permission | server/tool namespace policy |
 | skill/plugin URI | skill/plugin read permission | installed source trust |
 
-Read and resource outputs stay behind refs until policy admits them. A read/search/resource tool result should return `ContentRef`s, source hashes, anchors, MIME/type metadata, bounds, truncation state, and redacted summaries. If the result should influence a later provider call, it creates a `ContextContribution`; only `PostTool` policy and the context assembler can admit that contribution as a `ContextItem` in a `ContextProjection`.
+Read and resource outputs stay behind refs until policy admits them. A read/search/resource tool result should return `ContentRef`s, source hashes, anchors, MIME/type metadata, detected file kind, parser pipeline, bounds, truncation state, media/document/archive metadata, warnings, and redacted summaries. If the result should influence a later provider call, it creates a `ContextContribution`; only `PostTool` policy and the context assembler can admit that contribution as a `ContextItem` in a `ContextProjection`.
+
+## Format-Aware Read Requirements
+
+The SDK toolkit read surface is one simple operation, but internally it must detect and route formats through typed readers:
+
+- text, Markdown, JSON, and code: bounded UTF-8 with anchors only when the backing source is editable;
+- PDF: extracted text plus page/document metadata, OCR-needed warnings for scanned or empty-text PDFs, and bounded OCR sidecar fallback when the host/workspace provides one;
+- image: dimensions, color/type metadata, parser warnings, bounded OCR sidecar fallback when present, and no raw pixel bytes in model-visible text by default;
+- RAW / Apple Photos-style media: RAW/DNG/HEIC/AVIF detection, dimensions where parsable, uncompressed strip and embedded preview metadata when available, bounded `.AAE` sidecar summaries, and explicit warnings when camera-specific demosaicing or Photos adjustment application is not available;
+- Office OpenXML: DOCX/PPTX/XLSX text extraction from safe ZIP/XML reads;
+- legacy Office: `.doc`/`.xls`/`.ppt` bounded sidecar/fallback extraction with limited-fidelity warnings unless a host converter is attached;
+- archives: safe ZIP/TAR/TGZ/GZIP listing and later explicit entry reads, with path traversal and decompression limits;
+- SQLite: read-only/query-only schema and bounded sample reads with no extension loading or writes;
+- URI/resource: local data URLs may be decoded through the same output shape; live network/resource reads require host policy/resolver adapters and fail closed by default;
+- fallback binary: bounded summary only.
+
+Detection must prefer magic bytes over extension, use extension as a subtype hint, and fall back to UTF-8 validation before declaring opaque binary. Parser failures should be typed tool failures or structured warnings; they must not silently return lossy binary text. Oversized safe files return a bounded prefix with `truncated: true` and model-facing guidance to use search/grep or range reads; full-file parser adapters should not load files beyond the policy cap.
 
 ## Effect Class, Intent, And Reversibility Matrix
 
@@ -329,6 +346,7 @@ let request = WorkspaceEditRequest {
     anchor: HashLineAnchor { line: 42, before_hash: ContentHash::sha256("...") },
     replacement_ref: ContentRef::new("patch/replacement_1"),
     preview_only: false,
+    preview_hash: Some(ContentHash::sha256("preview-before-apply")),
 };
 ```
 

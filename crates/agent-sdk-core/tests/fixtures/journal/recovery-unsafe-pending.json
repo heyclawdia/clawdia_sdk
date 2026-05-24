@@ -1,0 +1,67 @@
+{
+  "agent_id": "agent.journal.1",
+  "delivery_semantics": "journal_backed",
+  "destination": {
+    "id": "destination.tool.fake",
+    "kind": "tool",
+    "privacy": "content_refs_only",
+    "retention": "host_policy"
+  },
+  "event_index": {
+    "agent_id": "agent.journal.1",
+    "delivery_semantics": "journal_backed",
+    "destination": {
+      "id": "destination.tool.fake",
+      "kind": "tool",
+      "privacy": "content_refs_only",
+      "retention": "host_policy"
+    },
+    "event_family": "recovery",
+    "event_kind": "marker",
+    "privacy_class": "content_refs_only",
+    "run_id": "run.journal.1",
+    "source": {
+      "id": "source.sdk.run_loop",
+      "kind": "sdk",
+      "privacy": "content_refs_only",
+      "trust": "host_provided"
+    },
+    "subject_ref": {
+      "id": "run.journal.1",
+      "kind": "run",
+      "privacy": "content_refs_only"
+    }
+  },
+  "journal_schema_version": 1,
+  "journal_seq": 2,
+  "payload": {
+    "recovery_reason": "terminal result append failed",
+    "type": "recovery",
+    "unsafe_pending": [
+      {
+        "effect_id": "effect.tool.1",
+        "idempotency_key": "idem.tool.1",
+        "intent_record_id": "journal.record.intent.1",
+        "unsafe_pending_reason": "terminal result append failed after external operation"
+      }
+    ]
+  },
+  "privacy": "content_refs_only",
+  "record_id": "journal.record.2",
+  "record_kind": "recovery",
+  "redaction_policy_id": "redaction.default",
+  "run_id": "run.journal.1",
+  "runtime_package_fingerprint": "runtime.package.fingerprint.test",
+  "source": {
+    "id": "source.sdk.run_loop",
+    "kind": "sdk",
+    "privacy": "content_refs_only",
+    "trust": "host_provided"
+  },
+  "subject_ref": {
+    "id": "run.journal.1",
+    "kind": "run",
+    "privacy": "content_refs_only"
+  },
+  "timestamp_millis": 42
+}

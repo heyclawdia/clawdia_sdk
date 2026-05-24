@@ -1,0 +1,158 @@
+{
+  "agent": {
+    "agent_id": "agent.contract",
+    "default_behavior_refs": [
+      {
+        "id": "policy.agent.default",
+        "kind": "runtime_package"
+      }
+    ],
+    "name": "contract agent"
+  },
+  "capabilities": [
+    {
+      "capability_id": "cap.workspace_read",
+      "executor_ref": "executor.workspace_read.v1",
+      "kind": "tool",
+      "namespace": "tool.workspace_read",
+      "policy_ref": {
+        "id": "policy.approval.workspace_read",
+        "kind": "approval"
+      },
+      "privacy": "content_refs_only",
+      "projection": {
+        "provider_tool_schema": {
+          "schema_ref": {
+            "content_hash": "sha256:schema.v1",
+            "kind": "tool_schema",
+            "sidecar_id": "sidecar.schema.workspace_read",
+            "version": "v1"
+          }
+        }
+      },
+      "readiness": {
+        "acceptance_tests": [
+          "provider_visible_capability_requires_executor_and_policy_refs",
+          "projection_and_execution_hashes_match"
+        ],
+        "emitted_events": [
+          "capability_loaded",
+          "tool_requested",
+          "tool_completed"
+        ],
+        "fingerprint_fields": [
+          "capability_id",
+          "kind",
+          "namespace",
+          "version",
+          "projection",
+          "executor_ref",
+          "policy_ref",
+          "sidecar_refs",
+          "source"
+        ],
+        "journal_records": [
+          "package_catalog_snapshot",
+          "package_delta",
+          "tool_execution_intent",
+          "tool_execution_result"
+        ],
+        "owner_role": "02-runtime-package-p0-fake-tool",
+        "status": "active",
+        "typed_sidecar_contract": "capability.tool.schema_ref.executor_ref.policy_ref"
+      },
+      "source": {
+        "kind": "test_only_fake",
+        "source_ref": {
+          "id": "source.sdk.toolpack",
+          "kind": "sdk",
+          "privacy": "content_refs_only",
+          "trust": "host_provided"
+        }
+      },
+      "version": "v1",
+      "visibility": "active"
+    }
+  ],
+  "catalogs": [],
+  "child_lifecycle": {
+    "cleanup_timeout_ms": 30000,
+    "detach_policy_ref": {
+      "id": "policy.detach.deny-by-default",
+      "kind": "runtime_package"
+    },
+    "manual_cancel": "cancel_agent_owned_children",
+    "policy_ref": {
+      "id": "policy.child.safe-defaults",
+      "kind": "runtime_package"
+    }
+  },
+  "fingerprint_manifest": {
+    "algorithm": "sha256:runtime-package-canonical-v1",
+    "canonical_schema_version": 1,
+    "excluded_groups": [
+      "run_ids",
+      "event_ids",
+      "timestamps",
+      "adapter_health",
+      "temporary_paths",
+      "telemetry_sink_health"
+    ],
+    "included_groups": [
+      "agent",
+      "provider_route",
+      "output_contracts",
+      "output_sinks",
+      "capabilities",
+      "sidecars",
+      "isolation_requirements",
+      "catalogs",
+      "child_lifecycle",
+      "policies"
+    ],
+    "readiness_profile": "p0_text",
+    "reserved_feature_status": []
+  },
+  "isolation_requirements": [],
+  "output_contracts": [],
+  "output_sinks": [],
+  "package_id": "package.contract",
+  "policies": {
+    "policy_refs": [
+      {
+        "id": "policy.package.default",
+        "kind": "runtime_package"
+      }
+    ]
+  },
+  "provider_capabilities": {
+    "capability_version": "provider.capabilities.v1"
+  },
+  "provider_route": {
+    "model_id": "model.fake.p0",
+    "route_id": "provider.fake"
+  },
+  "schema_version": 1,
+  "sidecars": [
+    {
+      "content_hash": "sha256:schema.v1",
+      "kind": "tool_schema",
+      "policy_refs": [
+        {
+          "id": "policy.approval.workspace_read",
+          "kind": "approval"
+        }
+      ],
+      "refs": [
+        {
+          "content_hash": "sha256:schema.v1",
+          "kind": "tool_schema",
+          "sidecar_id": "sidecar.schema.workspace_read",
+          "version": "v1"
+        }
+      ],
+      "sidecar_id": "sidecar.schema.workspace_read",
+      "version": "v1"
+    }
+  ]
+}

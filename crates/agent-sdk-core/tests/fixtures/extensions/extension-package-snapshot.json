@@ -1,0 +1,36 @@
+{
+  "actions": [
+    {
+      "action_id": "submit_ui_effect",
+      "approval_policy_ref": "policy.extension.approval",
+      "bridge_ref": "bridge.extension.reviewer",
+      "capability_id": "cap.extension.reviewer.submit_ui_effect",
+      "destination_kind": "Host",
+      "kind": "host_action",
+      "policy_refs": [
+        "policy.extension.action"
+      ],
+      "sidecar_id": "sidecar.extension.reviewer.action.submit_ui_effect"
+    }
+  ],
+  "catalog": {
+    "activation_policy": "policy.extension.activation",
+    "candidates": [
+      "cap.extension.reviewer.submit_ui_effect"
+    ],
+    "catalog_id": "catalog.extension.reviewer",
+    "source_kind": "Extension",
+    "source_ref": "extension.reviewer"
+  },
+  "sidecars": [
+    {
+      "kind": "extension_action",
+      "policy_refs": [
+        "policy.extension.action",
+        "policy.extension.approval"
+      ],
+      "sidecar_id": "sidecar.extension.reviewer.action.submit_ui_effect",
+      "version": "v1"
+    }
+  ]
+}

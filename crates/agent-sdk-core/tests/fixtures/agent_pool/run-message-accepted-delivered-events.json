@@ -1,0 +1,27 @@
+{
+  "events": [
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.4",
+      "kind": "run_message_accepted",
+      "message_id": "message.agent_pool.1",
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "run message accepted"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.5",
+      "kind": "run_message_delivered",
+      "message_id": "message.agent_pool.1",
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "run message delivered"
+    }
+  ],
+  "schema_version": 1
+}

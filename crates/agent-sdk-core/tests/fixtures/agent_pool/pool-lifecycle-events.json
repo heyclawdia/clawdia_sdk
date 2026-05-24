@@ -1,0 +1,38 @@
+{
+  "events": [
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.1",
+      "kind": "agent_pool_created",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "agent pool membership updated"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.2",
+      "kind": "agent_pool_run_joined",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "agent pool membership updated"
+    },
+    {
+      "agent_id": "agent.child",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.3",
+      "kind": "agent_pool_run_joined",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.child",
+      "summary": "agent pool membership updated"
+    }
+  ],
+  "schema_version": 1
+}

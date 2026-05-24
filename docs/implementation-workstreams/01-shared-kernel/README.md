@@ -12,7 +12,7 @@ Implement the shared low-level types every later phase needs. All launch targets
 
 ## Exit Gate
 
-- [ ] Shared types compile and have serde/golden coverage where durable.
-- [ ] Fakes are deterministic and usable by Phase 02 without live providers or hosts.
-- [ ] Policy/error paths fail closed by default.
-- [ ] Phase exit report records reviewer PASS.
+- [x] Shared types compile and have serde/golden coverage where durable.
+- [x] Fakes are deterministic and usable by Phase 02 without live providers or hosts.
+- [x] Policy/error paths fail closed by default.
+- [x] Phase exit report records reviewer PASS.

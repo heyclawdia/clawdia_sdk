@@ -1,0 +1,16 @@
+{
+  "candidate_content_ref": "content.validation.valid",
+  "output_schema_version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "privacy": "content_refs_only",
+  "record_kind": "validation_succeeded",
+  "record_schema_version": 1,
+  "redacted_summary": "structured output candidate validated locally",
+  "schema_fingerprint": "sha256:9ab0baebea81acca5fedf196c57bf32d7dbf6ee542979c53614953f5fecaa9d8",
+  "schema_id": "schema.todo_validation",
+  "source_attempt_id": "attempt.valid",
+  "validation_attempt_id": "validation.attempt.valid"
+}

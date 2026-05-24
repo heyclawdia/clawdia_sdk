@@ -13,7 +13,7 @@
 | --- | --- | --- | --- |
 | [05a Streaming Realtime](../05a-streaming-realtime.md) | Dirac (`019e5882-0304-7403-9657-4f98501a21fe`) | `docs/contracts/stream-rule-contract.md` | Prove stream rules, realtime lifecycle, interventions, restart/backpressure, and completion semantics are feature-layer state over the kernel and side-effect spine. |
 | [05b Isolation Execution](../05b-isolation-execution.md) | Hooke (`019e5882-03af-74c0-8498-3c533011f99d`) | `docs/contracts/isolation-runtime-contract.md` | Prove isolation is `ExecutionEnvironment` plus adapter capabilities, policy, journal, events, cleanup, and no silent downgrade to host execution. |
-| [05c Subagents](../05c-subagents.md) | Parfit (`019e5882-0444-70d0-aa7d-6256e620f278`) | `docs/contracts/subagent-contract.md` | Prove subagents are parent-owned child runs with stripped packages, explicit handoff, wrapped events, child journals, mailbox, clarification, lifecycle, and usage rollup. |
+| [05c Subagents](../05c-subagents.md) | Parfit (`019e5882-0444-70d0-aa7d-6256e620f278`) | `docs/contracts/subagent-contract.md` | Prove subagents are parent-owned child-run helpers over AgentPool with stripped packages, explicit handoff, wrapped events, child journals, run-message/wake clarification, lifecycle, and usage rollup. |
 | [05d Extension SDK](../05d-extension-sdk.md) | Kuhn (`019e5882-055b-7a20-b164-9b8d6239c123`) | `docs/contracts/extension-sdk-contract.md` | Prove core extension capabilities are SDK-facing package material while host manifests, runtime, install, marketplace, browser-safe packaging, and action UI stay outside core. |
 
 ## Stitching Duties

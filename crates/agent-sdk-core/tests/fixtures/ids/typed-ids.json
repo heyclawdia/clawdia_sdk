@@ -1,0 +1,8 @@
+{
+  "agent_id": "agent.contract",
+  "event_cursor": "event.cursor.contract",
+  "event_id": "event.contract",
+  "journal_cursor": "journal.cursor.contract",
+  "run_id": "run.contract",
+  "trace_id": "trace.contract"
+}

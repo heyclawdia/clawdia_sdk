@@ -152,7 +152,7 @@ pub struct ContextItemEnvelope {
 }
 ```
 
-`kind` is finite and source-qualified, for example `UserInput`, `HostContext`, `MemoryRecall`, `ToolResult`, `SkillResult`, `FileContext`, `RemoteChannel`, `SubagentHandoff`, `CompactionSummary`, `SystemInstruction`, or `OutputSchemaHint`.
+`kind` is finite and source-qualified, for example `UserInput`, `HostContext`, `MemoryRecall`, `ToolResult`, `SkillResult`, `FileContext`, `RemoteChannel`, `AgentPoolMessage`, `SubagentHandoff`, `CompactionSummary`, `SystemInstruction`, or `OutputSchemaHint`.
 
 ## Events And Journal Records
 

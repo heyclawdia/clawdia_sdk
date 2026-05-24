@@ -1,0 +1,25 @@
+{
+  "content_capture": "off",
+  "raw_content_attributes_present": false,
+  "schema_url": "https://opentelemetry.io/schemas/1.41.0",
+  "span_events": [
+    {
+      "attributes": {
+        "agent_sdk.stream.action": "mask_and_continue",
+        "agent_sdk.stream.channel": "assistant_text",
+        "agent_sdk.stream.match.redaction": "hash_length_summary",
+        "agent_sdk.stream.rule.id": "rule.mask.key"
+      },
+      "name": "stream_rule.intervention"
+    },
+    {
+      "attributes": {
+        "agent_sdk.realtime.backpressure.policy": "gate_during_restart",
+        "agent_sdk.realtime.restart.count": 1,
+        "agent_sdk.realtime.session.id": "realtime.session.run.realtime"
+      },
+      "name": "realtime.restart"
+    }
+  ],
+  "stability_opt_in": "gen_ai_latest_experimental"
+}

@@ -1,0 +1,8 @@
+{
+  "capability_gaps": [],
+  "policy_decision_scope": null,
+  "requested_class": "Sandbox",
+  "selected_class": "Sandbox",
+  "status": "UnsupportedHost",
+  "trust_gaps": []
+}

@@ -1,0 +1,7 @@
+{
+  "repair_kind": "non_idempotent_pending_side_effect",
+  "resume_allowed": false,
+  "retry_allowed": false,
+  "status": "repair_needed",
+  "unsafe_pending_count": 1
+}

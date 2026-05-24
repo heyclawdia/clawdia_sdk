@@ -20,9 +20,10 @@ Implement `RunHandle`, event stream reconnect, `wait()`, `status()`, cancellatio
 
 ## Owned Implementation Surface
 
-- `crates/agent-sdk-core/src/run_handle.rs`
-- `crates/agent-sdk-core/src/subscription.rs`
-- `crates/agent-sdk-core/tests/run_handle_contract.rs`
+- `crates/agent-sdk-core/src/application/run_handle.rs`
+- `crates/agent-sdk-core/src/ports/subscription.rs`
+- `crates/agent-sdk-core/tests/runtime/run_handle_contract.rs`
+- root Cargo test-target shim `crates/agent-sdk-core/tests/run_handle_contract.rs`
 
 ## Must Deliver
 
@@ -36,6 +37,7 @@ Implement `RunHandle`, event stream reconnect, `wait()`, `status()`, cancellatio
 - reconnect catch-up tests
 - duplicate subscriber and `wait()` idempotency tests
 - no duplicate side effects on reconnect
+- SDK package architecture audit for root facades and runtime test shims
 
 ## Must Not
 

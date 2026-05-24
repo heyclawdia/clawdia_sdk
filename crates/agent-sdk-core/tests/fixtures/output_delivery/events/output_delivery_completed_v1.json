@@ -1,0 +1,16 @@
+{
+  "ack_ref": "ack.output_delivery.fake",
+  "dedupe_key": "dedupe.output_delivery.cdb2c095339bf84b18c212d8ec0bc8bbfdd656b8dc508ff773af2fb0a462d168",
+  "delivery_id": "output.delivery.39c4ee3054db.final.message",
+  "destination": {
+    "id": "destination.output.chat",
+    "kind": "output_sink",
+    "privacy": "content_refs_only",
+    "retention": "host_policy"
+  },
+  "dispatch_status": "completed",
+  "event_kind": "output_dispatch_completed",
+  "redacted_summary": "output delivery event contains refs and bounded summary only",
+  "sink_ref": "sink.output.fixture",
+  "source_message_id": "message.output.final"
+}

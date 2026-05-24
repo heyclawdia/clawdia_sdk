@@ -1,0 +1,34 @@
+{
+  "agent_id": "agent.telemetry",
+  "content_capture": "off",
+  "payload": {
+    "record": {
+      "model_id": "model.fake",
+      "provider_id": "provider.fake",
+      "units": {
+        "input_tokens": 12,
+        "output_tokens": 5,
+        "total_tokens": 17
+      },
+      "usage_record_id": "telemetry.usage.record.1"
+    },
+    "type": "usage"
+  },
+  "policy_refs": [
+    {
+      "id": "policy.telemetry.derived",
+      "kind": "host"
+    }
+  ],
+  "privacy": "content_refs_only",
+  "record_id": "telemetry.record.telemetry.usage.event.model.1",
+  "redaction_policy_id": "redaction.telemetry.default",
+  "retention": "run_scoped",
+  "run_id": "run.telemetry.usage",
+  "runtime_package_fingerprint": "sha256:runtime.package.telemetry",
+  "schema_version": 1,
+  "source_cursor": {
+    "cursor": "journal.usage.1",
+    "type": "journal"
+  }
+}

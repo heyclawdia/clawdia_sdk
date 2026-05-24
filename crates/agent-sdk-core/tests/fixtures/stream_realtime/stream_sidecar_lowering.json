@@ -1,0 +1,11 @@
+{
+  "content_hash_is_sha256": true,
+  "fingerprint_changed": true,
+  "policy_refs": [
+    "policy.redaction.stream",
+    "policy.content_capture.off",
+    "policy.stream.mask_secret"
+  ],
+  "sidecar_kind": "stream_rule",
+  "sidecar_version": "stream_rule.sidecar.v1"
+}

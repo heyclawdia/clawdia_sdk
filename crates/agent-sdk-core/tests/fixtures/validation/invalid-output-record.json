@@ -1,0 +1,33 @@
+{
+  "candidate_content_ref": "content.validation.invalid",
+  "errors": [
+    {
+      "code": "missing_required_field",
+      "path": "/title",
+      "redacted_summary": "required schema field is missing"
+    },
+    {
+      "code": "enum_mismatch",
+      "path": "/priority",
+      "redacted_summary": "candidate value is not one of the allowed schema values"
+    },
+    {
+      "code": "additional_property_denied",
+      "path": "/",
+      "redacted_summary": "candidate contains an additional property denied by schema"
+    }
+  ],
+  "output_schema_version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "privacy": "content_refs_only",
+  "record_kind": "validation_failed",
+  "record_schema_version": 1,
+  "redacted_summary": "structured output validation failed with 3 error(s): required schema field is missing at /title",
+  "schema_fingerprint": "sha256:9ab0baebea81acca5fedf196c57bf32d7dbf6ee542979c53614953f5fecaa9d8",
+  "schema_id": "schema.todo_validation",
+  "source_attempt_id": "attempt.invalid",
+  "validation_attempt_id": "validation.attempt.invalid"
+}

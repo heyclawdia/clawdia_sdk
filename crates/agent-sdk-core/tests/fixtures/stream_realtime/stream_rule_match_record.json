@@ -1,0 +1,13 @@
+{
+  "interventions": [
+    {
+      "action": "mask_and_continue",
+      "byte_len": 9,
+      "channel": "assistant_text",
+      "direction": "output_from_provider",
+      "hash_is_sha256": true,
+      "raw_match_serialized": false,
+      "summary": "stream match redacted: 9 bytes on assistant_text"
+    }
+  ]
+}

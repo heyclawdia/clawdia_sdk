@@ -1,0 +1,34 @@
+{
+  "records": [
+    {
+      "event_kind": "agent_pool_created",
+      "lifecycle_status": "created",
+      "member_run_ids": [],
+      "pool_id": "pool.contract",
+      "record_kind": "agent_pool",
+      "topics": []
+    },
+    {
+      "event_kind": "agent_pool_run_joined",
+      "lifecycle_status": "run_joined",
+      "member_run_ids": [
+        "run.pool.parent"
+      ],
+      "pool_id": "pool.contract",
+      "record_kind": "agent_pool",
+      "topics": []
+    },
+    {
+      "event_kind": "agent_pool_run_joined",
+      "lifecycle_status": "run_joined",
+      "member_run_ids": [
+        "run.pool.child",
+        "run.pool.parent"
+      ],
+      "pool_id": "pool.contract",
+      "record_kind": "agent_pool",
+      "topics": []
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,16 @@
+{
+  "records": [
+    {
+      "effect_kind": "ChildArtifactShutdown",
+      "journal_seq": 1,
+      "record_kind": "cleanup_intent",
+      "redacted_summary": "cleanup isolated environment and child artifacts"
+    },
+    {
+      "journal_seq": 3,
+      "record_kind": "cleanup_result",
+      "redacted_summary": "isolation cleanup requires host repair",
+      "terminal_status": "Failed"
+    }
+  ]
+}

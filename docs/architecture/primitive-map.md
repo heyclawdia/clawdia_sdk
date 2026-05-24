@@ -48,7 +48,11 @@ Feature primitives must layer on the kernel:
 - Structured output is `OutputContract` plus local validation and repair over the normal run loop.
 - Memory, tool results, skills, host input, subagents, and compaction may create `ContextContribution` candidates. `ContextAssembler` admits only selected items into `ContextItem` and `ContextProjection` under policy and budget.
 - Isolation is `ExecutionEnvironment` plus an `IsolationRuntime` port; concrete runtimes stay optional or host-owned.
-- Subagents are parent-owned child runs with stripped `RuntimePackage` snapshots and wrapped events.
+- Agent pools are feature-layer coordination scopes over existing runs, messages,
+  event subscriptions, and wake conditions. They are not workflow engines.
+- Subagents are higher-order supervised child-run presets over `AgentPool` with
+  stripped `RuntimePackage` snapshots, parent-owned lifecycle, wrapped events,
+  and usage rollup.
 - Extensions declare `CoreExtensionCapabilities` that a host may resolve into runtime-package capabilities and sidecars after policy checks.
 - Telemetry is a projection from events, journals, and usage records; it is not durable run truth.
 - Output delivery is a destination/sink port with dedupe and journaled intent; product channel UX stays host-owned.
@@ -183,8 +187,9 @@ New primitives must pass the decision ladder above before they are added.
 
 | Primitive | Owns | Key methods | Must not own |
 | --- | --- | --- | --- |
-| `SubagentSupervisor` | Parent-owned child runs, routing, depth, tools, cancellation, event wrapping. | `spawn_child`, `stream_child`, `cancel_child`, `rollup_usage`. | Direct user chat ownership. |
-| `AgentTopology` | Graph/swarm/tree metadata and limits. | `validate`, `next_nodes`, `handoff`. | Execution of individual agents. |
+| `AgentPool` | Feature-layer coordination scope for run membership, generic run messages, topic fan-out, event subscriptions, and wake registration. | `start_run`, `send`, `subscribe`, `suspend_until`. | Workflow/DAG/barrier engines, product swarm UI, global archive ownership, or semantic relationship roles. |
+| `RunMessage` / `WakeCondition` | Durable run-to-run communication and event-filter-based suspend/resume. | `send`, `reply_to`, `delivery_status`, `wake_on`, `timeout`. | Provider prompt injection, direct user chat ownership, or scheduling/compensation logic. |
+| `SubagentSupervisor` | Higher-order helper over `AgentPool`, child `RunRequest`, stripped child package, lifecycle policy, event wrapping, and usage rollup. | `spawn_child`, `stream_child`, `cancel_child`, `rollup_usage`. | Generic coordination, direct user chat ownership, or recursive agent societies. |
 | `RemoteChannelAdapter` | Inbound/outbound remote messages and source/destination metadata. | `receive`, `send`, `ack`, `dedupe`. | Agent loop policy. |
 | `OutputSink` | Where final or streaming output is sent: desktop, CLI, remote reply, webhook, file. | `send_chunk`, `send_final`, `fail`. | Model/tool execution. |
 

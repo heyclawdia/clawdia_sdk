@@ -1,0 +1,17 @@
+{
+  "records": [
+    {
+      "effect_kind": "IsolatedProcessStart",
+      "journal_seq": 1,
+      "record_kind": "effect_intent",
+      "redacted_summary": "start isolated process with redacted argv and environment",
+      "subject_kind": "ExecutionEnvironment"
+    },
+    {
+      "journal_seq": 4,
+      "record_kind": "effect_result",
+      "redacted_summary": "isolated process started",
+      "terminal_status": "Completed"
+    }
+  ]
+}

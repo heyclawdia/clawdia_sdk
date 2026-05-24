@@ -1,6 +1,6 @@
 # Start Here
 
-This packet describes a future Rust-first `agent_sdk` crate family and extension SDK layer.
+This packet describes a Rust-first `agent_sdk` crate family and extension SDK layer.
 
 It is intentionally standalone and product-neutral. The SDK should support demanding host workflows such as desktop chat, CLI/headless runs, realtime voice, remote channels, external runtimes, extensions, telemetry, and subagents without inheriting any one product's UI, trace store, process cache, marketplace, or workflow assumptions.
 
@@ -10,14 +10,15 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
-- Future Rust implementation launch sequencing lives in [implementation-workstreams](implementation-workstreams/README.md).
+- Rust implementation launch sequencing and phase exit evidence live in [implementation-workstreams](implementation-workstreams/README.md).
 
 ## Navigation
 
 | Note | Purpose |
 | --- | --- |
-| [../coding_standards.md](../coding_standards.md) | Root coding standards entry point for future SDK implementation agents. |
-| [architecture/coding-standards.md](architecture/coding-standards.md) | Future SDK engineering standards, testing discipline, performance rules, and observability requirements. |
+| [../coding_standards.md](../coding_standards.md) | Root coding standards entry point for SDK implementation agents. |
+| [architecture/coding-standards.md](architecture/coding-standards.md) | SDK engineering standards, testing discipline, performance rules, and observability requirements. |
+| [agent-sdk-toolkit/README.md](agent-sdk-toolkit/README.md) | Optional adapter/toolkit roadmap for live providers, OpenAI-compatible providers, ACP, MCP, isolation runtimes, browser/web access, and local MLX/llama.cpp acceleration. |
 | [architecture/external-sdk-lessons.md](architecture/external-sdk-lessons.md) | Lessons from Strands, Cursor, Claude Agent SDK, Pi, oh-my-pi, Apple Containerization, and OpenTelemetry GenAI conventions. |
 | [architecture/primitive-map.md](architecture/primitive-map.md) | First-principles primitive map: ownership, responsibilities, methods, and non-ownership boundaries. |
 | [architecture/observability-and-lineage.md](architecture/observability-and-lineage.md) | Source, destination, metadata, context-injection, stable event taxonomy, journal/replay, trace, privacy, telemetry, cost, and multi-agent lineage model. |
@@ -26,7 +27,7 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 | [contracts/README.md](contracts/README.md) | Normative implementation contracts for API, events, loop, package, journal/replay, policy, tools, isolation, extension, and telemetry. |
 | [examples/README.md](examples/README.md) | Mermaid-heavy scenario examples for complex host workflows and SDK boundaries. |
 | [workstreams/README.md](workstreams/README.md) | Completed phase-gated contract packet: what ran first, what ran in parallel, owner roles, and what closed each gate. |
-| [implementation-workstreams/README.md](implementation-workstreams/README.md) | Future Rust coding launch map: phase dependencies, parallel-safe launch targets, and implementation exit gates. |
+| [implementation-workstreams/README.md](implementation-workstreams/README.md) | Rust coding launch map: phase dependencies, parallel-safe launch targets, implementation exit gates, and phase reports. |
 | [workstreams/validation-gates.md](workstreams/validation-gates.md) | Shared validation levels, required evidence, and target commands for every workstream. |
 | [reference/feature-to-primitive-matrix.md](reference/feature-to-primitive-matrix.md) | Feature-to-primitive mapping and primitive decision ladder used by Phase 00, Phase 01, and Phase 02. |
 | [reference/sdk-review-checklist.md](reference/sdk-review-checklist.md) | SDK review rubric for simplicity, product-neutrality, observability, durability, privacy, and API quality. |
@@ -35,7 +36,7 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 
 ## Design Posture
 
-The future `agent_sdk` should be a reusable core for agent products. It should not become a host app, terminal UI, web UI, coding agent, remote messaging product, workflow engine, dashboard, deployment platform, marketplace, or self-improvement product. Those products should be built on top through typed adapters, runtime packages, policies, hooks, and event streams.
+The `agent_sdk` should be a reusable core for agent products. It should not become a host app, terminal UI, web UI, coding agent, remote messaging product, workflow engine, dashboard, deployment platform, marketplace, or self-improvement product. Those products should be built on top through typed adapters, runtime packages, policies, hooks, and event streams.
 
 Host workflows are coverage constraints only. They prove what the SDK must make possible. They are not architecture to copy.
 

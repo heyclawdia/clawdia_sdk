@@ -20,9 +20,10 @@ Implement the explicit agent loop state machine and transition validation.
 
 ## Owned Implementation Surface
 
-- `crates/agent-sdk-core/src/loop_state.rs`
-- `crates/agent-sdk-core/src/recovery.rs`
-- `crates/agent-sdk-core/tests/loop_state_contract.rs`
+- `crates/agent-sdk-core/src/application/loop_state.rs`
+- `crates/agent-sdk-core/src/application/recovery.rs`
+- `crates/agent-sdk-core/tests/runtime/loop_state_contract.rs`
+- root Cargo test-target shim `crates/agent-sdk-core/tests/loop_state_contract.rs`
 
 ## Must Deliver
 
@@ -35,6 +36,7 @@ Implement the explicit agent loop state machine and transition validation.
 - `cargo test -p agent-sdk-core --test loop_state_contract`
 - table tests for every legal transition
 - property/table tests for invalid transition rejection
+- SDK package architecture audit for root facades and runtime test shims
 
 ## Must Not
 

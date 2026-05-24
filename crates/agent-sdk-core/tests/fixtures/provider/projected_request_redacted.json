@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "content": "release notes request",
+      "privacy": "sensitive",
+      "role": "user"
+    }
+  ],
+  "projection_item_count": 1,
+  "projection_policy_ref": "policy.provider.redacted",
+  "schema_version": 1
+}

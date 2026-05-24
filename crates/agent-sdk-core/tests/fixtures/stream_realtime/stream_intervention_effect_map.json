@@ -1,0 +1,10 @@
+{
+  "action": "abort_and_retry",
+  "effect_id": "effect.provider.retry",
+  "effect_kind": "provider_request",
+  "policy_refs": [
+    "policy.stream.retry"
+  ],
+  "redacted_summary": "stream intervention abort_and_retry requested for redacted match",
+  "subject_kind": "stream_rule"
+}

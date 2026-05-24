@@ -1,0 +1,159 @@
+{
+  "events": [
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Run",
+      "event_kind": "RunStarted",
+      "event_seq": 1,
+      "journal_cursor": "journal.1"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "ContextAssembled",
+      "event_seq": 2,
+      "journal_cursor": "journal.2"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputRequested",
+      "event_seq": 3,
+      "journal_cursor": "journal.3"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "ProviderRequestProjected",
+      "event_seq": 4,
+      "journal_cursor": "journal.4"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelAttemptStarted",
+      "event_seq": 5,
+      "journal_cursor": "journal.5"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelMessageCompleted",
+      "event_seq": 6,
+      "journal_cursor": "journal.7"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputValidationStarted",
+      "event_seq": 7,
+      "journal_cursor": "journal.8"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputValidationFailed",
+      "event_seq": 8,
+      "journal_cursor": "journal.9"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputRepairRequested",
+      "event_seq": 9,
+      "journal_cursor": "journal.10"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "ProviderRequestProjected",
+      "event_seq": 10,
+      "journal_cursor": "journal.11"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelAttemptStarted",
+      "event_seq": 11,
+      "journal_cursor": "journal.12"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelMessageCompleted",
+      "event_seq": 12,
+      "journal_cursor": "journal.14"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputValidationStarted",
+      "event_seq": 13,
+      "journal_cursor": "journal.15"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputValidationFailed",
+      "event_seq": 14,
+      "journal_cursor": "journal.16"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputRepairRequested",
+      "event_seq": 15,
+      "journal_cursor": "journal.17"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "ProviderRequestProjected",
+      "event_seq": 16,
+      "journal_cursor": "journal.18"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelAttemptStarted",
+      "event_seq": 17,
+      "journal_cursor": "journal.19"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelMessageCompleted",
+      "event_seq": 18,
+      "journal_cursor": "journal.21"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputValidationStarted",
+      "event_seq": 19,
+      "journal_cursor": "journal.22"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputValidationFailed",
+      "event_seq": 20,
+      "journal_cursor": "journal.23"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "StructuredOutput",
+      "event_kind": "StructuredOutputFailed",
+      "event_seq": 21,
+      "journal_cursor": "journal.25"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Run",
+      "event_kind": "RunFailed",
+      "event_seq": 22,
+      "journal_cursor": "journal.27"
+    }
+  ],
+  "schema_version": 1
+}

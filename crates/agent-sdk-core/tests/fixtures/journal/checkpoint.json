@@ -1,0 +1,76 @@
+{
+  "agent_id": "agent.journal.1",
+  "checkpoint_ref": "checkpoint.run.1",
+  "delivery_semantics": "journal_backed",
+  "destination": {
+    "id": "destination.tool.fake",
+    "kind": "tool",
+    "privacy": "content_refs_only",
+    "retention": "host_policy"
+  },
+  "event_index": {
+    "agent_id": "agent.journal.1",
+    "delivery_semantics": "journal_backed",
+    "destination": {
+      "id": "destination.tool.fake",
+      "kind": "tool",
+      "privacy": "content_refs_only",
+      "retention": "host_policy"
+    },
+    "event_family": "checkpoint",
+    "event_kind": "saved",
+    "privacy_class": "content_refs_only",
+    "run_id": "run.journal.1",
+    "source": {
+      "id": "source.sdk.run_loop",
+      "kind": "sdk",
+      "privacy": "content_refs_only",
+      "trust": "host_provided"
+    },
+    "subject_ref": {
+      "id": "run.journal.1",
+      "kind": "run",
+      "privacy": "content_refs_only"
+    }
+  },
+  "journal_schema_version": 1,
+  "journal_seq": 2,
+  "payload": {
+    "checkpoint_id": "checkpoint.run.1",
+    "checkpoint_seq": 1,
+    "covers_journal_seq": 1,
+    "created_at_millis": 40,
+    "loop_state": "awaiting_model",
+    "pending_side_effects": [
+      {
+        "effect_id": "effect.tool.1",
+        "idempotency_key": "idem.tool.1",
+        "intent_record_id": "journal.record.intent.1",
+        "unsafe_pending_reason": "terminal result append failed after external operation"
+      }
+    ],
+    "run_id": "run.journal.1",
+    "runtime_package_fingerprint": "runtime.package.fingerprint.test",
+    "state_hash": "state.hash.replayed.1",
+    "type": "checkpoint",
+    "writer_id": "writer.fake"
+  },
+  "privacy": "content_refs_only",
+  "record_id": "journal.record.2",
+  "record_kind": "checkpoint",
+  "redaction_policy_id": "redaction.default",
+  "run_id": "run.journal.1",
+  "runtime_package_fingerprint": "runtime.package.fingerprint.test",
+  "source": {
+    "id": "source.sdk.run_loop",
+    "kind": "sdk",
+    "privacy": "content_refs_only",
+    "trust": "host_provided"
+  },
+  "subject_ref": {
+    "id": "run.journal.1",
+    "kind": "run",
+    "privacy": "content_refs_only"
+  },
+  "timestamp_millis": 42
+}

@@ -152,6 +152,10 @@ pub enum EntityKind {
     ExecutionEnvironment,
     ChildArtifact,
     SubagentRun,
+    AgentPool,
+    AgentPoolTopic,
+    RunMessage,
+    WakeCondition,
     ExtensionAction,
     OutputDelivery,
 }
@@ -407,7 +411,8 @@ Feature goals must add fixtures before emitting additional reserved kinds. Famil
 | `child_lifecycle` | `ChildLifecycleShutdownRequested`, `ChildLifecycleShutdownCompleted`, `ChildLifecycleShutdownFailed`, `ChildLifecycleDetachRequested`, `ChildLifecycleDetachAcknowledged`, `ChildLifecycleDetached`, `ChildLifecycleDetachDenied`, `ChildLifecycleReclaimRequested`, `ChildLifecycleReclaimed`, `ChildLifecycleReclaimFailed` |
 | `memory_context` | `MemoryRetrieved`, `ContextContributionReceived`, `ContextContributionSelected`, `ContextContributionOmitted`, `MemoryStored`, `ContextItemInjected`, `ContextCompactionStarted`, `ContextCompactionCompleted`, `ContextProjectionAudited` |
 | `realtime` | `RealtimeConnected`, `RealtimeInputSent`, `RealtimeOutputReceived`, `RealtimeInterrupted`, `RealtimeRestartRequested`, `RealtimeRestartStarted`, `RealtimeRestartCompleted`, `RealtimeRestartFailed`, `RealtimeConnectionRestarted`, `RealtimeClosed`, `RealtimeBackpressureApplied` |
-| `subagent` | `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, `SubagentParentMessageSent`, `SubagentParentMessageRead`, `SubagentClarificationRequested`, `SubagentClarificationResponded`, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp` |
+| `agent_pool` | `AgentPoolCreated`, `AgentPoolRunJoined`, `AgentPoolRunLeft`, `RunMessageAccepted`, `RunMessageDelivered`, `RunMessageResponded`, `RunMessageFailed`, `RunMessageTimedOut`, `RunMessageExpired`, `RunMessageCancelled`, `WakeConditionRegistered`, `WakeConditionTriggered`, `WakeConditionTimedOut`, `WakeConditionCancelled` |
+| `subagent` | `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp` |
 | `extension` | `ExtensionCapabilityLoaded`, `ExtensionHookInvoked`, `ExtensionToolRequested`, `ExtensionEventObserved`, `ExtensionActionSubmitted`, `ExtensionActionStarted`, `ExtensionActionCompleted`, `ExtensionActionFailed`, `ExtensionActionDenied` |
 | `output_delivery` | `OutputDispatchRequested`, `OutputDispatchCompleted`, `OutputDispatchFailed`, `OutputDispatchDeduped` |
 | `telemetry_cost` | `TelemetrySinkFailed`, `TelemetrySinkRecovered`, `UsageRecorded`, `CostEstimated`, `CostCorrected` |
@@ -415,7 +420,14 @@ Feature goals must add fixtures before emitting additional reserved kinds. Famil
 
 Adding a family or kind requires a contract update and golden fixture. Renaming a family or kind requires a compatibility note. `RealtimeConnectionRestarted` is a compatibility alias only; new adapters should emit the requested/started/completed/failed sequence so observers can tell whether a restart was merely planned, in progress, successful, or failed.
 
-Phase 05 canonicalizes earlier isolation and child-lifecycle draft names before code exists: process I/O, stats, and signal events use `IsolationProcessIoCaptured`, `IsolationProcessStatsRecorded`, and `IsolationProcessSignalled`; detach/reclaim ownership uses the `child_lifecycle` family rather than `IsolationProcessDetached`; child-lifecycle event kinds carry the `ChildLifecycle*` prefix. Implementations should not emit the shorter Phase 04 draft aliases.
+The completed contract-packet Phase 05 feature-layer pass canonicalizes earlier
+isolation and child-lifecycle draft names before code exists: process I/O, stats,
+and signal events use `IsolationProcessIoCaptured`,
+`IsolationProcessStatsRecorded`, and `IsolationProcessSignalled`;
+detach/reclaim ownership uses the `child_lifecycle` family rather than
+`IsolationProcessDetached`; child-lifecycle event kinds carry the
+`ChildLifecycle*` prefix. Implementations should not emit the shorter Phase 04
+draft aliases.
 
 `HookRegistered` is run-effective, not a pre-run package construction event. It is emitted only after a hook spec is part of a specific run's immutable runtime package and a `run_id` exists. Package construction and validation use runtime-package records/fixtures rather than run-scoped `AgentEvent`s.
 
@@ -470,6 +482,7 @@ These are minimum fields. Event-specific DTOs may add optional fields, but they 
 | `child_lifecycle` | `child_artifact_id`, `child_artifact_kind`, `owner_run_id`, `shutdown_behavior`, `detach_status`, `reclaim_policy_ref`, `host_ack_ref`, `terminal_status`, `error_ref`. |
 | `memory_context` | `context_contribution_id`, `context_item_id`, `context_kind`, `producer_ref`, `source_ref`, `content_ref`, `selection_reason`, `policy_refs`, `projection_id`, `included_counts`, `omitted_counts`, `redaction_policy_id`. |
 | `realtime` | `connection_id`, `media_kind`, `stream_cursor`, `backpressure_policy`, `restart_count`, `interruption_ref`, `status`. |
+| `agent_pool` | `pool_id`, `message_id`, `wake_condition_id`, `source_run_id`, `target_ref`, `topic_id`, `delivery_status`, `timeout_ms`, `policy_refs`, `content_refs`. |
 | `subagent` | `parent_run_id`, `child_run_id`, `child_agent_id`, `handoff_context_refs`, `child_policy_summary`, `usage_rollup_ref`, `terminal_status`. |
 | `extension` | `extension_id`, `capability_kind`, `protocol_version`, `hook_kind`, `action_kind`, `policy_decision_ref`, `status`. |
 | `output_delivery` | `destination`, `dedupe_key`, `source_message_id`, `dispatch_status`, `ack_ref`, `reconciliation_status`. |
@@ -488,7 +501,8 @@ Each workstream must maintain an emitted-kind matrix:
 | fake tool executor | all tool and approval kinds used by tests | one JSON payload per emitted kind |
 | fake realtime adapter | all realtime lifecycle/interruption/restart kinds used by tests | one JSON payload per emitted kind |
 | fake isolation adapter | all isolation capability, downgrade, lifecycle, process I/O, stats, cleanup, and failure kinds used by tests | one JSON payload per emitted kind plus no-raw-process-data redaction cases |
-| fake subagent runner | all subagent handoff, parent-message, clarification, rollup kinds used by tests | one JSON payload per emitted kind |
+| fake agent-pool coordinator | all agent-pool run-message and wake-condition kinds used by tests | one JSON payload per emitted kind plus no-raw-message-content redaction cases |
+| fake subagent runner | all subagent handoff, wrapped event, terminal, and rollup kinds used by tests | one JSON payload per emitted kind |
 | fake hook executor | all hook invocation, timeout, response, cancel, and failure kinds used by tests | one JSON payload per emitted kind plus no-raw-content redaction cases |
 | fake child lifecycle reconciler | all child shutdown, detach, reclaim, process signal, and cleanup kinds used by tests | one JSON payload per emitted kind plus replay fixtures |
 | fake extension bridge | all extension capability, hook/tool/action, app-event observation, and action terminal kinds used by tests | one JSON payload per emitted kind plus host-manifest-exclusion redaction cases |
@@ -512,6 +526,8 @@ Family-level fixture coverage is still required, but it is not enough for implem
 - `cli`
 - `desktop`
 - `external_runtime`
+- `agent_run`
+- `agent_pool`
 - `subagent`
 - `replay`
 - `compaction`
@@ -534,6 +550,8 @@ Family-level fixture coverage is still required, but it is not enough for implem
 - `journal`
 - `ui`
 - `external_runtime`
+- `agent_pool`
+- `agent_run`
 - `isolation_runtime`
 - `hook`
 - `output_sink`
@@ -594,8 +612,8 @@ Feature-layer golden tests required when those kinds are emitted:
 
 - family-level coverage fixture for each event family emitted by the implemented slice
 - one parent/child `SubagentEvent`
-- one subagent clarification request/response pair
-- one subagent parent-message send/read pair
+- one agent-pool run-message request/response pair
+- one wake-condition register/trigger or timeout pair
 - one `ContextProjectionAudited`
 - one `StreamRuleMatched`
 - one realtime restart requested/started/completed sequence

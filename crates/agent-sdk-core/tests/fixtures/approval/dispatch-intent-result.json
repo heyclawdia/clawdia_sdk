@@ -1,0 +1,23 @@
+{
+  "records": [
+    {
+      "destination_kind": "tool",
+      "effect_id": "effect.approval.1",
+      "effect_kind": "approval_dispatch",
+      "policy_refs": [
+        "policy.approval.workspace_write"
+      ],
+      "record_kind": "approval_dispatch_intent",
+      "source_kind": "remote_channel",
+      "subject_kind": "approval_request"
+    },
+    {
+      "effect_id": "effect.approval.1",
+      "lifecycle_status": "approved",
+      "record_kind": "approval_dispatch_result",
+      "summary": "approval approved",
+      "terminal_status": "completed"
+    }
+  ],
+  "schema_version": 1
+}

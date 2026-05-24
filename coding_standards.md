@@ -11,7 +11,12 @@ The authoritative standards live at [docs/architecture/coding-standards.md](docs
 - Preserve observability, journal durability, lineage, privacy, policy, and recovery in every implementation slice.
 - Prefer explicit typed primitives over text-label archaeology or ambient host state.
 - Fail closed when policy, dispatcher, adapter, isolation, or storage requirements are absent.
+- Maintain the Rust SDK package with clear architectural ownership. Source and tests should be organized by SDK responsibility (`domain`, `package`, `records`, `ports`, `application`/`runtime`, and `testing`) while preserving a stable, discoverable public facade.
+- Keep `mod.rs` and crate facades small and navigable. Real behavior belongs in meaningfully named files or responsibility folders, and future agents should be able to find read/search/edit/write/protocol behavior by filename.
+- Follow the mature-SDK layout lesson captured in the architecture standards: stable package facades, separated generated/spec-derived code, explicit ports/adapters, durable records apart from runtime orchestration, and visible reusable fake/test-kit support.
+- Expose SDK-consumer test helpers through the documented `agent_sdk_core::testing` namespace. New `Fake*`, `Scripted*`, and conformance harnesses belong in `src/testing/` unless explicitly justified as production reference implementations.
 - Validate behavior with fake adapters, golden fixtures, property tests, smoke tests, and contract audits before using live providers or concrete host runtimes.
+- Treat mockability as a core SDK contract. Every port, adapter boundary, side-effect path, and scenario surface must be testable with deterministic fakes or a public test-support harness that SDK users can reuse for their own implementations.
 
 ## Required Reading
 
@@ -27,3 +32,5 @@ The authoritative standards live at [docs/architecture/coding-standards.md](docs
 ## Completion Rule
 
 An SDK implementation launch target is not complete until its contract tests, golden fixtures, smoke tests, and cross-contract audits named in the launch doc have evidence. Passing docs review alone is not implementation confidence.
+
+The SDK package architecture gate is part of completion: reviewers must reject changes that add new source or integration-test files outside the owning SDK responsibility folder unless the phase exit report explains a deliberate public facade, conventional Cargo layout choice, or Cargo test-target shim.

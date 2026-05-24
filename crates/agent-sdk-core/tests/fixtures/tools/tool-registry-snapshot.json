@@ -1,0 +1,26 @@
+{
+  "routes": [
+    {
+      "canonical_tool_name": "workspace_read",
+      "capability_id": "cap.tool.read",
+      "effect_class": "Read",
+      "executor_ref": "executor.workspace_read.v1",
+      "namespace": "tool.workspace_read",
+      "policy_refs": [
+        "policy.approval.read"
+      ],
+      "risk_class": "Low"
+    },
+    {
+      "canonical_tool_name": "workspace_write",
+      "capability_id": "cap.tool.write",
+      "effect_class": "Write",
+      "executor_ref": "executor.workspace_write.v1",
+      "namespace": "tool.workspace_write",
+      "policy_refs": [
+        "policy.approval.write"
+      ],
+      "risk_class": "High"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Agent SDK Implementation Workstreams
 
-Use this folder to launch future Rust implementation work after the contract packet exits through [Phase 07](../workstreams/07-final-review/README.md).
+Use this folder to launch, audit, and review phase-gated Rust implementation work after the contract packet exits through [Phase 07](../workstreams/07-final-review/README.md).
 
 The rule is strict: **run phases in numeric order, and run every launch target inside the current numbered phase folder in parallel**. If one item needs another item's output, it belongs in a later phase. Sibling launch targets are parallel-safe by contract.
 
@@ -15,14 +15,15 @@ Launch targets use short titles such as `typed-ids`, `event-frames`, or `text-ru
 | [02 Core Records](02-core-records/README.md) | all targets in parallel | Build package, event, journal, content/context, and provider-port records over the shared kernel. |
 | [03 Run Control](03-run-control/README.md) | all targets in parallel | Implement runtime ownership, loop state transitions, and reconnectable run handles. |
 | [04 P0 Text Run](04-p0-text-run/README.md) | one target | Integrate the first fake-provider text run through package, context, provider, events, and journal. |
-| [05 Output Contract](05-output-contract/README.md) | one target | Add output contracts, schema refs, helper lowering, and package fingerprint normalization. |
-| [06 P1 Validation Result](06-p1-validation-result/README.md) | all targets in parallel | Add local validation/repair and typed result records over the output contract. |
-| [07 P1 Typed Run](07-p1-typed-run/README.md) | one target | Integrate P1 typed output over the P0 loop and prove typed result publication. |
-| [08 P2 Side Effects](08-p2-side-effects/README.md) | all targets in parallel | Add approval, tool execution, output delivery, hooks, and core telemetry over the shared effect spine. |
-| [09 Feature Ports](09-feature-ports/README.md) | all targets in parallel | Add reserved feature-layer ports and optional crates without making them P0/P1 requirements. |
-| [10 Replay Hardening](10-replay-hardening/README.md) | all targets in parallel | Fill golden fixtures, replay/recovery coverage, performance, and privacy hardening. |
-| [11 Scenario Verification](11-scenario-verification/README.md) | all targets in parallel | Prove generic scenarios and public API readiness after hardening. |
-| [12 Release Readiness](12-release-readiness/README.md) | one target | Run final packaging, feature flag, docs, verification-matrix, and release-handoff checks. |
+| [05 Agent Pool Coordination](05-agent-pool-coordination/README.md) | one target | Add generic agent-run coordination, run messages, delivery receipts, and wake conditions without workflow-engine behavior. |
+| [06 Output Contract](06-output-contract/README.md) | one target | Add output contracts, schema refs, helper lowering, and package fingerprint normalization. |
+| [07 P1 Validation Result](07-p1-validation-result/README.md) | all targets in parallel | Add local validation/repair and typed result records over the output contract. |
+| [08 P1 Typed Run](08-p1-typed-run/README.md) | one target | Integrate P1 typed output over the P0 loop and prove typed result publication. |
+| [09 P2 Side Effects](09-p2-side-effects/README.md) | all targets in parallel | Add approval, tool execution, output delivery, hooks, and core telemetry over the shared effect spine. |
+| [10 Feature Ports](10-feature-ports/README.md) | all targets in parallel | Add reserved feature-layer ports and optional crates without making them P0/P1 requirements. |
+| [11 Replay Hardening](11-replay-hardening/README.md) | all targets in parallel | Fill golden fixtures, replay/recovery coverage, performance, and privacy hardening. |
+| [12 Scenario Verification](12-scenario-verification/README.md) | all targets in parallel | Prove generic scenarios and public API readiness after hardening. |
+| [13 Release Readiness](13-release-readiness/README.md) | one target | Run final packaging, feature flag, docs, verification-matrix, and release-handoff checks. |
 
 Do not start a later phase until the previous phase README exit gate is checked and the phase exit report records reviewer PASS.
 
@@ -35,14 +36,20 @@ The phase graph is shaped around test seams:
 - Phase 02 splits independent durable record families so package, event, journal, context, and provider DTOs can each get their own fixtures.
 - Phase 03 keeps runtime control independent from the first complete run so state-machine and reconnect tests can fail locally.
 - Phase 04 is the first integration gate: P0 must pass one fake-provider text run before typed output or side effects start.
-- Phase 05 freezes output-contract DTOs and helper lowering before validators or typed results depend on them.
-- Phase 06 lets validation/repair and typed-result record work run in parallel because both depend only on the Phase 05 contract, not each other.
-- Phase 07 is the P1 integration gate: typed output must pass over the P0 loop before side effects start.
-- Phase 08 proves P2 side effects with policy matrices and intent-before-effect journal tests.
-- Phase 09 adds optional feature ports only after P2, keeping streaming, isolation, subagents, extensions, and tool packs out of the minimal core profiles.
-- Phase 10 exists specifically to close cross-cutting fixture, replay, privacy, and performance gaps before release scenarios.
-- Phase 11 runs scenario and API verification in parallel after the hardening phase has made the evidence stable.
-- Phase 12 is a final serialized release-readiness stitching phase that consumes all earlier verification evidence.
+- Phase 05 adds the generic `AgentPool` feature layer after the P0 loop exists, so later subagent work can reuse run messages and wake conditions instead of inventing a private mailbox.
+- Phase 05 is an intentional full-packet sequencing gate, not a P0/P1 profile
+  requirement. A strict minimal MVP can still prove P0/P1 without agent pools;
+  this launch map places the pool after P0 so its IDs, events, journal records,
+  and wake semantics are settled before later subagent and workflow-facing
+  feature work depends on them.
+- Phase 06 freezes output-contract DTOs and helper lowering before validators or typed results depend on them.
+- Phase 07 lets validation/repair and typed-result record work run in parallel because both depend only on the Phase 06 contract, not each other.
+- Phase 08 is the P1 integration gate: typed output must pass over the P0 loop before side effects start.
+- Phase 09 proves P2 side effects with policy matrices and intent-before-effect journal tests.
+- Phase 10 adds optional feature ports only after P2, keeping streaming, isolation, subagents, extensions, and tool packs out of the minimal core profiles.
+- Phase 11 exists specifically to close cross-cutting fixture, replay, privacy, and performance gaps before release scenarios.
+- Phase 12 runs scenario and API verification in parallel after the hardening phase has made the evidence stable.
+- Phase 13 is a final serialized release-readiness stitching phase that consumes all earlier verification evidence.
 
 If a future implementer finds a hidden dependency between two sibling launch targets, do not coordinate through shared mutable work. Move the dependent work into the next numbered phase and update this launch map.
 
@@ -54,14 +61,15 @@ flowchart TD
   P01 --> P02["02 Core Records<br/>parallel"]
   P02 --> P03["03 Run Control<br/>parallel"]
   P03 --> P04["04 P0 Text Run"]
-  P04 --> P05["05 Output Contract"]
-  P05 --> P06["06 P1 Validation Result<br/>parallel"]
-  P06 --> P07["07 P1 Typed Run"]
-  P07 --> P08["08 P2 Side Effects<br/>parallel"]
-  P08 --> P09["09 Feature Ports<br/>parallel"]
-  P09 --> P10["10 Replay Hardening<br/>parallel"]
-  P10 --> P11["11 Scenario Verification<br/>parallel"]
-  P11 --> P12["12 Release Readiness"]
+  P04 --> P05["05 Agent Pool Coordination"]
+  P05 --> P06["06 Output Contract"]
+  P06 --> P07["07 P1 Validation Result<br/>parallel"]
+  P07 --> P08["08 P1 Typed Run"]
+  P08 --> P09["09 P2 Side Effects<br/>parallel"]
+  P09 --> P10["10 Feature Ports<br/>parallel"]
+  P10 --> P11["11 Replay Hardening<br/>parallel"]
+  P11 --> P12["12 Scenario Verification<br/>parallel"]
+  P12 --> P13["13 Release Readiness"]
 ```
 
 ## Launch Protocol

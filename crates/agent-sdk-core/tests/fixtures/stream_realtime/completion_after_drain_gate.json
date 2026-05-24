@@ -1,0 +1,9 @@
+{
+  "approvals_terminal": true,
+  "final_visible_output_seen": true,
+  "journal_terminal": true,
+  "output_delivery_terminal": true,
+  "realtime_sessions_terminal": true,
+  "stream_interventions_terminal": true,
+  "terminal_event_replayable": true
+}

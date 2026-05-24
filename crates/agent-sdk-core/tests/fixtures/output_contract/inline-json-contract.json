@@ -1,0 +1,63 @@
+{
+  "content_policy": {
+    "byte_limit": 0,
+    "mode": "Off",
+    "policy_ref": {
+      "id": "policy.output.content_capture.safe_defaults",
+      "kind": "privacy"
+    },
+    "redaction_required": true,
+    "retention_required": true,
+    "sampling_required": true,
+    "sink_permits_content": false,
+    "source_permits_content": false
+  },
+  "dialect": "json_schema2020_12_subset",
+  "mode": "final_only",
+  "projection_hint": {
+    "include_schema_ref": true,
+    "provider_hint_policy": "schema_required"
+  },
+  "repair": {
+    "backoff": "none",
+    "include_candidate_content": "content_ref_only",
+    "include_redacted_errors": true,
+    "include_schema_in_prompt": true,
+    "max_repair_attempts": 2,
+    "on_exhausted": "fail_run",
+    "repair_adapter_ref": "repair.output.provider_redacted.v1"
+  },
+  "retry_budget": {
+    "max_attempts": 2
+  },
+  "schema": {
+    "content_hash": "sha256:c0f00621ba42dc1169cada464288b7e72467105c72f48a996833673ce4435390",
+    "redacted_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    },
+    "type": "inline_json"
+  },
+  "schema_id": "schema.todo_inline",
+  "schema_version": {
+    "major": 1,
+    "minor": 2,
+    "patch": 0
+  },
+  "validation": {
+    "allow_additional_properties": false,
+    "failure_visibility": "redacted_summary",
+    "max_candidate_bytes": 32768,
+    "max_errors_returned": 32,
+    "timeout_ms": 10000,
+    "validator_ref": "validator.output.json_schema.local.v1"
+  }
+}

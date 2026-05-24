@@ -23,9 +23,15 @@ Prove the smallest complete SDK run: one fake provider text response through pac
 
 ## Owned Implementation Surface
 
-- `crates/agent-sdk-core/src/loop_driver.rs`
-- `crates/agent-sdk-core/src/result.rs`
-- `crates/agent-sdk-core/tests/p0_text_run.rs`
+- `crates/agent-sdk-core/src/application/loop_driver.rs`
+- `crates/agent-sdk-core/src/application/agent.rs`
+- `crates/agent-sdk-core/src/application/run.rs`
+- `crates/agent-sdk-core/src/application/runtime.rs`
+- `crates/agent-sdk-core/src/records/event.rs`
+- `crates/agent-sdk-core/src/records/journal.rs`
+- `crates/agent-sdk-core/src/ports/event_bus.rs`
+- `crates/agent-sdk-core/tests/p0/p0_text_run.rs`
+- root Cargo test-target shim `crates/agent-sdk-core/tests/p0_text_run.rs`
 - fixture files under `crates/agent-sdk-core/tests/fixtures/p0/`
 
 ## Must Deliver
@@ -42,6 +48,7 @@ Prove the smallest complete SDK run: one fake provider text response through pac
 - `cargo test -p agent-sdk-core`
 - P0 golden event and journal fixtures
 - audit that P0 core builds with optional features disabled
+- SDK package architecture audit for root facades and P0 test shim
 
 ## Must Not
 

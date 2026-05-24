@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 1,
+      "payload_type": "run_lifecycle",
+      "record_kind": "Run"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 2,
+      "payload_type": "context_projection",
+      "record_kind": "Context"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 3,
+      "payload_type": "effect_intent",
+      "record_kind": "EffectIntent"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 4,
+      "payload_type": "model_attempt",
+      "record_kind": "ModelAttempt"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 5,
+      "payload_type": "effect_result",
+      "record_kind": "EffectResult"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 6,
+      "payload_type": "model_attempt",
+      "record_kind": "ModelAttempt"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 7,
+      "payload_type": "message",
+      "record_kind": "Message"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 8,
+      "payload_type": "terminal_result",
+      "record_kind": "Run"
+    }
+  ]
+}

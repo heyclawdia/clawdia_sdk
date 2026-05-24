@@ -1,0 +1,46 @@
+{
+  "destination": {
+    "id": "destination.provider.1",
+    "kind": "provider",
+    "privacy": "content_refs_only",
+    "redacted_summary": "provider projection",
+    "retention": "run_scoped"
+  },
+  "entity": {
+    "id": "run.contract",
+    "kind": "run",
+    "privacy": "content_refs_only",
+    "redacted_summary": "run subject",
+    "source": {
+      "correlation": [
+        {
+          "key": "thread",
+          "value": "thread.redacted"
+        }
+      ],
+      "id": "source.remote.1",
+      "kind": "remote_channel",
+      "privacy": "content_refs_only",
+      "redacted_summary": "remote user request",
+      "trust": "user_provided"
+    }
+  },
+  "policy": {
+    "id": "policy.privacy.default",
+    "kind": "privacy",
+    "version": "v1"
+  },
+  "source": {
+    "correlation": [
+      {
+        "key": "thread",
+        "value": "thread.redacted"
+      }
+    ],
+    "id": "source.remote.1",
+    "kind": "remote_channel",
+    "privacy": "content_refs_only",
+    "redacted_summary": "remote user request",
+    "trust": "user_provided"
+  }
+}

@@ -47,7 +47,7 @@ The first slice has three explicit profiles. P0 proves one fake-provider text ru
 
 | Profile | Required surface | Not required |
 | --- | --- | --- |
-| P0 text run | run lifecycle, provider port, context projection, events, journal, package fingerprint, refs/IDs, provider-request effect records | typed output, tools, approvals, isolation, extensions, telemetry exporters, subagents, realtime |
+| P0 text run | run lifecycle, provider port, context projection, events, journal, package fingerprint, refs/IDs, provider-request effect records | typed output, tools, approvals, isolation, extensions, telemetry exporters, agent pools, subagents, realtime |
 | P1 typed output | P0 plus `OutputContract`, schema refs, local validation, repair accounting, `ValidatedOutput` | tool execution, output delivery channels, approval UI |
 | P2 tools/approval | P1 plus `ToolExecutor`, `ApprovalBroker`, tool capabilities, tool effect intent/result records | concrete toolkit packs, concrete isolation adapters, extension runtimes |
 
@@ -59,7 +59,13 @@ The first slice has three explicit profiles. P0 proves one fake-provider text ru
 - ports: `ProviderAdapter`, optional fake `OutputSink`, journal/store ports; P2 activates `ToolExecutor` and approval policy/broker ports;
 - boundaries: `EntityRef`, `SourceRef`, `DestinationRef`, `PrivacyClass`, `RetentionClass`, `TrustClass`, `LineageRef`, and typed IDs.
 
-Tool packs, hooks, stream rules, memory stores, isolation adapters, subagents, extensions, telemetry exporters, and output channels are feature layers over these primitives. They may add helpers and optional crates, but they must not create a second run loop, event stream, journal, package registry, policy path, or side-effect path. Reserved feature ports can exist as traits or contracts before implementation, but they are not required to pass the MVP fake-provider run.
+Tool packs, hooks, stream rules, memory stores, agent pools, isolation adapters,
+subagents, extensions, telemetry exporters, and output channels are feature
+layers over these primitives. They may add helpers and optional crates, but they
+must not create a second run loop, event stream, journal, package registry,
+policy path, or side-effect path. Reserved feature ports can exist as traits or
+contracts before implementation, but they are not required to pass the MVP
+fake-provider run.
 
 ## Public Surface Tiers
 
@@ -68,7 +74,7 @@ The API docs name three tiers so the first slice stays small without losing plan
 | Tier | Required when | Examples |
 | --- | --- | --- |
 | P0/P1 public | Required for one fake-provider text run and typed-output run. | `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, `RunResult`, `RuntimePackage`, first-slice `CapabilitySpec`, `AgentMessage`, `ContextProjection`, `OutputContract`, `AgentEvent`, `RunJournal`, core refs/IDs, provider and optional fake output ports. |
-| Reserved public contract | Contract may be documented now, but implementation waits for the owning phase goal. | hook lifecycle, stream rules, isolation, subagents, extension capabilities, telemetry exporters, event archive replay. |
+| Reserved public contract | Contract may be documented now, but implementation waits for the owning phase goal. | hook lifecycle, stream rules, agent pools, isolation, subagents, extension capabilities, telemetry exporters, event archive replay. |
 | Optional crate API | Public only from an optional crate or host adapter. | concrete toolkit tools, isolation adapters, extension JSON-RPC bridge, OTel exporter helpers, workflow/orchestration helpers. |
 
 Reserved public contracts must not be required for the MVP crate to compile or run a fake-provider run.
@@ -207,7 +213,12 @@ impl RunResult {
 
 `AgentRuntime` resolves a request package ref plus runtime defaults into one effective per-run `RuntimePackage` before execution starts. That effective package snapshot, not the runtime object, is the execution authority and fingerprint source for the run.
 
-Reserved hook helpers, child lifecycle helpers, telemetry registration, event archive replay, stream rules, tools/approval, isolation, subagents, and extension helpers should be shown in their owning contracts, not the P0/P1 conceptual API. When activated, each helper must lower into the same `RunRequest`, `RuntimePackage`, `AgentEvent`, `RunJournal`, `PolicyRef`, and `EffectIntent` path instead of adding a parallel behavior path.
+Reserved hook helpers, child lifecycle helpers, telemetry registration, event
+archive replay, stream rules, tools/approval, agent pools, isolation, subagents,
+and extension helpers should be shown in their owning contracts, not the P0/P1
+conceptual API. When activated, each helper must lower into the same
+`RunRequest`, `RuntimePackage`, `AgentEvent`, `RunJournal`, `PolicyRef`, and
+`EffectIntent` path instead of adding a parallel behavior path.
 
 ## Ergonomic Surface And Lowering Contract
 
@@ -274,7 +285,11 @@ Every public error carries causal IDs when available and a typed retry classific
 
 ## Slice Order
 
-Implementation should land contracts in this order. The MVP text gate is one fake-provider text run after steps 1-6. Step 7 completes the first-slice typed-output gate over the same run loop. Later steps are feature layers.
+Implementation should land contracts in this order. The MVP text gate is one
+fake-provider text run after steps 1-6. Step 7 is an intentional full-packet
+coordination gate after P0, not a P1 requirement. Step 8 completes the
+first-slice typed-output gate over the same run loop. Later steps are feature
+layers.
 
 1. Domain IDs, errors, privacy, source/destination refs.
 2. Event envelope, event bus filters, cursors, and golden event records.
@@ -282,12 +297,13 @@ Implementation should land contracts in this order. The MVP text gate is one fak
 4. Runtime package snapshot/fingerprint.
 5. Loop state machine with fake provider.
 6. Projection/message/context.
-7. Structured output and optional fake output delivery sink for the typed-output gate.
-8. Tools and approval.
-9. Stream rules.
-10. Tool packs and isolation fake adapter.
-11. Subagents and extension bridge.
-12. Telemetry exporters and host adapter prototypes with fakes first.
+7. Agent-pool coordination, when running the full SDK launch map.
+8. Structured output and optional fake output delivery sink for the typed-output gate.
+9. Tools and approval.
+10. Stream rules.
+11. Tool packs and isolation fake adapter.
+12. Subagents and extension bridge.
+13. Telemetry exporters and host adapter prototypes with fakes first.
 
 ## Core Vs Toolkit Crate Boundary
 

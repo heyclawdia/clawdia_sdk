@@ -1,0 +1,145 @@
+{
+  "budget": {
+    "included_items": 1,
+    "max_items": 2,
+    "max_tokens": 1000,
+    "omitted_items": 1,
+    "used_tokens": 42
+  },
+  "budget_denied_count": 0,
+  "candidate_count": 2,
+  "compacted_count": 0,
+  "decisions": [
+    {
+      "content_ref": {
+        "artifact_ref": null,
+        "content_hash": null,
+        "content_id": "content.fixture",
+        "destination_ref": null,
+        "kind": "document",
+        "mime": "text/markdown",
+        "privacy_class": "content_refs_only",
+        "producer_ref": {
+          "id": "producer.context.test",
+          "kind": "content",
+          "privacy": "content_refs_only"
+        },
+        "redacted_summary": "fixture context summary",
+        "resolver_ref": "resolver.fake.context",
+        "retention_class": "run_scoped",
+        "scope": "run",
+        "size_bytes": null,
+        "source_ref": {
+          "id": "source.context.test",
+          "kind": "host",
+          "privacy": "content_refs_only",
+          "trust": "host_provided"
+        },
+        "trust_class": "host_provided",
+        "version": "v1"
+      },
+      "context_item_id": "context.item.fixture",
+      "contribution_id": "contribution.fixture",
+      "policy_refs": [
+        {
+          "id": "policy.context.test",
+          "kind": "context"
+        }
+      ],
+      "privacy_class": "content_refs_only",
+      "producer_ref": {
+        "id": "producer.context.test",
+        "kind": "content",
+        "privacy": "content_refs_only"
+      },
+      "protected": false,
+      "reason": "relevant",
+      "redacted_summary": "fixture context summary",
+      "required": false,
+      "retention_class": "run_scoped",
+      "source_ref": {
+        "id": "source.context.test",
+        "kind": "host",
+        "privacy": "content_refs_only",
+        "trust": "host_provided"
+      },
+      "trust_class": "host_provided"
+    },
+    {
+      "content_ref": {
+        "artifact_ref": null,
+        "content_hash": null,
+        "content_id": "content.duplicate",
+        "destination_ref": null,
+        "kind": "document",
+        "mime": "text/markdown",
+        "privacy_class": "content_refs_only",
+        "producer_ref": {
+          "id": "producer.context.test",
+          "kind": "content",
+          "privacy": "content_refs_only"
+        },
+        "redacted_summary": "duplicate context summary",
+        "resolver_ref": "resolver.fake.context",
+        "retention_class": "run_scoped",
+        "scope": "run",
+        "size_bytes": null,
+        "source_ref": {
+          "id": "source.context.test",
+          "kind": "host",
+          "privacy": "content_refs_only",
+          "trust": "host_provided"
+        },
+        "trust_class": "host_provided",
+        "version": "v1"
+      },
+      "context_item_id": null,
+      "contribution_id": "contribution.duplicate",
+      "policy_refs": [
+        {
+          "id": "policy.context.test",
+          "kind": "context"
+        }
+      ],
+      "privacy_class": "content_refs_only",
+      "producer_ref": {
+        "id": "producer.context.test",
+        "kind": "content",
+        "privacy": "content_refs_only"
+      },
+      "protected": false,
+      "reason": "omitted_duplicate",
+      "redacted_summary": "duplicate context summary",
+      "required": false,
+      "retention_class": "run_scoped",
+      "source_ref": {
+        "id": "source.context.test",
+        "kind": "host",
+        "privacy": "content_refs_only",
+        "trust": "host_provided"
+      },
+      "trust_class": "host_provided"
+    }
+  ],
+  "included_count": 1,
+  "missing_ref_count": 0,
+  "omitted_count": 1,
+  "policy_denied_count": 0,
+  "policy_refs": [
+    {
+      "id": "policy.context.test",
+      "kind": "context"
+    }
+  ],
+  "projection_id": "context.projection.fixture",
+  "protected_omitted_count": 0,
+  "redacted_count": 0,
+  "redaction_policy_id": {
+    "id": "policy.redaction.test",
+    "kind": "redaction"
+  },
+  "runtime_package_fingerprint": "runtime.package.fingerprint.fixture",
+  "source_message_ids": [
+    "message.fixture"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "events": [
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Run",
+      "event_kind": "RunStarted",
+      "event_seq": 1,
+      "journal_cursor": "journal.1"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "ContextAssembled",
+      "event_seq": 2,
+      "journal_cursor": "journal.2"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "ProviderRequestProjected",
+      "event_seq": 3,
+      "journal_cursor": "journal.3"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelAttemptStarted",
+      "event_seq": 4,
+      "journal_cursor": "journal.4"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelMessageCompleted",
+      "event_seq": 5,
+      "journal_cursor": "journal.6"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Run",
+      "event_kind": "RunCompleted",
+      "event_seq": 6,
+      "journal_cursor": "journal.8"
+    }
+  ]
+}

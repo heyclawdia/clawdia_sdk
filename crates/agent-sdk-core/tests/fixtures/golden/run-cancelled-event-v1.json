@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "events": [
+    {
+      "family": "run",
+      "kind": "run_cancelled",
+      "delivery_semantics": "journal_backed",
+      "privacy": "content_refs_only",
+      "content_capture": "off",
+      "redacted_summary": "run cancelled without raw content"
+    }
+  ]
+}

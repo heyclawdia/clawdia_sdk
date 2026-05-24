@@ -2,7 +2,12 @@
 
 ## Phase Objective
 
-Phase 05 proves streaming/realtime, isolation, subagents, and extensions layer over the primitive kernel and Phase 04 side-effect spine. Each feature remains product-neutral and uses `RuntimePackage`, `PolicyRef`, `RunJournal`, `AgentEvent`, typed refs, ports/adapters, privacy/redaction, and shared effect fields instead of creating parallel registries, run loops, journals, event streams, policy paths, or telemetry stores.
+Phase 05 proves streaming/realtime, isolation, agent-pool/subagent coordination,
+and extensions layer over the primitive kernel and Phase 04 side-effect spine.
+Each feature remains product-neutral and uses `RuntimePackage`, `PolicyRef`,
+`RunJournal`, `AgentEvent`, typed refs, ports/adapters, privacy/redaction, and
+shared effect fields instead of creating parallel registries, run loops,
+journals, event streams, policy paths, or telemetry stores.
 
 ## Goal Status
 
@@ -10,7 +15,7 @@ Phase 05 proves streaming/realtime, isolation, subagents, and extensions layer o
 | --- | --- | --- | --- | --- |
 | [05a Streaming Realtime](../05a-streaming-realtime.md) | Dirac (`019e5882-0304-7403-9657-4f98501a21fe`) | PASS | `docs/contracts/stream-rule-contract.md` | [05a Review Packet](../05a-streaming-realtime.md#review-packet) |
 | [05b Isolation Execution](../05b-isolation-execution.md) | Hooke (`019e5882-03af-74c0-8498-3c533011f99d`) | PASS | `docs/contracts/isolation-runtime-contract.md` | [05b Review Packet](../05b-isolation-execution.md#review-packet) |
-| [05c Subagents](../05c-subagents.md) | Parfit (`019e5882-0444-70d0-aa7d-6256e620f278`) | PASS | `docs/contracts/subagent-contract.md` | [05c Review Packet](../05c-subagents.md#review-packet) |
+| [05c Subagents](../05c-subagents.md) | Parfit (`019e5882-0444-70d0-aa7d-6256e620f278`) | PASS | `docs/contracts/agent-pool-contract.md`, `docs/contracts/subagent-contract.md` | [05c Review Packet](../05c-subagents.md#review-packet) |
 | [05d Extension SDK](../05d-extension-sdk.md) | Kuhn (`019e5882-055b-7a20-b164-9b8d6239c123`) | PASS | `docs/contracts/extension-sdk-contract.md` | [05d Review Packet](../05d-extension-sdk.md#review-packet) |
 
 ## Accepted Proposals
@@ -21,7 +26,10 @@ Phase 05 proves streaming/realtime, isolation, subagents, and extensions layer o
 - Accept `ChildLifecycle*` event names for child artifact shutdown, detach, acknowledgement, denial, reclaim, and failure. Isolation owns isolated-process child-artifact lifecycle use; subagents reference shared child-lifecycle records for child-run cancellation and detach.
 - Defer dedicated shared `EffectKind` variants for isolation image/rootfs/session/mount/network/secret/environment side effects. Typed `IsolationRecord::*Intent/Result` payloads must map one-to-one to common effect fields until code proves narrower shared kinds are needed.
 - Accept `ExtensionActionStarted`, `ExtensionActionCompleted`, and `ExtensionActionFailed` as extension-family live projections backed by journaled `EffectResult`.
-- Close the Phase 04 OTel deferrals for `stream_rule`, `realtime`, `isolation`, `child_lifecycle`, `subagent`, and `extension` families through explicit emitted-kind mappings, redaction defaults, journal records, and fixture gates.
+- Close the Phase 04 OTel deferrals for `stream_rule`, `realtime`, `isolation`,
+  `child_lifecycle`, `agent_pool`, `subagent`, and `extension` families through
+  explicit emitted-kind mappings, redaction defaults, journal records, and
+  fixture gates.
 - Include Phase 05 feature sidecars and SDK-facing capability snapshots in runtime-package fingerprint inputs when their reserved feature is activated; continue excluding host manifest/runtime/install/marketplace/trust/browser-safe/app-event transport details unless represented as SDK-facing refs or policy decisions.
 
 ## Rejected Proposals
@@ -43,7 +51,10 @@ None.
 
 - Stream/realtime shared records: `StreamRuleRecord`, `RealtimeSessionRecord`, `ContextRecord` for stream-rule injections, approval records for pauses, provider attempt records for retry/cancel, and output-delivery records for sink delivery.
 - Isolation shared records: `IsolationRecord` for requested/capability/downgrade/lifecycle/process/cleanup facts and `ChildLifecycleRecord` for child-artifact shutdown, detach, acknowledgement, reclaim, and failure.
-- Subagent shared records: `SubagentStartedRecord`, `SubagentHandoffRecord`, `SubagentWrappedEventRecord`, mailbox/clarification records, usage rollup records, terminal records, child journal refs, and shared child-lifecycle records.
+- Agent-pool/subagent shared records: `AgentPoolRecord`, `RunMessageRecord`,
+  `WakeRecord`, `SubagentStartedRecord`, `SubagentHandoffRecord`,
+  `SubagentWrappedEventRecord`, usage rollup records, terminal records, child
+  journal refs, and shared child-lifecycle records.
 - Extension shared records: SDK-facing capability catalog/sidecar records, hook/tool records where the extension supplies an executor, `ApprovalRecord` when an action asks, `EffectIntent { kind: ExtensionAction }`, terminal `EffectResult`, and recovery records for unsafe protocol/effect windows.
 - OTel projections remain derived from event and journal facts only. The Phase 05 mapping rows do not grant permission to emit any kind before per-kind event, journal, redaction, and OTel projection fixtures exist.
 

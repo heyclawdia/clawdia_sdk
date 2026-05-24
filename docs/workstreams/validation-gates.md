@@ -12,6 +12,7 @@ This document defines the shared validation language for parallel Agent SDK phas
 | Property/table tests | generated or table-driven cases | reducers, fingerprints, filters, regex safety, policy matrices |
 | Smoke tests | package/import/runtime checks with fake implementations | extension packaging, browser-safe helpers, optional crates |
 | Scenario tests | multi-component fake workflows | chat, voice, headless, subagents, isolation, recovery |
+| SDK test kit | reusable fakes, conformance helpers, and weird-scenario harnesses | downstream provider/tool/sink/runtime/extension/telemetry adapter tests |
 | Docs audits | link, ownership, boundary, and simplicity checks | documentation-only or integration/stitching work |
 
 ## Universal Required Evidence
@@ -34,6 +35,7 @@ Every implementation goal must provide:
 - confirmation that simple helpers lower into canonical contracts when helpers are involved;
 - confirmation that new behavior reuses the primitive kernel or explains why a new primitive proposal is needed;
 - confirmation that events, journal records, telemetry, redaction, policy, and host-owned boundaries were either exercised or explicitly not applicable;
+- confirmation that touched public ports and adapter boundaries have deterministic fakes, conformance helpers, or an explicitly blocked/deferred test-support gap for SDK consumers;
 - a handoff note naming cross-role proposals, unresolved risks, and skipped live/external tests.
 - for non-stitching goals, cross-role proposals appear as proposal blocks in the handoff, not as direct edits to shared reference files.
 
@@ -50,7 +52,37 @@ Every goal must pass these gates before implementation work can be considered re
 | Context projection gate | Memory, tool results, skills, files, subagents, and host input may create `ContextContribution` candidates, but only policy-admitted `ContextItem` values enter `ContextProjection`. |
 | Effect gate | Mutating or externally visible behavior appends effect intent before execution and terminal effect result after execution, or maps one-to-one to that common shape. |
 | No mini-SDK gate | The change does not create a parallel run loop, package registry, event stream, journal, policy path, context projection path, side-effect path, telemetry truth store, or host adapter product layer. |
+| Mockability gate | Public ports, adapter contracts, side-effect paths, and scenario surfaces are mockable through deterministic fakes or reusable conformance helpers; weird/hostile cases are named and tested or explicitly blocked/deferred. |
+| SDK package architecture gate | Source and integration-test files live under the owning SDK responsibility folder (`domain`, `package`, `records`, `ports`, `application`/`runtime`, or `testing`), with only thin public facades or Cargo test-target shims at the root unless a conventional Cargo layout choice is documented. |
 | Phase exit gate | The phase README exit checklist has passed before later phase goals start. |
+
+## SDK Package Architecture Evidence
+
+Every implementation phase must prove the package stayed maintainable before a phase exit can pass.
+
+Required source-layout evidence:
+
+- `crates/agent-sdk-core/src` contains only `lib.rs`, `README.md`, and responsibility folders such as `domain`, `package`, `records`, `ports`, `application`, and `testing`.
+- Full integration-test bodies live in `tests/domain`, `tests/package`, `tests/records`, `tests/ports`, `tests/runtime`, `tests/feature_layers`, or `tests/testing`; root `tests/*.rs` files are stable Cargo target shims only.
+- Optional crates expose a narrow `src/lib.rs` facade and place real implementation in responsibility modules, not in one growing file.
+- Generated/spec-derived material, when introduced, has a named generated/spec boundary and a hand-written public facade. Generated internals are not treated as stable deep-import paths.
+- New public fakes and test helpers live in `src/testing` or `tests/testing` and exercise the same public ports, records, and package contracts as production code.
+- SDK-consumer test-kit APIs are imported through a single documented public namespace, `agent_sdk_core::testing`, even when legacy flat re-exports temporarily exist.
+- New public module aliases, deep-import paths, or facade exports require a SemVer/API review note in the phase exit report.
+
+Mandatory audit commands:
+
+```bash
+find crates/agent-sdk-core/src -maxdepth 1 -type f -not -name lib.rs -not -name README.md
+find crates/agent-sdk-core/tests -maxdepth 1 -type f -name '*.rs' -print -exec sh -c 'wc -l "$1"' sh {} \;
+find crates -path '*/src/*.rs' -maxdepth 3 -type f
+rg -n '#\\[path = .*\\]\\s*pub mod|pub mod [a-zA-Z0-9_]+;' crates/agent-sdk-core/src/lib.rs
+rg -n '\\b(Fake|Scripted)[A-Za-z0-9_]+|ConformanceHarness' crates/agent-sdk-core/src --glob '*.rs'
+rg -n '\\btrait\\b|\\bAdapter\\b|\\bResolver\\b|\\bFake\\b|\\bScripted\\b|ConformanceHarness' crates/agent-sdk-core/src/records --glob '*.rs'
+wc -l crates/agent-sdk-*/src/lib.rs
+```
+
+The phase exit report must summarize the output and explain any non-empty or non-shim result. Reviewers must treat unexplained source/test sprawl, new public deep modules without API review, scripted helpers outside `src/testing`, or adapter/port behavior inside `records/` as blocking even when behavior tests pass.
 
 ## Common Commands Once Code Exists
 
@@ -128,6 +160,7 @@ Validation evidence:
 Reviewer checklist:
 - Simplicity:
 - Product-neutrality:
+- Mockability / SDK test kit:
 - Event/journal durability:
 - Privacy/redaction:
 - Replay/idempotency:
@@ -145,3 +178,4 @@ New `CapabilitySpec` variants are not accepted until the review packet names the
 - Do not accept host-adapter scenarios as proof that core owns the behavior.
 - Do not accept "not covered yet" without adding a named follow-up owner and blocking status where it affects the first Rust slice.
 - Do not accept a feature-specific event stream, journal, package registry, policy path, or side-effect path when the primitive kernel already has one.
+- Do not accept source or test sprawl: new implementation files and test bodies must be placed in the owning SDK responsibility folder before phase exit.

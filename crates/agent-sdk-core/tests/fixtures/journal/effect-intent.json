@@ -1,0 +1,94 @@
+{
+  "agent_id": "agent.journal.1",
+  "delivery_semantics": "journal_backed",
+  "destination": {
+    "id": "destination.tool.fake",
+    "kind": "tool",
+    "privacy": "content_refs_only",
+    "retention": "host_policy"
+  },
+  "event_index": {
+    "agent_id": "agent.journal.1",
+    "delivery_semantics": "journal_backed",
+    "destination": {
+      "id": "destination.tool.fake",
+      "kind": "tool",
+      "privacy": "content_refs_only",
+      "retention": "host_policy"
+    },
+    "event_family": "effect",
+    "event_kind": "intent",
+    "privacy_class": "content_refs_only",
+    "related_refs": [
+      {
+        "id": "effect.tool.1",
+        "kind": "effect",
+        "privacy": "content_refs_only"
+      }
+    ],
+    "run_id": "run.journal.1",
+    "source": {
+      "id": "source.sdk.run_loop",
+      "kind": "sdk",
+      "privacy": "content_refs_only",
+      "trust": "host_provided"
+    },
+    "subject_ref": {
+      "id": "tool.call.1",
+      "kind": "tool_call",
+      "privacy": "content_refs_only"
+    }
+  },
+  "idempotency_key": "idem.tool.1",
+  "journal_schema_version": 1,
+  "journal_seq": 1,
+  "payload": {
+    "destination": {
+      "id": "destination.tool.fake",
+      "kind": "tool",
+      "privacy": "content_refs_only",
+      "retention": "host_policy"
+    },
+    "effect_id": "effect.tool.1",
+    "idempotency_key": "idem.tool.1",
+    "kind": "tool_execution",
+    "redacted_summary": "execute workspace read tool",
+    "source": {
+      "id": "source.sdk.run_loop",
+      "kind": "sdk",
+      "privacy": "content_refs_only",
+      "trust": "host_provided"
+    },
+    "subject_ref": {
+      "id": "tool.call.1",
+      "kind": "tool_call",
+      "privacy": "content_refs_only"
+    },
+    "type": "effect_intent"
+  },
+  "privacy": "content_refs_only",
+  "record_id": "journal.record.1",
+  "record_kind": "effect_intent",
+  "redaction_policy_id": "redaction.default",
+  "related_refs": [
+    {
+      "id": "effect.tool.1",
+      "kind": "effect",
+      "privacy": "content_refs_only"
+    }
+  ],
+  "run_id": "run.journal.1",
+  "runtime_package_fingerprint": "runtime.package.fingerprint.test",
+  "source": {
+    "id": "source.sdk.run_loop",
+    "kind": "sdk",
+    "privacy": "content_refs_only",
+    "trust": "host_provided"
+  },
+  "subject_ref": {
+    "id": "tool.call.1",
+    "kind": "tool_call",
+    "privacy": "content_refs_only"
+  },
+  "timestamp_millis": 41
+}

@@ -1,0 +1,23 @@
+{
+  "current_status": "deduped",
+  "dedupe_key": "dedupe.output_delivery.cdb2c095339bf84b18c212d8ec0bc8bbfdd656b8dc508ff773af2fb0a462d168",
+  "delivery_id": "output.delivery.39c4ee3054db.final.message",
+  "policy_refs": [
+    {
+      "id": "policy.output.delivery.required",
+      "kind": "host"
+    },
+    {
+      "id": "policy.output.delivery.retry.host-owned",
+      "kind": "host"
+    },
+    {
+      "id": "policy.output.delivery.reconcile.host-owned",
+      "kind": "host"
+    }
+  ],
+  "prior_delivery_id": "output.delivery.39c4ee3054db.final.message",
+  "prior_external_operation_id": "external.fixture",
+  "prior_terminal_status": "completed",
+  "redacted_summary": "output delivery skipped by completed dedupe proof"
+}

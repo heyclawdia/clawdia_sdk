@@ -1,0 +1,5 @@
+{
+  "agent_pool_id": "pool.contract",
+  "topic_id": "topic.contract",
+  "wake_condition_id": "wake.contract"
+}

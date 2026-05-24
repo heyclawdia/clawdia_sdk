@@ -1,0 +1,41 @@
+{
+  "records": [
+    {
+      "address_target": {
+        "run_id": "run.pool.child",
+        "type": "run"
+      },
+      "content_ref": "content.message.agent_pool.1",
+      "delivered_to": [
+        "run.pool.child"
+      ],
+      "delivery_status": "accepted",
+      "effect_intent_kind": "run_message_delivery",
+      "effect_result_status": null,
+      "event_kind": "run_message_accepted",
+      "idempotency_key": "idem.message.agent_pool.1",
+      "message_id": "message.agent_pool.1",
+      "record_kind": "run_message",
+      "source_run_id": "run.pool.parent"
+    },
+    {
+      "address_target": {
+        "run_id": "run.pool.child",
+        "type": "run"
+      },
+      "content_ref": "content.message.agent_pool.1",
+      "delivered_to": [
+        "run.pool.child"
+      ],
+      "delivery_status": "delivered",
+      "effect_intent_kind": null,
+      "effect_result_status": "completed",
+      "event_kind": "run_message_delivered",
+      "idempotency_key": "idem.message.agent_pool.1",
+      "message_id": "message.agent_pool.1",
+      "record_kind": "run_message",
+      "source_run_id": "run.pool.parent"
+    }
+  ],
+  "schema_version": 1
+}

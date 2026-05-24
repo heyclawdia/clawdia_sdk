@@ -1,0 +1,77 @@
+{
+  "records": [
+    {
+      "event_kind": "approval_dispatch_intent",
+      "kind": "approval",
+      "payload": {
+        "destination_kind": "host",
+        "effect_kind": "approval_dispatch",
+        "policy_refs": [
+          "policy.extension.approval"
+        ],
+        "source_kind": "extension"
+      }
+    },
+    {
+      "event_kind": "approval_dispatch_result",
+      "kind": "approval",
+      "payload": {
+        "lifecycle_status": "approved",
+        "summary": "approval approved",
+        "terminal_status": "completed"
+      }
+    },
+    {
+      "action_kind": "host_action",
+      "event_kind": "extension_action_submitted",
+      "has_effect_intent": false,
+      "has_effect_result": false,
+      "kind": "extension_action",
+      "policy_refs": [
+        "policy.extension.action"
+      ],
+      "status": "submitted"
+    },
+    {
+      "content_refs": [
+        "content.extension.action.args.1"
+      ],
+      "destination_kind": "host",
+      "effect_kind": "extension_action",
+      "kind": "effect_intent",
+      "policy_refs": [
+        "policy.extension.action",
+        "policy.extension.approval"
+      ],
+      "source_kind": "extension",
+      "subject_kind": "extension_action"
+    },
+    {
+      "action_kind": "host_action",
+      "event_kind": "extension_action_started",
+      "has_effect_intent": true,
+      "has_effect_result": false,
+      "kind": "extension_action",
+      "policy_refs": [
+        "policy.extension.action"
+      ],
+      "status": "started"
+    },
+    {
+      "kind": "effect_result",
+      "summary": "host action accepted",
+      "terminal_status": "completed"
+    },
+    {
+      "action_kind": "host_action",
+      "event_kind": "extension_action_completed",
+      "has_effect_intent": true,
+      "has_effect_result": true,
+      "kind": "extension_action",
+      "policy_refs": [
+        "policy.extension.action"
+      ],
+      "status": "completed"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "dedupe_key": "dedupe.output_delivery.cdb2c095339bf84b18c212d8ec0bc8bbfdd656b8dc508ff773af2fb0a462d168",
+  "delivery_id": "output.delivery.39c4ee3054db.final.message",
+  "idempotency_key": "idempotency.output.delivery.39c4ee3054db.final.message",
+  "intent_record_id": "journal.output_delivery.intent.replay",
+  "reconciliation_adapter": "sink.output.fixture",
+  "replay_decision": "unsafe_pending",
+  "resend_allowed": false,
+  "side_effect_kind": "output_delivery",
+  "terminal_append_status": "not_attempted",
+  "terminal_status": "reconciliation_needed",
+  "unsafe_pending_reason": "repair replay cannot resend output delivery without completed dedupe proof"
+}

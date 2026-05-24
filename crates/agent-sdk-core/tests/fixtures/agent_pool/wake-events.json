@@ -1,0 +1,71 @@
+{
+  "events": [
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.4",
+      "kind": "wake_condition_registered",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "wake condition registered"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.5",
+      "kind": "wake_condition_triggered",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "wake condition triggered"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.6",
+      "kind": "wake_condition_registered",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "wake condition registered"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.7",
+      "kind": "wake_condition_timed_out",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "wake condition timed out"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.8",
+      "kind": "wake_condition_registered",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "wake condition registered"
+    },
+    {
+      "agent_id": "agent.parent",
+      "content_capture": "off",
+      "family": "agent_pool",
+      "journal_cursor": "journal.9",
+      "kind": "wake_condition_cancelled",
+      "message_id": null,
+      "privacy": "content_refs_only",
+      "run_id": "run.pool.parent",
+      "summary": "wake condition cancelled"
+    }
+  ],
+  "schema_version": 1
+}

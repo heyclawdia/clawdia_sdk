@@ -1,0 +1,36 @@
+{
+  "context": {
+    "default_raw_content_included": false,
+    "default_redacted_has_bytes": false,
+    "raw_opt_in_has_bytes": true,
+    "raw_opt_in_raw_content_included": true
+  },
+  "event_default": {
+    "content_capture": "off",
+    "privacy": "content_refs_only",
+    "raw_content_absent": true
+  },
+  "journal_default": {
+    "content_refs_only": true,
+    "raw_content_absent": true
+  },
+  "output": {
+    "publication_raw_absent": true,
+    "validated_output_privacy": "content_refs_only",
+    "validated_output_raw_absent": true
+  },
+  "stream_rule": {
+    "intervention_raw_absent": true,
+    "serialized_delta_raw_absent": true
+  },
+  "telemetry": {
+    "default_effective_capture": "redacted_summary",
+    "default_strips_raw": true,
+    "raw_opt_in_keeps_raw": true
+  },
+  "tool": {
+    "args_are_refs": 1,
+    "raw_content_absent": true,
+    "result_is_refs": 1
+  }
+}

@@ -87,9 +87,9 @@ External runtime compatibility notifications can be ingested as external runtime
 
 ## Events, Journals, Telemetry, And Recovery
 
-- Events: `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, mailbox/clarification events, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp`, and shared `ChildLifecycle*` events.
-- Journal records: child-start `EffectIntent` / `EffectResult`, `SubagentStartedRecord`, handoff/wrapped-event/mailbox/clarification records, `SubagentUsageRolledUpRecord`, child `RunJournal` refs, `ChildLifecycleRecord`, and `RecoveryRecord`.
-- Policy decisions: topology/depth policy, route policy, `ContextHandoffPolicy`, child tool policy, mailbox policy, child lifecycle policy, redaction/content-capture policy, and detach/reclaim policy.
+- Events: `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, agent-pool run-message/wake events, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp`, and shared `ChildLifecycle*` events.
+- Journal records: child-start `EffectIntent` / `EffectResult`, `SubagentStartedRecord`, handoff/wrapped-event records, linked `RunMessageRecord` / `WakeRecord` entries, `SubagentUsageRolledUpRecord`, child `RunJournal` refs, `ChildLifecycleRecord`, and `RecoveryRecord`.
+- Policy decisions: agent-pool membership/depth policy, route policy, `ContextHandoffPolicy`, child tool policy, message/wake policy, child lifecycle policy, redaction/content-capture policy, and detach/reclaim policy.
 - Telemetry/cost: child run spans, child event links, usage/cost rollup, handoff counts, and terminal status are derived from parent and child journals.
 - Recovery: parent completion cannot seal while a non-detached child is running, unreconciled, or missing usage rollup; duplicate subscribers cannot duplicate child runs or rollups.
 

@@ -1,0 +1,8 @@
+{
+  "environment_id": "env.isolation.contract",
+  "fingerprint_has_isolation": true,
+  "minimum_class": "Sandbox",
+  "network": "allowlist:crates.io",
+  "sidecar_count": 1,
+  "workspace_mode": "Snapshot"
+}

@@ -13,7 +13,7 @@ The rule for this completed packet is intentionally simple: **run phases in nume
 | [02 Primitive Kernel](02-primitive-kernel/README.md) | all goals in parallel | Freeze core API, events/journal, and context/output projection over the package spine. |
 | [03 Kernel Review](03-kernel-review/README.md) | one goal | Reconcile Phase 01 and Phase 02 outputs before side-effect work starts. |
 | [04 Side Effects And Policy](04-side-effects-policy/README.md) | all goals in parallel | Align tools, output delivery, telemetry/privacy, and hooks on the shared effect/policy spine. |
-| [05 Feature Layers](05-feature-layers/README.md) | all goals in parallel | Layer streaming, isolation, subagents, and extensions over the frozen kernel. |
+| [05 Feature Layers](05-feature-layers/README.md) | all goals in parallel | Layer streaming, isolation, agent-pool/subagent coordination, and extensions over the frozen kernel. |
 | [06 Scenario Coverage](06-scenario-coverage/README.md) | one goal | Prove generic scenarios compose from the primitives without importing product behavior. |
 | [07 Final Review](07-final-review/README.md) | one goal | Run whole-packet review and decide readiness for coding. |
 
@@ -69,7 +69,7 @@ Owner role docs keep writable scopes and future implementation scopes disjoint. 
 | [04 Tools, Approval, And Tool Packs](_roles/04-tools-approval-toolpacks.md) | Tool approval and tool-pack contracts. |
 | [05 Streaming And Realtime Rules](_roles/05-streaming-realtime-rules.md) | Stream-rule contract. |
 | [06 Isolation And Execution](_roles/06-isolation-execution.md) | Isolation runtime contract. |
-| [07 Subagents And Coordination](_roles/07-subagents-coordination.md) | Subagent contract. |
+| [07 Subagents And Coordination](_roles/07-subagents-coordination.md) | AgentPool and subagent contracts. |
 | [08 Extension SDK And Packaging](_roles/08-extension-sdk-packaging.md) | Extension SDK contract. |
 | [09 Telemetry, Privacy, And Cost](_roles/09-telemetry-privacy-cost.md) | OTel mapping and telemetry/privacy contracts. |
 | [10 Generic Scenario Coverage](_roles/10-generic-scenario-coverage.md) | Generic examples. |

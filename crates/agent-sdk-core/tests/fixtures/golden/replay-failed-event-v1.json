@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "events": [
+    {
+      "family": "recovery",
+      "kind": "replay_failed",
+      "delivery_semantics": "diagnostic_only",
+      "privacy": "content_refs_only",
+      "content_capture": "off",
+      "redacted_summary": "expired run cursor could not replay without a journal cursor"
+    }
+  ]
+}

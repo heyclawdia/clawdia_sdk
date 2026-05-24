@@ -1,0 +1,37 @@
+{
+  "lifecycle": [
+    {
+      "action": "shutdown_intent",
+      "child_run_id": "run.subagent.life.child",
+      "effect_intent_kind": "child_artifact_shutdown",
+      "effect_result_status": null,
+      "host_ack_ref": null,
+      "status": "requested"
+    },
+    {
+      "action": "shutdown_completed",
+      "child_run_id": "run.subagent.life.child",
+      "effect_intent_kind": "child_artifact_shutdown",
+      "effect_result_status": "cancelled",
+      "host_ack_ref": null,
+      "status": "completed"
+    },
+    {
+      "action": "detach_intent",
+      "child_run_id": "run.subagent.life_detach.child",
+      "effect_intent_kind": "detach_transfer",
+      "effect_result_status": null,
+      "host_ack_ref": "host_ack.subagent.detach.1",
+      "status": "requested"
+    },
+    {
+      "action": "detached",
+      "child_run_id": "run.subagent.life_detach.child",
+      "effect_intent_kind": "detach_transfer",
+      "effect_result_status": "completed",
+      "host_ack_ref": "host_ack.subagent.detach.1",
+      "status": "detached"
+    }
+  ],
+  "schema_version": 1
+}

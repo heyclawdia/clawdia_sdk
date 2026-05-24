@@ -1,0 +1,25 @@
+{
+  "records": [
+    {
+      "content_refs": [
+        "content.args.read.1"
+      ],
+      "effect_id": "effect.tool.call.read.1",
+      "effect_kind": "ToolExecution",
+      "journal_seq": 1,
+      "record_kind": "tool_intent",
+      "redacted_summary": "execute tool workspace_read with redacted arguments",
+      "subject_kind": "ToolCall"
+    },
+    {
+      "content_refs": [
+        "content.result.read.1"
+      ],
+      "effect_id": "effect.tool.call.read.1",
+      "journal_seq": 2,
+      "record_kind": "tool_result",
+      "redacted_summary": "workspace read returned content refs",
+      "terminal_status": "Completed"
+    }
+  ]
+}

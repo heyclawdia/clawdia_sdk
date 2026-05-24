@@ -1,0 +1,15 @@
+{
+  "policy": "drop_non_terminal",
+  "dropped_count": 7,
+  "gap_end": {
+    "scope": {
+      "run": "run.event.contract"
+    },
+    "event_seq": 9,
+    "event_id": "event.9",
+    "journal_cursor": "journal.cursor.9"
+  },
+  "repair_from": "journal.cursor.9",
+  "terminal_preserved": true,
+  "reason": "policy_dropped_non_terminal"
+}

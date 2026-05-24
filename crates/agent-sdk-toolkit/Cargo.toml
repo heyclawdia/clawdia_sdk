@@ -1,0 +1,24 @@
+[package]
+name = "agent-sdk-toolkit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Optional tool-pack helpers layered over agent-sdk-core primitive contracts."
+documentation = "https://docs.rs/agent-sdk-toolkit"
+readme = "README.md"
+publish = false
+
+[dependencies]
+agent-sdk-core = { path = "../agent-sdk-core" }
+base64 = "0.22.1"
+flate2 = "1.1.9"
+image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "ico", "jpeg", "png", "tiff", "webp"] }
+pdf-extract = "0.10.0"
+quick-xml = "0.40.1"
+regex = "1"
+rusqlite = { version = "0.39.0", features = ["bundled"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tar = "0.4.46"
+zip = { version = "2.4.2", default-features = false, features = ["deflate"] }

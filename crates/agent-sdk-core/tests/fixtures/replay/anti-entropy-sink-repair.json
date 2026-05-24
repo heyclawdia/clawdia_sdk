@@ -1,0 +1,18 @@
+{
+  "latest_journal_cursor": "journal.2",
+  "repairs": [
+    {
+      "affected_record_ids": [
+        "journal.replay.output.intent",
+        "journal.replay.output.reconciliation"
+      ],
+      "external_side_effect_compensation": false,
+      "host_action_required": true,
+      "repair_from": "journal.1",
+      "repair_reason": "output delivery reconciliation requires sink-scoped repair cursor",
+      "repair_to": "journal.2",
+      "view_id": "view.output_sink_repair",
+      "view_kind": "output_sink_repair_cursor"
+    }
+  ]
+}

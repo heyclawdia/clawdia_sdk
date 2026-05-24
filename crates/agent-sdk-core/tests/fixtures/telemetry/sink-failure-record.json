@@ -1,0 +1,41 @@
+{
+  "agent_id": "agent.telemetry",
+  "content_capture": "off",
+  "payload": {
+    "record": {
+      "dropped_count": 0,
+      "failure_kind": "sink_unavailable",
+      "last_acknowledged_cursor": {
+        "export_seq": 0,
+        "sink_id": "telemetry.repairable"
+      },
+      "redacted_summary": "temporary sink outage",
+      "repair_cursor": {
+        "cursor": "journal.terminal.1",
+        "type": "journal"
+      },
+      "sink_id": "telemetry.repairable",
+      "sink_kind": "test",
+      "terminal_preserved": true,
+      "unsafe_pending_reason": null
+    },
+    "type": "sink_failed"
+  },
+  "policy_refs": [
+    {
+      "id": "policy.telemetry.derived",
+      "kind": "host"
+    }
+  ],
+  "privacy": "content_refs_only",
+  "record_id": "telemetry.telemetry.repairable.sink_failed.1",
+  "redaction_policy_id": "redaction.telemetry.default",
+  "retention": "run_scoped",
+  "run_id": "run.telemetry.usage",
+  "runtime_package_fingerprint": "sha256:runtime.package.telemetry",
+  "schema_version": 1,
+  "source_cursor": {
+    "cursor": "journal.terminal.1",
+    "type": "journal"
+  }
+}

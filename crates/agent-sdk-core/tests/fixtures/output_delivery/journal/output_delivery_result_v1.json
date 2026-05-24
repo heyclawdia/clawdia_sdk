@@ -1,0 +1,25 @@
+{
+  "ack_ref": "ack.output_delivery.fake",
+  "content_refs": [
+    "content.ref.output.final.v1"
+  ],
+  "delivery_id": "output.delivery.39c4ee3054db.final.message",
+  "destination": {
+    "id": "destination.output.chat",
+    "kind": "output_sink",
+    "privacy": "content_refs_only",
+    "retention": "host_policy"
+  },
+  "dispatch_status": "completed",
+  "effect_result": {
+    "content_refs": [
+      "content.ref.output.final.v1"
+    ],
+    "effect_id": "effect.output.delivery.39c4ee3054db.final.message",
+    "redacted_summary": "output delivery completed",
+    "terminal_status": "completed"
+  },
+  "redacted_summary": "output delivery completed",
+  "retry_classification": "NotRetryable",
+  "sink_ref": "sink.output.fixture"
+}
