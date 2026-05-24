@@ -1,0 +1,47 @@
+# Goal 04c: Telemetry Privacy
+
+## Phase
+
+[Phase 04: Side Effects And Policy](README.md)
+
+## Owner Role
+
+[Telemetry Privacy Cost](../_roles/09-telemetry-privacy-cost.md)
+
+## Parallelism
+
+Parallel-safe with every other goal in Phase 04 after Phase 03 exits. Do not start Phase 05 until all Phase 04 goals finish.
+
+## Required Reading
+
+- `README.md`
+- `docs/start-here.md`
+- `coding_standards.md`
+- `docs/workstreams/validation-gates.md`
+- `docs/reference/sdk-review-checklist.md`
+- `docs/architecture/primitive-map.md`
+- phase README
+- owner role doc
+- owner role doc read-only inputs
+
+## Writable Files
+
+- `docs/contracts/otel-mapping-contract.md`
+- `docs/contracts/telemetry-privacy-contract.md`
+
+## Primitive Focus
+
+- Telemetry is a derived projection from events, journals, usage, and policy decisions.
+- Raw content capture is opt-in by policy and bounded by redaction, retention, sampling, and destination permission.
+- Sink failure never controls the run.
+
+## Must Not Own
+
+Durable run truth, product dashboards, billing UX, provider credentials, or raw content defaults.
+
+## Validation And Review
+
+- Golden span/log mapping for emitted kinds.
+- Redaction and content-capture policy matrix.
+- Sink failure and retry behavior.
+- Primitive-lowering evidence: telemetry does not create its own event stream or ledger.

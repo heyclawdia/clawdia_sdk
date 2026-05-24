@@ -1,0 +1,103 @@
+# Start Here
+
+This packet describes a future Rust-first `agent_sdk` crate family and extension SDK layer.
+
+It is intentionally standalone and product-neutral. The SDK should support demanding host workflows such as desktop chat, CLI/headless runs, realtime voice, remote channels, external runtimes, extensions, telemetry, and subagents without inheriting any one product's UI, trace store, process cache, marketplace, or workflow assumptions.
+
+## What Changed In This Reorg
+
+- The authoritative Agent SDK packet lives in `/Users/clawdia/clawdia_sdk`.
+- Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
+- Normative implementation contracts live in [contracts](contracts/README.md).
+- Parallel implementation ownership lives in [workstreams](workstreams/README.md).
+- Historical plans, risk notes, and scratch diagrams live in [reference](reference/source-migration-map.md).
+
+## Navigation
+
+| Note | Purpose |
+| --- | --- |
+| [../coding_standards.md](../coding_standards.md) | Root coding standards entry point for future SDK implementation agents. |
+| [architecture/coding-standards.md](architecture/coding-standards.md) | Future SDK engineering standards, testing discipline, performance rules, and observability requirements. |
+| [architecture/external-sdk-lessons.md](architecture/external-sdk-lessons.md) | Lessons from Strands, Cursor, Claude Agent SDK, Pi, oh-my-pi, Apple Containerization, and OpenTelemetry GenAI conventions. |
+| [architecture/primitive-map.md](architecture/primitive-map.md) | First-principles primitive map: ownership, responsibilities, methods, and non-ownership boundaries. |
+| [architecture/observability-and-lineage.md](architecture/observability-and-lineage.md) | Source, destination, metadata, context-injection, stable event taxonomy, journal/replay, trace, privacy, telemetry, cost, and multi-agent lineage model. |
+| [architecture/architecture-proposal.md](architecture/architecture-proposal.md) | Main middle-level proposal with module layout, flows, diagrams, and conceptual Rust skeletons. |
+| [architecture/coverage-gap-matrix.md](architecture/coverage-gap-matrix.md) | Phase 1 acceptance coverage, gaps, and Phase 2 candidates. |
+| [contracts/README.md](contracts/README.md) | Normative implementation contracts for API, events, loop, package, journal/replay, policy, tools, isolation, extension, and telemetry. |
+| [examples/README.md](examples/README.md) | Mermaid-heavy scenario examples for complex host workflows and SDK boundaries. |
+| [workstreams/README.md](workstreams/README.md) | Phase-gated Codex goal folders: what must run first, what can run in parallel, owner roles, and what closes each gate. |
+| [workstreams/validation-gates.md](workstreams/validation-gates.md) | Shared validation levels, required evidence, and target commands for every workstream. |
+| [plans/2026-05-23-agent-sdk-core-primitives-phase-goals-plan.md](plans/2026-05-23-agent-sdk-core-primitives-phase-goals-plan.md) | Current hardening plan for primitive extraction, phase-goal launch docs, source audit, and review gates. |
+| [reference/feature-to-primitive-matrix.md](reference/feature-to-primitive-matrix.md) | Feature-to-primitive mapping and primitive decision ladder used by Phase 00, Phase 01, and Phase 02. |
+| [reference/sdk-review-checklist.md](reference/sdk-review-checklist.md) | SDK review rubric for simplicity, product-neutrality, observability, durability, privacy, and API quality. |
+| [reference/simplicity-audit.md](reference/simplicity-audit.md) | Simplicity audit identifying what to default, merge, keep advanced-only, or preserve as essential complexity. |
+| [reference/open-questions-and-ambiguities.md](reference/open-questions-and-ambiguities.md) | Decision register for first Rust-slice resolved decisions, deferred details, and non-questions. |
+| [reference/source-migration-map.md](reference/source-migration-map.md) | Historical source-to-target migration audit. Not implementation authority. |
+
+## Design Posture
+
+The future `agent_sdk` should be a reusable core for agent products. It should not become a host app, terminal UI, web UI, coding agent, remote messaging product, workflow engine, dashboard, deployment platform, marketplace, or self-improvement product. Those products should be built on top through typed adapters, runtime packages, policies, hooks, and event streams.
+
+Host workflows are coverage constraints only. They prove what the SDK must make possible. They are not architecture to copy.
+
+Product features such as proposal scoring, benchmark UI, product-specific recommendations, or automatic mutation policy stay outside the SDK. The SDK can provide generic primitives for lineage, journaled side effects, approval, replay, recovery, and inverse-candidate metadata without owning product workflows.
+
+## Ergonomics Posture
+
+The SDK should feel simple for normal usage and explicit for power users. Common operations should have one-line helpers and defaulted builders:
+
+- `agent.run_text(...)` for normal text output.
+- `agent.run_typed::<T>(...)` for Pydantic-like typed output where `T` provides or derives a schema.
+- `agent.on(HookPoint::BeforeToolCall, hook)` or declarative hook config for lifecycle hooks that lower into `HookSpec`.
+- `RuntimePackage::for_agent(...).tool_pack(...)` for common package composition.
+- `StreamRule::mask_regex(...)` for common streaming safeguards.
+- `ExecutionEnvironment::isolated("coder").image(...).workspace(...)` for common isolated workloads.
+
+Those helpers are thin. They lower into the same canonical contracts as advanced usage: `RunRequest`, `OutputContract`, `RuntimePackage`, `StreamRule`, `EnvironmentSpec`, `SubagentRequest`, `CoreExtensionCapabilities`, events, journal records, and policy checks. Simple APIs cannot bypass local validation, approval, redaction, lineage, or side-effect intent records.
+
+## Primitive Kernel
+
+The MVP Rust slice should stay small enough to prove one fake-provider text or typed run:
+
+- `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, and `RunResult` for run lifecycle.
+- `RuntimePackage`, the first-slice `CapabilitySpec` profile, typed sidecars, and source-qualified catalog snapshots for immutable per-run package state.
+- `AgentMessage`, `ArtifactRef`, `ContentRef`, `ContextContribution`, `ContextItem`, `ContextProjection`, `OutputContract`, and `ValidatedOutput` for content refs, context admission/projection, and typed output.
+- `EffectIntent`, `EffectResult`, `IdempotencyKey`, and `DedupeKey` for side effects.
+- `AgentEvent`, `EventFrame`, `EventFilter`, `EventCursor`, `RunJournal`, `JournalRecord`, and `JournalCursor` for live observation and durable truth.
+- Typed ports for provider, fake tool execution, approval policy decisions, host output delivery, and storage.
+- `EntityRef`, `SourceRef`, `DestinationRef`, `PolicyRef`, `PrivacyClass`, `RetentionClass`, `TrustClass`, and typed IDs for lineage across every boundary.
+
+Everything else layers over that kernel. Tool packs install callable package capabilities plus typed tool sidecars. Hooks are package sidecars plus ordered executors. Stream rules are package sidecars plus journaled interventions. Memory, tools, skills, host input, remote channels, subagents, and compaction create context candidates; only policy-admitted items become provider context. Isolation is a typed environment requirement plus adapter port. Subagents are parent-owned child runs. Extensions declare core capabilities that a host may resolve into a package. Telemetry is a projection, not durable truth. Output delivery is a sink port with journaled intent and dedupe, not product channel UX.
+
+Reserved feature ports may exist as traits or contract sketches before implementation, but they are not required to run in the MVP slice: telemetry exporters, isolation adapters, extension bridges, subagents, realtime providers, stream rules, full tool packs, and global event archive replay.
+
+## Core Thesis
+
+An agent loop repeatedly coordinates input, context, model calls, model output, tools, tool results, memory/context updates, events, telemetry, and control decisions. A good SDK should make those transitions explicit, typed, observable, resumable, and replaceable.
+
+The proposal centers on:
+
+- An explicit `AgentLoop` state machine rather than an opaque callback chain.
+- A typed `RuntimePackage` snapshot so provider-visible schemas and executable registries cannot drift.
+- Opt-in SDK tool packs for common read/search/edit/write/shell/resource-reader behavior, always controlled by host policy.
+- A `StreamRuleEngine` for stop-on-regex, abort-and-retry, mask, approval, and emit-only interventions during streaming.
+- `ExecutionEnvironment` and `IsolationRuntime` primitives so tool and subagent workloads can run in policy-selected host, container, VM, or remote sandboxes.
+- A lossless internal `AgentMessage`/`ContextItem` model plus provider-specific projection.
+- First-class `AgentEventBus` lifecycle subscriptions, filters, frames, cursors, and `TelemetrySink` streams from day one.
+- Message and context lineage for source, destination, injection path, policy, sensitivity, retention, trace, run, turn, and parent/child agent relationships.
+- Host-owned approval, escalation, extension runtime, and UI routing boundaries.
+- First-class lifecycle hooks with typed mutation rights, non-blocking/redacted defaults, and shared config/code lowering.
+- Run child lifecycle policies so manual stop cleans up agent-owned work by default while explicit detach remains observable and journaled.
+- Backpressure-aware streaming and realtime execution.
+- Durable sessions, checkpoints, run journals, replay, idempotency, and reconnect.
+- Parent-owned, depth-bounded subagents with explicit context and tool policy.
+
+## Non-Goals
+
+- Do not replace or migrate any existing product runtime in this phase.
+- Do not introduce product-specific runtime paths, UI adapters, trace stores, or marketplace behavior into core.
+- Do not design every final API detail before implementation feedback.
+- Do not make provider-specific transport details the core abstraction.
+- Do not let observability require raw prompt/tool/model content capture by default.
+- Do not let extensions, UI components, or remote channels become shadow owners of memory, approvals, or run state.
+- Do not provide self-improvement UX, proposal scoring, benchmark/evaluation product flows, or product-specific change recommendation logic.

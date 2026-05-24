@@ -1,0 +1,21 @@
+# Phase 03: Kernel Review
+
+Run this phase after [Phase 01](../01-package-capabilities/README.md) and every [Phase 02](../02-primitive-kernel/README.md) goal exits.
+
+This is a separate phase because it depends on all Phase 01 and Phase 02 outputs.
+
+## Goals
+
+| Goal | Run in parallel? | Owner role | Purpose |
+| --- | --- | --- | --- |
+| [03a Kernel Final Review](03a-kernel-final-review.md) | only goal | [00 Integration](../_roles/00-integration-stitching.md) | Reconcile names, IDs, events, journals, runtime-package fingerprints, and primitive-layering decisions from Phase 01 and Phase 02. |
+
+## Exit Gate
+
+- [ ] The Phase 01 package spine and Phase 02 primitive kernel are internally consistent.
+- [ ] The feature-to-primitive matrix and review matrix reflect accepted Phase 01 and Phase 02 decisions.
+- [ ] Later phases can use the kernel without reopening must-answer primitive questions.
+
+## Next Phase
+
+After this phase exits, run every goal in [Phase 04: Side Effects And Policy](../04-side-effects-policy/README.md) in parallel.
