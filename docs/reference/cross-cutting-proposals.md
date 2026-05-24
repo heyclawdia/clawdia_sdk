@@ -130,6 +130,44 @@ Validation needed:
 
 Phase 04 exit report must prove every side-effecting feature maps to `EffectIntent` / `EffectResult`, approval dispatch is not a parallel side-effect path, missing required policy/dispatcher/adapter/sink/journal append fails closed, telemetry remains derived, product-specific host UX stays outside contracts, and Phase 05 deferrals name their owners.
 
+### 2026-05-24 Phase 05 Feature-Layer Alignment
+
+Status: accepted
+Proposed by: Phase 05 feature-layer workers and stitching checkpoint
+Date: 2026-05-24
+Affected workstreams: 05, 06, 07, 08, 09
+Affected files: `docs/contracts/event-schema.md`, `docs/contracts/journal-replay-schema.md`, `docs/contracts/runtime-package-schema.md`, `docs/contracts/otel-mapping-contract.md`, `docs/contracts/review-matrix.md`, `docs/reference/feature-to-primitive-matrix.md`, `docs/reference/open-questions-and-ambiguities.md`, `docs/workstreams/05-feature-layers/_phase/phase-exit-report.md`
+Decision owner: 00-integration-stitching
+
+Problem:
+
+Phase 05 workers supplied feature-layer contracts for streaming/realtime, isolation, subagents, and extensions. Their handoffs raised shared decisions about event taxonomy, journal record names, runtime-package fingerprint inputs, effect-kind granularity, child-lifecycle ownership, and whether Phase 04 OTel deferrals could close.
+
+Proposed change:
+
+Accepted decisions:
+
+- Accept `RealtimeSessionRecord` as the shared realtime journal record for connection, input/output cursor, interruption, restart, backpressure, and close state.
+- Keep stream interventions as `StreamRuleRecord` intent/result payloads plus whichever provider, approval, output-delivery, or realtime effect they trigger; do not add `EffectKind::StreamIntervention` in Phase 05.
+- Accept the granular Phase 05 isolation event names for capability match, downgrade approval/denial, rootfs/session/mount/network/secret preparation, process I/O/stats/signal, cleanup failure, and failure. Earlier Phase 04 draft aliases should not be emitted by future adapters.
+- Accept `ChildLifecycle*` event names for child artifact shutdown, detach, acknowledgement, denial, reclaim, and failure. Isolation owns isolated-process child-artifact lifecycle use; subagents reference the shared child-lifecycle records for child-run cancellation and detach.
+- Defer dedicated shared `EffectKind` variants for isolation image/rootfs/session/mount/network/secret/environment steps. Typed `IsolationRecord::*Intent/Result` payloads must map one-to-one to common effect fields until code proves narrower effect kinds are needed.
+- Accept `ExtensionActionStarted`, `ExtensionActionCompleted`, and `ExtensionActionFailed` so extension action telemetry has explicit live projections in addition to journal-backed `EffectResult`.
+- Close the Phase 04 OTel deferrals for `stream_rule`, `realtime`, `isolation`, `child_lifecycle`, `subagent`, and `extension` families by naming mappings, redaction defaults, journal records, and fixture gates in the Phase 05 contracts and OTel contract.
+- Include Phase 05 feature sidecars and SDK-facing capability snapshots in runtime-package fingerprint inputs when their reserved feature is activated; continue excluding host manifest/runtime/install/marketplace/trust/browser-safe/app-event transport details unless represented as SDK-facing refs or policy decisions.
+
+Why this is cross-cutting:
+
+These decisions change shared event/journal vocabulary, package fingerprint determinism, telemetry projection rules, and the boundaries between feature-layer contracts and kernel primitives.
+
+Compatibility impact:
+
+Documentation-only alignment before Rust code exists. Existing draft names are clarified as pre-implementation aliases. Future code must fixture every emitted kind before activation.
+
+Validation needed:
+
+Phase 05 exit report must prove every feature layer lowers to runtime-package sidecars/capabilities, ports, events, journals, policy refs, and shared effect fields; OTel mappings are derived only; product-specific host UX and host manifests stay outside core; and unresolved cross-cutting proposals are accepted, rejected, or explicitly deferred before Phase 06 starts.
+
 ## Open Proposals
 
 None yet.

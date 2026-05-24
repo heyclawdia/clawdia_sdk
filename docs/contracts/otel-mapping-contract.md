@@ -48,13 +48,13 @@ flowchart TD
   E --> G["approval event/span"]
   B --> J["hook invocation span/event"]
   B --> K["output delivery span/event"]
-  B --> H["subagent span<br/>deferred Phase 05c"]
+  B --> H["subagent child-run span"]
   A --> I["journal/replay events"]
 ```
 
-## Phase 04 Emitted-Kind Mapping
+## Phase 04 And Phase 05 Emitted-Kind Mapping
 
-This table maps event kinds available through Phase 04 to OTel projections. It is not permission to emit a kind before that kind has the event payload fixture required by [event-schema.md](event-schema.md). Exporters must route from envelope fields and journal/index projections, not raw payload content.
+This table maps event kinds available through Phase 04 plus Phase 05 feature-layer closures to OTel projections. It is not permission to emit a kind before that kind has the event payload fixture required by [event-schema.md](event-schema.md). Exporters must route from envelope fields and journal/index projections, not raw payload content.
 
 | SDK event family or kinds | OTel projection | Mapping rules |
 | --- | --- | --- |
@@ -70,19 +70,18 @@ This table maps event kinds available through Phase 04 to OTel projections. It i
 | `ApprovalRequested`, `ApprovalDispatched`, `ApprovalDispatchUnavailable`, `ApprovalResponded`, `ApprovalTimedOut`, `ApprovalDenied`, `ApprovalCancelled` | approval span events under tool/output/hook span or a short approval span | Approval events export broker lifecycle, dispatcher kind, finite decision, actor refs, policy refs, timeout, and denial reason. Approval UI remains host-owned. |
 | `HookRegistered`, `HookInvoked`, `HookCompleted`, `HookFailed`, `HookTimedOut`, `HookCancelled`, `HookResponseApplied`, `HookResponseRejected` | hook invocation span/events | Hook telemetry links to package sidecar refs, hook policy refs, mutation rights, timeout/failure policy, and any journaled domain operation produced by the hook. |
 | `MemoryRetrieved`, `ContextContributionReceived`, `ContextContributionSelected`, `ContextContributionOmitted`, `MemoryStored`, `ContextItemInjected`, `ContextCompactionStarted`, `ContextCompactionCompleted`, `ContextProjectionAudited` | context/memory span events | Export selection/omission decisions, projection IDs, privacy, retention, and content refs. Memory bodies are not exported by default. |
+| `StreamRuleRegistered`, `StreamRuleCompileFailed`, `StreamRuleMatched`, `StreamInterventionRequested`, `StreamInterventionApplied`, `StreamInterventionFailed`, `StreamRuleInjectionAppended` | stream-rule span events under model, tool, realtime, or run span | Export rule ID/version, channel, cursor precision, matcher kind, action, partial-output policy, policy refs, and redaction policy. Matched content stays as hash/length/redacted summary unless content capture explicitly allows raw match capture. |
+| `RealtimeConnected`, `RealtimeInputSent`, `RealtimeOutputReceived`, `RealtimeInterrupted`, `RealtimeRestartRequested`, `RealtimeRestartStarted`, `RealtimeRestartCompleted`, `RealtimeRestartFailed`, `RealtimeConnectionRestarted`, `RealtimeClosed`, `RealtimeBackpressureApplied` | realtime session span and span events | Link to `RealtimeSessionRecord`, provider route refs, session/connection refs, send/receive cursors, restart count, backpressure policy, media kind, and content refs. Raw media and transcripts are absent by default. `RealtimeConnectionRestarted` is a compatibility alias projected as a completed restart event. |
+| `IsolationRequested`, `IsolationAdapterHealthChecked`, `IsolationCapabilityMatched`, `IsolationDowngradeDenied`, `IsolationDowngradeApproved`, `IsolationImageResolved`, `IsolationRootfsPrepared`, `IsolationSessionPrepared`, `IsolationMountsResolved`, `IsolationNetworkPrepared`, `IsolationSecretsPrepared`, `IsolationEnvironmentPrepared`, `IsolationProcessStarted`, `IsolationProcessIoCaptured`, `IsolationProcessStatsRecorded`, `IsolationProcessSignalled`, `IsolationProcessExited`, `IsolationCleanupStarted`, `IsolationCleanupCompleted`, `IsolationCleanupFailed`, `IsolationFailed` | isolation environment/process spans and logs | Link to `IsolationRecord`, environment/session/process refs, adapter refs, capability report versions, policy decision refs, cleanup status, stats counters, and redaction policy IDs. Raw process I/O, argv/env values, host paths, credentials, adapter handles, and secrets are absent by default. |
+| `ChildLifecycleShutdownRequested`, `ChildLifecycleShutdownCompleted`, `ChildLifecycleShutdownFailed`, `ChildLifecycleDetachRequested`, `ChildLifecycleDetachAcknowledged`, `ChildLifecycleDetached`, `ChildLifecycleDetachDenied`, `ChildLifecycleReclaimRequested`, `ChildLifecycleReclaimed`, `ChildLifecycleReclaimFailed` | child artifact lifecycle span events | Link to `ChildLifecycleRecord`, child artifact refs, owner run refs, detach/reclaim policy refs, host acknowledgement refs, terminal status, and error refs. These events do not imply subagent user-chat promotion or detached supervision ownership in core. |
+| `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, `SubagentParentMessageSent`, `SubagentParentMessageRead`, `SubagentClarificationRequested`, `SubagentClarificationResponded`, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp` | child run span, linked child events, and usage/cost metrics | Start/link a child-run span from journal-backed subagent start records. Handoff, mailbox, clarification, and wrapped child events export policy refs, content refs, counts, child journal cursors, and redaction policy IDs only. Terminal state comes from subagent and child journal records; usage rollup must be idempotent. |
+| `ExtensionCapabilityLoaded`, `ExtensionHookInvoked`, `ExtensionToolRequested`, `ExtensionEventObserved`, `ExtensionActionSubmitted`, `ExtensionActionStarted`, `ExtensionActionCompleted`, `ExtensionActionFailed`, `ExtensionActionDenied` | extension capability/action/hook/tool span events | Export SDK-facing extension ID/version, capability IDs/kinds, action kind, package sidecar refs, policy decision refs, effect refs, idempotency/dedupe keys, and redacted summaries. Host manifest runtime fields, install paths, marketplace data, trust enums, browser-safe export lists, raw app-event payloads, and transport state are excluded. |
 | `OutputDispatchRequested`, `OutputDispatchCompleted`, `OutputDispatchFailed`, `OutputDispatchDeduped` | output sink span/events | Output delivery telemetry links to `OutputDispatchRecord`, destination refs, dedupe key, ack/failure refs, and sink policy. Product channel UX and copy stay host-owned. |
 | `UsageRecorded`, `CostEstimated`, `CostCorrected` | metrics, span attributes, and cost logs | Cost records are monotonic. Corrections append and include rate table/version, estimate status, child rollup refs, and source record refs. |
 | `TelemetrySinkFailed`, `TelemetrySinkRecovered` | telemetry sink health logs/metrics | Include sink ID, sink kind, failure reason, last acknowledged export cursor, retry policy, dropped counts when applicable, and `terminal_preserved`. These events never fail the run. |
 | `InvariantFailed`, `JournalAppendFailed`, `RecoveryPlanned`, `ReplayStarted`, `ReplayCompleted`, `ReplayFailed`, `AntiEntropyRepairSuggested`, `AntiEntropyRepairApplied` | recovery logs and repair spans | Repair telemetry can rebuild derived exports from journal cursors. It must not rerun providers, tools, output sends, memory writes, extensions, or product compensation. |
 
-Deferred mappings:
-
-| Deferred family | Owner phase | Deferral |
-| --- | --- | --- |
-| `stream_rule`, `realtime` | Phase 05a streaming/realtime | Map after stream/realtime contracts provide emitted-kind fixtures, cursor semantics, and redaction cases. |
-| `isolation`, `child_lifecycle` | Phase 05b isolation execution and related stitching | Map process/environment spans after isolation fixtures define stats, process I/O redaction, cleanup, detach, and terminal preservation. |
-| `subagent` | Phase 05c subagents | Map child run spans and usage rollups after parent/child event wrapping and handoff policy fixtures exist. |
-| `extension` | Phase 05d extension SDK | Map extension action/hook/tool telemetry after core extension capability boundaries and host-runtime ownership are frozen. |
+Phase 05 closes the Phase 04 mapping deferrals for `stream_rule`, `realtime`, `isolation`, `child_lifecycle`, `subagent`, and `extension`. Implementation is still fixture-gated: a fake adapter may emit only the specific kind that has a golden event payload, redaction fixture, journal fixture, and OTel projection fixture.
 
 ## Attribute Rules
 
@@ -138,8 +137,16 @@ Use SDK namespace for SDK-specific lineage:
 - `agent_sdk.usage.record.id`
 - `agent_sdk.cost.record.id`
 - `agent_sdk.cost.rate_table.version`
+- `agent_sdk.stream.rule.id`
+- `agent_sdk.stream.channel`
+- `agent_sdk.stream.action`
+- `agent_sdk.realtime.session.id`
+- `agent_sdk.realtime.restart.count`
 - `agent_sdk.isolation.environment_id`
+- `agent_sdk.isolation.process.id`
 - `agent_sdk.subagent.child_run_id`
+- `agent_sdk.extension.id`
+- `agent_sdk.extension.action.id`
 
 High-cardinality values such as content hashes, remote handles, filesystem paths, provider account IDs, and credential profile IDs must be omitted, redacted, hashed, or replaced by host-approved aliases according to policy before they become OTel attributes.
 
@@ -224,7 +231,8 @@ When MCP instrumentation is merged into an existing tool span, add MCP attribute
 - `otel_schema_url_is_1_41_0`
 - `otel_stability_opt_in_is_gen_ai_latest_experimental`
 - `otel_phase04_emitted_kind_mapping_has_no_unmapped_active_kind`
-- `otel_phase05_emitted_kind_mapping_is_deferred_with_owner`
+- `otel_phase05_emitted_kind_mapping_has_no_unmapped_active_kind`
+- `otel_phase05_feature_mappings_require_event_journal_redaction_and_projection_fixtures`
 - `otel_sdk_fields_use_agent_sdk_namespace`
 - `otel_golden_span_contains_required_gen_ai_and_agent_sdk_fields`
 - `otel_opt_in_content_attributes_absent_by_default`

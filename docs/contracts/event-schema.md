@@ -401,19 +401,21 @@ Feature goals must add fixtures before emitting additional reserved kinds. Famil
 | `stream_rule` | `StreamRuleRegistered`, `StreamRuleCompileFailed`, `StreamRuleMatched`, `StreamInterventionRequested`, `StreamInterventionApplied`, `StreamInterventionFailed`, `StreamRuleInjectionAppended` |
 | `structured_output` | `StructuredOutputRequested`, `StructuredOutputValidationStarted`, `StructuredOutputValidationFailed`, `StructuredOutputRepairRequested`, `StructuredOutputValidated`, `StructuredOutputFailed` |
 | `tool` | `ToolRequested`, `ToolApprovalRequired`, `ToolStarted`, `ToolProgress`, `ToolCompleted`, `ToolFailed`, `ToolRetried`, `ToolCancelled`, `ToolInterrupted` |
-| `isolation` | `IsolationRequested`, `IsolationAdapterHealthChecked`, `IsolationImageResolved`, `IsolationEnvironmentPrepared`, `IsolationProcessStarted`, `IsolationProcessIo`, `IsolationStatsRecorded`, `IsolationProcessExited`, `IsolationSignalRequested`, `IsolationSignalSent`, `IsolationSignalFailed`, `IsolationCleanupStarted`, `IsolationCleanupCompleted`, `IsolationFailed`, `IsolationProcessDetached` |
+| `isolation` | `IsolationRequested`, `IsolationAdapterHealthChecked`, `IsolationCapabilityMatched`, `IsolationDowngradeDenied`, `IsolationDowngradeApproved`, `IsolationImageResolved`, `IsolationRootfsPrepared`, `IsolationSessionPrepared`, `IsolationMountsResolved`, `IsolationNetworkPrepared`, `IsolationSecretsPrepared`, `IsolationEnvironmentPrepared`, `IsolationProcessStarted`, `IsolationProcessIoCaptured`, `IsolationProcessStatsRecorded`, `IsolationProcessSignalled`, `IsolationProcessExited`, `IsolationCleanupStarted`, `IsolationCleanupCompleted`, `IsolationCleanupFailed`, `IsolationFailed` |
 | `approval` | `ApprovalRequested`, `ApprovalDispatched`, `ApprovalDispatchUnavailable`, `ApprovalResponded`, `ApprovalTimedOut`, `ApprovalDenied`, `ApprovalCancelled` |
 | `hook` | `HookRegistered`, `HookInvoked`, `HookCompleted`, `HookFailed`, `HookTimedOut`, `HookCancelled`, `HookResponseApplied`, `HookResponseRejected` |
-| `child_lifecycle` | `ChildShutdownRequested`, `ChildShutdownCompleted`, `ChildShutdownFailed`, `ChildDetachRequested`, `ChildDetached`, `ChildReclaimRequested`, `ChildReclaimed`, `ChildReclaimFailed` |
+| `child_lifecycle` | `ChildLifecycleShutdownRequested`, `ChildLifecycleShutdownCompleted`, `ChildLifecycleShutdownFailed`, `ChildLifecycleDetachRequested`, `ChildLifecycleDetachAcknowledged`, `ChildLifecycleDetached`, `ChildLifecycleDetachDenied`, `ChildLifecycleReclaimRequested`, `ChildLifecycleReclaimed`, `ChildLifecycleReclaimFailed` |
 | `memory_context` | `MemoryRetrieved`, `ContextContributionReceived`, `ContextContributionSelected`, `ContextContributionOmitted`, `MemoryStored`, `ContextItemInjected`, `ContextCompactionStarted`, `ContextCompactionCompleted`, `ContextProjectionAudited` |
 | `realtime` | `RealtimeConnected`, `RealtimeInputSent`, `RealtimeOutputReceived`, `RealtimeInterrupted`, `RealtimeRestartRequested`, `RealtimeRestartStarted`, `RealtimeRestartCompleted`, `RealtimeRestartFailed`, `RealtimeConnectionRestarted`, `RealtimeClosed`, `RealtimeBackpressureApplied` |
 | `subagent` | `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, `SubagentParentMessageSent`, `SubagentParentMessageRead`, `SubagentClarificationRequested`, `SubagentClarificationResponded`, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp` |
-| `extension` | `ExtensionCapabilityLoaded`, `ExtensionHookInvoked`, `ExtensionToolRequested`, `ExtensionEventObserved`, `ExtensionActionSubmitted`, `ExtensionActionDenied` |
+| `extension` | `ExtensionCapabilityLoaded`, `ExtensionHookInvoked`, `ExtensionToolRequested`, `ExtensionEventObserved`, `ExtensionActionSubmitted`, `ExtensionActionStarted`, `ExtensionActionCompleted`, `ExtensionActionFailed`, `ExtensionActionDenied` |
 | `output_delivery` | `OutputDispatchRequested`, `OutputDispatchCompleted`, `OutputDispatchFailed`, `OutputDispatchDeduped` |
 | `telemetry_cost` | `TelemetrySinkFailed`, `TelemetrySinkRecovered`, `UsageRecorded`, `CostEstimated`, `CostCorrected` |
 | `recovery` | `InvariantFailed`, `JournalAppendFailed`, `RecoveryPlanned`, `ReplayStarted`, `ReplayCompleted`, `ReplayFailed`, `AntiEntropyRepairSuggested`, `AntiEntropyRepairApplied` |
 
 Adding a family or kind requires a contract update and golden fixture. Renaming a family or kind requires a compatibility note. `RealtimeConnectionRestarted` is a compatibility alias only; new adapters should emit the requested/started/completed/failed sequence so observers can tell whether a restart was merely planned, in progress, successful, or failed.
+
+Phase 05 canonicalizes earlier isolation and child-lifecycle draft names before code exists: process I/O, stats, and signal events use `IsolationProcessIoCaptured`, `IsolationProcessStatsRecorded`, and `IsolationProcessSignalled`; detach/reclaim ownership uses the `child_lifecycle` family rather than `IsolationProcessDetached`; child-lifecycle event kinds carry the `ChildLifecycle*` prefix. Implementations should not emit the shorter Phase 04 draft aliases.
 
 `HookRegistered` is run-effective, not a pre-run package construction event. It is emitted only after a hook spec is part of a specific run's immutable runtime package and a `run_id` exists. Package construction and validation use runtime-package records/fixtures rather than run-scoped `AgentEvent`s.
 
@@ -485,9 +487,11 @@ Each workstream must maintain an emitted-kind matrix:
 | fake provider | all model and structured-output kinds used by tests | one JSON payload per emitted kind |
 | fake tool executor | all tool and approval kinds used by tests | one JSON payload per emitted kind |
 | fake realtime adapter | all realtime lifecycle/interruption/restart kinds used by tests | one JSON payload per emitted kind |
+| fake isolation adapter | all isolation capability, downgrade, lifecycle, process I/O, stats, cleanup, and failure kinds used by tests | one JSON payload per emitted kind plus no-raw-process-data redaction cases |
 | fake subagent runner | all subagent handoff, parent-message, clarification, rollup kinds used by tests | one JSON payload per emitted kind |
 | fake hook executor | all hook invocation, timeout, response, cancel, and failure kinds used by tests | one JSON payload per emitted kind plus no-raw-content redaction cases |
 | fake child lifecycle reconciler | all child shutdown, detach, reclaim, process signal, and cleanup kinds used by tests | one JSON payload per emitted kind plus replay fixtures |
+| fake extension bridge | all extension capability, hook/tool/action, app-event observation, and action terminal kinds used by tests | one JSON payload per emitted kind plus host-manifest-exclusion redaction cases |
 
 Family-level fixture coverage is still required, but it is not enough for implementation. Per-kind emitted fixtures are the coding gate.
 
@@ -599,9 +603,9 @@ Feature-layer golden tests required when those kinds are emitted:
 - one `IsolationProcessExited`
 - one `HookInvoked` / `HookResponseApplied` pair with content refs only
 - one `HookTimedOut` nonblocking event
-- one `ChildShutdownRequested` / `ChildShutdownCompleted` pair
-- one `ChildDetachRequested` / `ChildDetached` pair with host ack ref
-- one `IsolationSignalRequested` / `IsolationSignalSent` pair
+- one `ChildLifecycleShutdownRequested` / `ChildLifecycleShutdownCompleted` pair
+- one `ChildLifecycleDetachRequested` / `ChildLifecycleDetached` pair with host ack ref
+- one `IsolationProcessSignalled` event with signal intent/result refs
 - one `CostCorrected`
 
 Reserved feature families do not block the MVP slice. They become required only for the workstream that emits them.

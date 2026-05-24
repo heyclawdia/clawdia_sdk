@@ -54,3 +54,19 @@ User-chat conversation promotion, product routing, recursive agent societies, or
 - Child package strips recursive subagent tools by default.
 - Default handoff is `ContextHandoffPolicy::None`; summary or selected refs require explicit policy.
 - Parent cancel, completion, detach, mailbox, clarification, and usage rollup are journaled.
+
+## Validation Evidence
+
+- Worker agent: Parfit (`019e5882-0444-70d0-aa7d-6256e620f278`).
+- Changed file: `docs/contracts/subagent-contract.md`.
+- Scoped docs audit confirmed subagents lower into parent-owned child `RunRequest` values, stripped child `RuntimePackage` snapshots, linked `RunJournal` refs, wrapped `AgentEvent` frames, policy refs, content refs, lifecycle records, mailbox/clarification DTOs, and usage/cost rollups.
+- Named future topology, package-diff, handoff, mailbox, clarification, event-wrapping, usage-rollup, redaction, event, and OTel projection fixtures without creating executable fixtures in this documentation-only phase.
+- Cross-cutting proposals sent to stitching: close the Phase 04 OTel subagent deferral, include child package fingerprint inputs in runtime-package records, align mailbox/clarification DTO names, and keep child lifecycle events shared with isolation/stitching.
+- No Rust source, package manifests, executable tests, or fixtures were created.
+
+## Review Packet
+
+- Primitive decision: subagents are parent-owned child runs over the kernel, not direct user-chat conversations, recursive agent societies, or a separate child runtime ledger.
+- SDK-owned boundaries preserved: child package stripping, `ContextHandoffPolicy::None` default, parent mailbox, clarification flow, event wrapping, child journal linkage, cancellation/detach records, and usage rollup.
+- Host-owned boundaries preserved: inspector UI, promotion to conversation, rate tables/billing UI, detached-child dashboards, concrete child-run adapter/process management, and product workflows over subagent events.
+- Reviewer checklist: PASS for simplicity, product-neutrality, event/journal durability, privacy/redaction, replay/idempotency, package fingerprint impact, and no user-chat promotion after stitching accepted shared child-lifecycle ownership.

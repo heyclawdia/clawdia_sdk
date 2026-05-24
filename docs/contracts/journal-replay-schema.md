@@ -91,6 +91,7 @@ Cross-run, all-agent, or arbitrary filtered durable replay belongs to an optiona
 | `ModelAttemptRecord` | provider/model, attempt ID, stream cursor, stop reason, usage, error |
 | `StructuredOutputRecord` | schema ID, validation attempts, repair prompts, validated output refs |
 | `StreamRuleRecord` | rule compile/match/intervention state, cursor, repeat state |
+| `RealtimeSessionRecord` | realtime session connection, input/output cursors, interruption, restart, backpressure, close state |
 | `HookRecord` | hook spec hash, invocation, timeout/cancel/failure, response summary, applied mutation refs |
 | `ApprovalRecord` | request, dispatcher intent/result, timeout, response actor, policy refs |
 | `ToolRecord` | intent, idempotency key, approval ref, attempt, result, effect metadata |
@@ -149,6 +150,8 @@ pub enum EffectKind {
 ```
 
 The common effect fields are required for idempotency, dedupe, policy review, privacy, replay, and anti-entropy. Feature contracts may add typed payload fields, but intent-before-effect remains the shared rule.
+
+Phase 05 feature layers use existing effect kinds unless stitching explicitly adds a new shared kind. Stream interventions are represented by `StreamRuleRecord` intent/result payloads and by the provider, approval, output-delivery, or realtime effect they trigger; they do not introduce a separate `EffectKind::StreamIntervention`. Isolation adapter operations use typed `IsolationRecord::*Intent/Result` payloads that map one-to-one to the common effect fields until implementation needs narrower shared `EffectKind` variants for image, rootfs, session, mount, network, secret, or cleanup work.
 
 ## Side-Effect Atomicity
 
@@ -560,8 +563,8 @@ Events:
 - `RunCheckpointed`
 - `ReplayStarted`
 - `ReplayCompleted`
-- `ChildDetachRequested`
-- `ChildDetached`
+- `ChildLifecycleDetachRequested`
+- `ChildLifecycleDetached`
 - `HookResponseApplied`
 - `AntiEntropyRepairSuggested`
 - `AntiEntropyRepairApplied`

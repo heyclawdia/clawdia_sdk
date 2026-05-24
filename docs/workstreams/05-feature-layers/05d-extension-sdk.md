@@ -55,3 +55,19 @@ Marketplace UX, extension installation, subprocess lifecycle in core, app-event 
 - Extension action crosses host approval.
 - Browser-safe exports prove no native/process/fs dependencies.
 - Core has no extension runtime imports.
+
+## Validation Evidence
+
+- Worker agent: Kuhn (`019e5882-055b-7a20-b164-9b8d6239c123`).
+- Changed file: `docs/contracts/extension-sdk-contract.md`.
+- Scoped docs audit confirmed extension declarations lower into SDK-facing `CoreExtensionCapabilities`, runtime-package sidecars/capability refs, policy refs, approval records, journal-backed `EffectIntent` / `EffectResult`, events, and typed refs.
+- Named future manifest, JSON-RPC, packaging smoke, browser-safe, denied-action, redaction, event, and OTel projection fixtures without creating executable fixtures in this documentation-only phase.
+- Cross-cutting proposals sent to stitching: accept `ExtensionActionStarted`, `ExtensionActionCompleted`, and `ExtensionActionFailed`; close the Phase 04 OTel extension deferral; and keep host manifest/runtime/install/marketplace/browser-safe/trust/app-event transport fields outside core package authority.
+- No Rust source, package manifests, executable tests, or fixtures were created.
+
+## Review Packet
+
+- Primitive decision: extensions provide SDK-facing capability declarations and policy-crossing action requests; host manifests and extension runtime concerns remain outside `agent-sdk-core`.
+- SDK-owned boundaries preserved: core capability shapes, helper lowering, runtime-package resolution refs, policy-crossing event/journal/effect records, no self-approval, and typed refs.
+- Host-owned boundaries preserved: install flow, marketplace UX, subprocess runtime, app-event transport/fanout, browser-safe packaging validation, trust/action permission state, provider credentials, memory authority, and UI surfaces.
+- Reviewer checklist: PASS for simplicity, product-neutrality, event/journal durability, privacy/redaction, replay/idempotency, extension action effect ordering, and capability fingerprint impact after stitching accepted terminal action events.

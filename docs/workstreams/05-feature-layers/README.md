@@ -15,12 +15,14 @@ This phase layers streaming, realtime, isolation, subagents, and extensions over
 
 ## Exit Gate
 
-- [ ] Every feature is represented as package sidecars/capabilities, ports, events, journals, and policy refs over the kernel.
-- [ ] Realtime and streaming completion distinguish final visible text from terminal run completion.
-- [ ] Isolation never silently downgrades to host execution.
-- [ ] Subagents default to isolated child context and explicit handoff policy.
-- [ ] Extensions split core SDK capabilities from host extension manifest/runtime concerns.
-- [ ] Stitching checkpoint complete: blocking cross-cutting proposals from Phase 05 are accepted, rejected, or explicitly deferred before Phase 06 starts.
+- [x] Every feature is represented as package sidecars/capabilities, ports, events, journals, and policy refs over the kernel.
+- [x] Realtime and streaming completion distinguish final visible text from terminal run completion.
+- [x] Isolation never silently downgrades to host execution.
+- [x] Subagents default to isolated child context and explicit handoff policy.
+- [x] Extensions split core SDK capabilities from host extension manifest/runtime concerns.
+- [x] Stitching checkpoint complete: blocking cross-cutting proposals from Phase 05 are accepted, rejected, or explicitly deferred before Phase 06 starts.
+
+Exit evidence: [Phase 05 exit report](_phase/phase-exit-report.md).
 
 ## Next Phase
 
