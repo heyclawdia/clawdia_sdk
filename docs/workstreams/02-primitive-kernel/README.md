@@ -14,9 +14,17 @@ This phase freezes the SDK kernel contracts over the runtime-package spine from 
 
 ## Exit Gate
 
-- [ ] All three goal review packets pass.
-- [ ] Public names, IDs, package fingerprint inputs, event/journal names, and context/output IDs are ready for stitching review.
-- [ ] No goal introduced a parallel run loop, package registry, event stream, journal, policy path, context projection path, or side-effect path.
+- [x] All three goal review packets pass.
+- [x] Public names, IDs, package fingerprint inputs, event/journal names, and context/output IDs are ready for stitching review.
+- [x] No goal introduced a parallel run loop, package registry, event stream, journal, policy path, context projection path, or side-effect path.
+
+## Exit Evidence
+
+- [02a Core Run API](02a-core-run-api.md) review packet passed with public API support-type cleanup in `docs/contracts/api-contracts.md`.
+- [02b Events Journal Kernel](02b-events-journal-kernel.md) review packet passed with no event/journal edits required; existing contracts already preserve entity refs, cursor compatibility, run-scoped replay, optional archive boundaries, and shared effect intent/result records.
+- [02c Context Output Projection](02c-context-output-projection.md) review packet passed after making content resolver policy, projection audit, and `ValidatedOutput` publication semantics explicit.
+- Documentation-only audits passed for Markdown links, Phase 02 writable scope, no Rust/code/fixture creation, product-neutrality keywords, and no-mini-SDK primitive layering.
+- No Rust source files, executable tests, package manifests, or fixtures were created.
 
 ## Next Phase
 

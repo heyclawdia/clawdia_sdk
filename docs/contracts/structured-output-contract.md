@@ -86,6 +86,22 @@ pub struct StructuredOutputResult<T> {
     pub lineage: OutputLineage,
 }
 
+pub struct ValidatedOutput {
+    pub output_id: ValidatedOutputId,
+    pub schema_id: OutputSchemaId,
+    pub schema_version: SchemaVersion,
+    pub schema_fingerprint: ContentHash,
+    pub canonical_value_ref: ContentRef,
+    pub validation_report_ref: ContentRef,
+    pub validation_attempts: Vec<ValidationAttemptId>,
+    pub repair_attempts: Vec<RepairAttemptId>,
+    pub source_attempt_ids: Vec<AttemptId>,
+    pub policy_refs: Vec<PolicyRef>,
+    pub lineage: OutputLineage,
+    pub privacy_class: PrivacyClass,
+    pub redacted_summary: RedactedSummary,
+}
+
 pub trait OutputValidator {
     fn dialect(&self) -> OutputSchemaDialect;
     async fn validate(
@@ -297,6 +313,19 @@ sequenceDiagram
 - Semantic validators must return bounded, redacted error summaries.
 - Exhausted retries return a typed validation error, not best-effort parsed content.
 
+## Publication And Result Construction
+
+`ValidatedOutput` is the SDK-owned terminal validation artifact. `StructuredOutputResult<T>` is a typed ergonomic view over that artifact.
+
+Rules:
+
+- Validation writes candidate, error-report, repair, and validated-output refs to `StructuredOutputRecord` before typed construction.
+- `PolicyStage::Output` runs after local validation and before the value is published as the terminal typed result or sent to an output sink.
+- `StructuredOutputResult<T>` is constructed by deserializing the canonical validated value referenced by `ValidatedOutput::canonical_value_ref`; it is not constructed from raw provider text, provider-native schema mode, or a repair prompt response directly.
+- Provider-assisted output can reduce repair attempts, but it still produces the same `ValidatedOutput`, events, journal records, policy refs, and lineage as strict local validation.
+- If output publication is denied, the run returns a typed policy/output failure with refs to the validated artifact and policy decision. The SDK does not expose a best-effort typed object outside policy.
+- Output sinks receive a `ContentRef` or `StructuredOutputResult` only after output publication policy passes; sink delivery still uses the output-delivery effect intent/result path.
+
 ## Schema Safety And Validator Sandbox
 
 User-provided schemas are untrusted input.
@@ -360,6 +389,9 @@ Required failure fields:
 - `strict_json_schema_preset_uses_conservative_defaults`
 - `provider_assisted_still_locally_validates`
 - `schema_registry_detects_fingerprint_drift`
+- `validated_output_records_schema_fingerprint_policy_refs_and_lineage`
+- `policy_stage_output_runs_before_typed_result_publication`
+- `output_sink_receives_ref_only_after_publication_policy`
 - `advanced_config_cannot_disable_required_journal_events`
 
 ## Complete Example

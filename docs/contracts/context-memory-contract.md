@@ -39,6 +39,7 @@ Long-term memory retrieval, detail expansion, semantic ranking, compaction hooks
 - `ContextContribution` values are candidates. Memory, tool results, skills, files, host input, remote channels, subagents, hooks, and compaction may produce candidates.
 - `ContextAssembler` is the only component that admits candidates into `ContextItem` and `ContextProjection`. Host input normally arrives as `ContextContribution`; if a host supplies a pre-admitted `ContextItem`, the SDK must validate its selection decision, policy refs, lineage, trust class, and projection audit before accepting it.
 - Every injected context item has a source, destination, producer ref, source ref, policy ref, privacy class, retention class, trust class, projection role, content ref or bounded inline summary, and lineage refs.
+- Every projection has an audit record that explains included, omitted, compacted, redacted, policy-denied, budget-denied, duplicate, trust-denied, missing-ref, and protected-item outcomes without copying raw content.
 - `MemoryPort` is optional. Missing memory access means no memory retrieval, not a fallback to host globals.
 - Memory retrieval may return candidates; `ContextAssembler` decides inclusion under budget and policy.
 - Compaction creates a new context item or message summary with lineage to the inputs it summarized.
@@ -75,6 +76,55 @@ Selection reasons are finite:
 - `OmittedDuplicate`
 - `OmittedTrust`
 - `OmittedStale`
+- `OmittedMissingRef`
+- `ProtectedOmittedByPolicy`
+
+## Projection Audit
+
+`ContextProjection` includes the provider-ready message parts plus a separate audit surface. Provider adapters consume the projected parts; replay, debugging, tests, and events consume the audit. The audit is journaled as a `ContextRecord::ProjectionAudit` before provider streaming starts and can be summarized into `ContextProjectionAudited`.
+
+```rust
+// Non-compiling contract sketch.
+pub struct ContextProjectionAudit {
+    pub projection_id: ContextProjectionId,
+    pub source_message_ids: Vec<MessageId>,
+    pub candidate_count: u32,
+    pub included_count: u32,
+    pub omitted_count: u32,
+    pub compacted_count: u32,
+    pub redacted_count: u32,
+    pub policy_denied_count: u32,
+    pub budget_denied_count: u32,
+    pub missing_ref_count: u32,
+    pub protected_omitted_count: u32,
+    pub decisions: Vec<ContextSelectionDecision>,
+    pub budget: ContextBudgetSummary,
+    pub policy_refs: Vec<PolicyRef>,
+    pub redaction_policy_id: RedactionPolicyId,
+    pub runtime_package_fingerprint: RuntimePackageFingerprint,
+}
+
+pub struct ContextSelectionDecision {
+    pub contribution_id: Option<ContextContributionId>,
+    pub context_item_id: Option<ContextItemId>,
+    pub reason: ContextSelectionReason,
+    pub producer_ref: EntityRef,
+    pub source_ref: SourceRef,
+    pub content_ref: Option<ContentRef>,
+    pub policy_refs: Vec<PolicyRef>,
+    pub privacy_class: PrivacyClass,
+    pub retention_class: RetentionClass,
+    pub trust_class: TrustClass,
+    pub redacted_summary: RedactedSummary,
+}
+```
+
+Audit rules:
+
+- `ContextProjectionAudited` is emitted after the audit journal record exists and before `ProviderRequestProjected`.
+- A projection with any `ProtectedOmittedByPolicy` or required `OmittedMissingRef` decision fails closed unless the run policy explicitly allows repair or omission.
+- Omitted decisions remain part of the audit even when their raw content is unavailable or policy-denied.
+- The audit uses `ContentRef`, hashes, counts, policy refs, and redacted summaries. It is not a provider prompt and not a substitute for memory storage.
 
 ## Context Item Envelope
 
@@ -134,6 +184,9 @@ Journal records:
 - `artifact_ref_does_not_imply_provider_visibility`
 - `context_selection_records_omitted_policy_budget_duplicate_and_trust_reasons`
 - `projection_budget_records_included_and_omitted_counts`
+- `projection_audit_records_compacted_redacted_policy_budget_and_missing_ref_counts`
+- `projection_audit_precedes_provider_request_projected`
+- `protected_missing_context_fails_closed_or_requests_repair`
 - `compaction_preserves_lineage_to_source_items`
 - `memory_retrieval_event_has_no_raw_content_by_default`
 - `memory_write_intent_precedes_store_call`

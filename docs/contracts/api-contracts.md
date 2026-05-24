@@ -112,6 +112,8 @@ Public signature support types must also be exported or reachable from stable mo
 - run API: `RunRegistry`, `RunSnapshot`, `RunSummary`, `RunQuery`, `RunStatus`, `RunStatusHandle`, `RunResultHandle`, `CancellationHandle`;
 - package API: `RuntimePackageRef`, `RuntimePackageResolver`, `CapabilitySpec`, `CapabilityId`, `CapabilityKind`, `CapabilitySource`, `PackageSidecarRef`, `CapabilityCatalogSnapshot`;
 - content/context API: `ArtifactRef`, `ContentRef`, `ContextContribution`, `ContextSelectionDecision`, `ContextItem`, `ContextProjection`;
+- content resolver API: `ContentResolver`, `ContentResolveRequest`, `ContentResolutionPolicy`, `MissingContentPolicy`, `ContentResolutionError`;
+- structured-output API: `OutputContract`, `TypedOutputModel`, `OutputSchemaRegistry`, `ValidatedOutput`, `StructuredOutputResult`, `ValidationErrorReport`;
 - effect API: `EffectIntent`, `EffectResult`, `EffectKind`, `IdempotencyKey`, `DedupeKey`;
 - reserved lifecycle API: `RunChildLifecyclePolicy`, `RunChildLifecyclePolicyRef`, `ChildArtifactKind`, `ChildShutdownBehavior`, `DetachPolicy`, `ChildArtifactId`, `ProcessOwnershipPolicy`;
 - reserved hook API: `HookId`, `HookSpec`, `HookPoint`, `HookInput`, `HookResponse`, `HookExecutionMode`, `HookQueueConfig`, `HookOverflowPolicy`, `HookFailurePolicy`, `HookMutationRights`, `HookExecutorRef`, `HookConfig`;
@@ -236,6 +238,7 @@ All durable and cross-boundary identity fields are typed newtypes:
 - `RunId`, `TurnId`, `AttemptId`, `MessageId`, `ContextItemId`, `ContextProjectionId`
 - `ToolCallId`, `ApprovalRequestId`, `AgentId`, `SubagentRunId`
 - `RuntimePackageId`, `RuntimePackageFingerprint`, `EventId`, `HookId`, `ChildArtifactId`
+- `ArtifactId`, `ContentId`, `OutputSchemaId`, `ValidatedOutputId`, `ValidationAttemptId`, `RepairAttemptId`
 - `TraceId`, `SpanId`, `ExecutionEnvironmentId`, `StreamRuleId`, `IsolatedProcessId`
 
 `AgentError` must distinguish:
