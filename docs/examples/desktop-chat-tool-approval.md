@@ -18,13 +18,13 @@ sequenceDiagram
   participant Telemetry as "TelemetryFanout"
 
   UI->>Host: "send message + attachments"
-  Host->>Runtime: "RunRequest(SourceRef::desktop, DestinationRef::ui)"
+  Host->>Runtime: "RunRequest(SourceRef::host_surface, DestinationRef::output_sink)"
   Runtime->>Journal: "RunRecord: RunStarted"
   Runtime->>Context: "assemble messages/memory/files/tools"
   Context->>Journal: "ContextRecord + ContextProjectionAudited"
   Runtime->>Provider: "stream projected request"
   Provider-->>Runtime: "ModelStreamDelta"
-  Runtime-->>UI: "ModelStreamDelta live event"
+  Runtime-->>UI: "ModelStreamDelta live event through host bridge"
   Provider-->>Runtime: "tool_use"
   Runtime->>Journal: "ModelAttemptRecord + ToolRecord intent"
   Runtime->>Policy: "classify tool"
@@ -32,13 +32,13 @@ sequenceDiagram
   Runtime->>Broker: "ApprovalRequest"
   Broker-->>UI: "host approval prompt"
   UI-->>Broker: "approve / approve_for_session / deny"
-  Broker->>Journal: "ApprovalRecord"
+  Broker->>Journal: "ApprovalRecord dispatch intent/result"
   Runtime->>Tool: "execute approved tool"
   Tool->>Journal: "ToolStarted / ToolCompleted"
   Tool-->>Runtime: "ToolResultEnvelope"
   Runtime->>Provider: "continue with tool result"
   Provider-->>Runtime: "final assistant message"
-  Runtime->>Journal: "MessageRecord + RunCompleted"
+  Runtime->>Journal: "MessageRecord + output delivery + RunCompleted"
   Runtime->>Telemetry: "usage/cost/tool/approval rollup"
 ```
 
@@ -63,7 +63,15 @@ sequenceDiagram
 - `ModelAttemptRecord`
 - `ApprovalRecord`
 - `ToolRecord`
+- `OutputDispatchRecord`
 - `TelemetryRecord`
+- `RecoveryRecord` when tool/result/output terminal append is unsafe
+
+## Policy, Telemetry, And Recovery
+
+- Policy decisions: context projection policy, tool permission policy, approval/escalation policy, redaction/content-capture policy, and output delivery policy.
+- Telemetry/cost: model usage, tool attempts, approval latency, output delivery status, and final run status are derived from journal-backed events.
+- Recovery: if a tool or output send may have happened but terminal append fails, the run enters recovery before another non-idempotent side effect starts. UI event loss never becomes run truth.
 
 ## Host-Owned Boundaries
 

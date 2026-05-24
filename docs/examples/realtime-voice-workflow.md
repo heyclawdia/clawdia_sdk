@@ -17,13 +17,16 @@ sequenceDiagram
 
   Voice->>Host: "wake phrase detected"
   Host-->>UI: "host live event: voice activity"
-  Host->>Runtime: "RunRequest SourceRef::extension_voice"
+  Host->>Runtime: "RunRequest SourceRef::extension"
   Runtime->>Journal: "RunStarted"
   Runtime->>RT: "connect send/receive halves"
   RT-->>Runtime: "RealtimeConnected"
+  Runtime->>Journal: "RealtimeSessionRecord: connected"
   Voice->>Runtime: "audio ContentRef / bounded chunks"
-  Runtime->>RT: "RealtimeInputSent"
+  Runtime->>Journal: "RealtimeInputSent"
+  Runtime->>RT: "send input frame"
   RT-->>Runtime: "transcript delta"
+  Runtime->>Journal: "RealtimeOutputReceived"
   Runtime-->>UI: "bounded live transcript event"
   alt user interrupts
     Voice->>Runtime: "interruption(response_id)"
@@ -55,20 +58,28 @@ sequenceDiagram
     Runtime->>RT: "send tool result"
   end
   RT-->>Runtime: "final text/audio output"
-  Runtime->>Journal: "RunCompleted"
+  Runtime->>Journal: "RealtimeClosed + output delivery records"
+  Runtime->>Journal: "RunCompleted after realtime/output/approval bookkeeping"
 ```
 
 ## Live Vs Durable
 
 ```mermaid
 flowchart LR
-  A["Realtime events"] --> B["RunJournal: durable connection/interruption/tool records"]
+  A["Realtime events"] --> B["RunJournal: durable session/interruption/tool/output records"]
   A --> C["Bounded host display events: voice activity"]
   A --> D["Telemetry: latency/usage/cost"]
   C --> E["Voice surface / composer selectors"]
 ```
 
 Transcript UI events can drop. Journaled response IDs and interruption records cannot.
+
+## Policy, Telemetry, And Recovery
+
+- Policy decisions: media capture policy, realtime send/receive policy, stream intervention policy, source-scoped approval policy, restart/backpressure policy, and output delivery policy.
+- Journal records: `RealtimeSessionRecord`, `StreamRuleRecord` when a stream rule intervenes, `ApprovalRecord`, `ToolRecord`, `OutputDispatchRecord`, `TelemetryRecord`, and `RecoveryRecord` when a connection or terminal append is unsafe.
+- Telemetry/cost: latency, restart count, backpressure state, usage, tool calls, and output delivery status are derived from journal-backed events.
+- Recovery: restart failure is observable before retry policy acts; raw audio is content-ref-only by default; terminal run completion waits for realtime close or explicit detach plus output/approval bookkeeping.
 
 ## Host-Owned Boundaries
 

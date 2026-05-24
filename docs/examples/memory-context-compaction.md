@@ -80,6 +80,14 @@ sequenceDiagram
 - Extension context proposals.
 - UI memory browsing.
 
+## Events, Journals, Telemetry, And Recovery
+
+- Events: `MemoryRetrieved`, `ContextContributionReceived`, `ContextContributionSelected`, `ContextContributionOmitted`, `MemoryStored`, `ContextCompactionStarted`, `ContextCompactionCompleted`, `ContextProjectionAudited`, and replay events.
+- Journal records: `ContextRecord`, `RunRecord`, checkpoint records, `TelemetryRecord` when memory/context metrics are exported, and `RecoveryRecord` for unsafe projection or missing content refs.
+- Policy decisions: memory retrieval/write policy, context admission policy, projection role policy, redaction/content-capture policy, retention policy, and compaction policy.
+- Telemetry/cost: retrieval counts, selected/omitted counts, projection sizes, compaction attempts, and provider token usage are derived from journal-backed records.
+- Recovery: resume uses the checkpoint content-ref manifest plus the journal; missing protected context fails closed before provider projection instead of inventing replacement memory.
+
 ## Acceptance Tests
 
 - `context_projection_audit_records_omitted_sensitive_memory`

@@ -31,9 +31,9 @@ sequenceDiagram
   alt approved
     Runtime->>Tool: "execute"
   else denied
-    Runtime->>Journal: "ToolDenied / denied result or RunFailed"
+    Runtime->>Journal: "ToolFailed denied result or RunFailed"
   end
-  Runtime->>Journal: "OutputDispatchIntent with dedupe key"
+  Runtime->>Journal: "OutputDispatchRequested with dedupe key"
   Runtime->>Remote: "send reply"
   Remote-->>Runtime: "ack"
   Runtime->>Journal: "OutputDispatchCompleted"
@@ -59,6 +59,14 @@ sequenceDiagram
 - Current compatibility fail-open mode, if temporarily enabled.
 - Remote message persistence and ack lookup.
 - User-facing approval copy.
+
+## Events, Journals, Telemetry, And Recovery
+
+- Events: `RunStarted`, approval lifecycle events, `ToolRequested`, `ToolFailed` for denied execution, `OutputDispatchRequested`, `OutputDispatchCompleted`, `OutputDispatchFailed`, and terminal run events.
+- Journal records: `RunRecord`, `ApprovalRecord`, `ToolRecord`, `OutputDispatchRecord`, `TelemetryRecord`, and `RecoveryRecord` when an ack or terminal append is missing.
+- Policy decisions: source-scoped approval policy, escalation policy, compatibility policy when explicitly configured, redaction/content-capture policy, and output delivery policy.
+- Telemetry/cost: approval latency, denial reason counts, output delivery attempts, ack status, and terminal run status are derived from journal-backed events.
+- Recovery: remote reply retry uses dedupe keys and ack refs; missing dispatcher denies by default instead of replaying a tool or sending out-of-band messages.
 
 ## Acceptance Tests
 

@@ -34,7 +34,7 @@ sequenceDiagram
   participant UI as "Host UI"
 
   Parent->>Sup: "SubagentRequest caused by ToolCallId"
-  Sup->>Journal: "SubagentStarted"
+  Sup->>Journal: "EffectIntent { kind: ChildAgentStart } + SubagentStarted"
   Sup->>Child: "start child run with stripped package"
   Child-->>Sup: "child events"
   Sup->>Journal: "SubagentEvent wrapped"
@@ -57,15 +57,15 @@ sequenceDiagram
 
   alt manual parent cancel
     Parent->>Journal: "RunCancelRequested"
-    Parent->>Journal: "ChildLifecycleRecord: ShutdownIntent"
+    Parent->>Journal: "ChildLifecycleShutdownRequested"
     Sup->>Child: "cancel child run"
     Child-->>Sup: "child terminal/cancelled"
-    Sup->>Journal: "SubagentCancelled + ShutdownCompleted"
+    Sup->>Journal: "SubagentCancelled + ChildLifecycleShutdownCompleted"
   else explicit detached child
-    Sup->>Journal: "ChildLifecycleRecord: DetachIntent"
+    Sup->>Journal: "ChildLifecycleDetachRequested"
     Sup->>Host: "request detached-child ownership ack"
     Host-->>Sup: "host_ack_ref + reclaim policy"
-    Sup->>Journal: "ChildLifecycleRecord: Detached"
+    Sup->>Journal: "ChildLifecycleDetachAcknowledged + ChildLifecycleDetached"
   end
 ```
 
@@ -84,6 +84,14 @@ External runtime compatibility notifications can be ingested as external runtime
 - External runtime compatibility notification ingestion.
 - Provider/model route registry.
 - Telemetry dashboard presentation.
+
+## Events, Journals, Telemetry, And Recovery
+
+- Events: `SubagentStarted`, `SubagentHandoff`, `SubagentEvent`, mailbox/clarification events, `SubagentCompleted`, `SubagentFailed`, `SubagentCancelled`, `SubagentUsageRolledUp`, and shared `ChildLifecycle*` events.
+- Journal records: child-start `EffectIntent` / `EffectResult`, `SubagentStartedRecord`, handoff/wrapped-event/mailbox/clarification records, `SubagentUsageRolledUpRecord`, child `RunJournal` refs, `ChildLifecycleRecord`, and `RecoveryRecord`.
+- Policy decisions: topology/depth policy, route policy, `ContextHandoffPolicy`, child tool policy, mailbox policy, child lifecycle policy, redaction/content-capture policy, and detach/reclaim policy.
+- Telemetry/cost: child run spans, child event links, usage/cost rollup, handoff counts, and terminal status are derived from parent and child journals.
+- Recovery: parent completion cannot seal while a non-detached child is running, unreconciled, or missing usage rollup; duplicate subscribers cannot duplicate child runs or rollups.
 
 ## Acceptance Tests
 

@@ -32,13 +32,15 @@ sequenceDiagram
   Host->>Approval: "shell approval"
   Approval-->>Shell: "approved"
   Shell->>Hook: "BeforeToolCall"
+  Hook->>Journal: "HookInvoked"
   Hook-->>Shell: "allow/narrow/deny typed response"
+  Hook->>Journal: "HookResponseApplied"
   Shell->>Iso: "prepare isolated env"
   Iso->>Journal: "IsolationEnvironmentPrepared"
-  Shell->>Journal: "EffectIntent { kind: ProcessStart }"
+  Shell->>Journal: "EffectIntent { kind: IsolatedProcessStart }"
   Shell->>Iso: "start process"
   Iso-->>Shell: "stdout/stderr refs + exit"
-  Shell->>Journal: "EffectResult { effect_id } + IsolationProcessExited + ToolCompleted"
+  Shell->>Journal: "EffectResult { effect_id } + IsolationProcessIoCaptured + IsolationProcessStatsRecorded + IsolationProcessExited + ToolCompleted"
   Journal->>Telemetry: "usage/tool/isolation cost export"
   AE->>Journal: "scan pending effects/export cursors"
 ```
@@ -60,10 +62,10 @@ sequenceDiagram
     Policy-->>Shell: "deny implicit orphan"
     Shell->>Journal: "ToolFailed: detach denied"
   else detach allowed
-    Shell->>Journal: "ChildLifecycleRecord: DetachIntent"
+    Shell->>Journal: "ChildLifecycleDetachRequested"
     Shell->>Host: "request ownership ack"
     Host-->>Shell: "host_ack_ref + reclaim policy"
-    Shell->>Journal: "ChildLifecycleRecord: Detached"
+    Shell->>Journal: "ChildLifecycleDetachAcknowledged + ChildLifecycleDetached"
     Shell-->>User: "started, tracked by host owner"
   end
 ```
@@ -83,6 +85,22 @@ flowchart TD
 ```
 
 Tool discovery never mutates the active package ambiently.
+
+## Stream Rule Safety
+
+```mermaid
+flowchart TD
+  A["Tool stdout/stderr StreamDelta"] --> B["StreamRuleEngine"]
+  B --> C{"secret or unsafe marker?"}
+  C -->|no| D["bounded redacted progress event"]
+  C -->|yes mask| E["StreamRuleMatched"]
+  E --> F["StreamInterventionApplied"]
+  F --> G["masked output before sink/telemetry"]
+  C -->|yes stop| H["StreamInterventionRequested"]
+  H --> I["policy-approved stop/cancel path"]
+```
+
+Stream rules observe bounded stream deltas and content refs. They cannot read hidden reasoning, bypass tool policy, or deliver output directly.
 
 ## Anti-Entropy Repair
 
@@ -106,6 +124,14 @@ flowchart TD
 - Host analytics exporter and repair scheduling.
 - Product UX for review, undo, or recommendation flows.
 
+## Events, Journals, Telemetry, And Recovery
+
+- Events: tool, approval, hook, stream-rule, isolation, child-lifecycle, output-delivery, telemetry, and recovery families.
+- Journal records: `ToolRecord`, `ApprovalRecord`, `HookRecord`, `StreamRuleRecord`, `IsolationRecord`, `ChildLifecycleRecord`, `OutputDispatchRecord`, `TelemetryRecord`, and `RecoveryRecord`.
+- Policy decisions: tool permission, approval/autonomy/escalation, hook mutation rights, stream intervention, isolation class/capability/trust downgrade, child lifecycle detach/reclaim, redaction/content-capture, and telemetry sink policy.
+- Telemetry/cost: tool attempts, hook latency, isolated process stats, stream-rule interventions, output delivery, and repair cursor status are projections from journal-backed events.
+- Recovery: anti-entropy can append terminal records or require host action, but it never reruns file writes, shell processes, output sends, provider calls, memory writes, extension actions, or detached process ownership transfers without idempotency or explicit repair policy.
+
 ## Acceptance Tests
 
 - `anchored_edit_rejects_stale_anchor_before_write`
@@ -117,3 +143,4 @@ flowchart TD
 - `start_script_detach_requires_explicit_policy_and_journal_record`
 - `manual_cancel_terminates_agent_owned_shell_process_by_default`
 - `before_tool_hook_cannot_silently_detach_process`
+- `stream_rule_masks_secret_before_tool_output_delivery`

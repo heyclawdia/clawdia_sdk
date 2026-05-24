@@ -54,12 +54,20 @@ sequenceDiagram
 
 Display-event loss is a UI concern. Journal and durable trace exports remain recoverable from authoritative records.
 
+## Policy, Telemetry, And Recovery
+
+- Policy decisions: event payload access policy, content-capture policy, subscriber overflow policy, telemetry sink policy, and optional archive replay policy.
+- Journal records: every journal-backed event carries a `JournalCursor`; telemetry sink health and export cursors live in `TelemetryRecord`; repair plans live in `RecoveryRecord`.
+- Telemetry/cost: OTel and trace exports are derived from `AgentEvent`, `RunJournal`, usage/cost records, and policy refs. Collector acknowledgement never decides run state.
+- Recovery: a dropped display event can be replayed from journal/archive cursors when the host supports that scope. Repair replay rebuilds derived exports and never reruns provider, tool, output, memory, extension, or host side effects.
+
 ## Host-Owned Boundaries
 
 - Host display-event stores are bounded and ephemeral.
 - Durable trace stores are host telemetry sinks, not SDK storage.
 - The SDK emits events and journal records; hosts decide which live projections enter product UI.
 - UI selectors never become approval, replay, or analytics source of truth.
+- Event archive implementation is optional host or adapter infrastructure.
 
 ## Acceptance Tests
 

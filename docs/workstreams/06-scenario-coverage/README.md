@@ -12,10 +12,12 @@ This phase is separated because scenario coverage depends on all feature-layer c
 
 ## Exit Gate
 
-- [ ] Every scenario maps to SDK-owned primitives and host-owned boundaries.
-- [ ] Scenario gaps become proposal blocks or accepted primitive changes with owners.
-- [ ] Examples remain product-neutral.
-- [ ] Stitching checkpoint complete: accepted scenario proposals are reconciled into shared docs and unresolved blockers are concrete before Phase 07 starts.
+- [x] Every scenario maps to SDK-owned primitives and host-owned boundaries.
+- [x] Scenario gaps become proposal blocks or accepted primitive changes with owners.
+- [x] Examples remain product-neutral.
+- [x] Stitching checkpoint complete: accepted scenario proposals are reconciled into shared docs and unresolved blockers are concrete before Phase 07 starts.
+
+Exit evidence: [Phase 06 exit report](_phase/phase-exit-report.md).
 
 ## Next Phase
 
