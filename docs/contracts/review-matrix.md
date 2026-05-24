@@ -30,7 +30,7 @@ These rows are not SDK-core contracts. They are used to verify that many host sh
 
 | Scenario reference | External sources to compare | Scenario coverage notes | Required records/events/tests | Owner role |
 | --- | --- | --- | --- | --- |
-| [../examples/README.md](../examples/README.md) | all above | maps desktop chat, voice, remote/headless, external runtimes, subagents, memory, isolation, and telemetry | host boundary tests and scenario notes | [10-generic-scenario-coverage](../workstreams/_roles/10-generic-scenario-coverage.md) |
+| [../examples/README.md](../examples/README.md) | all above | maps desktop/web chat, voice, remote/headless, external runtimes, structured output, stream rules, output delivery, extensions, subagents, memory, isolation, and telemetry | host boundary tests and scenario notes | [10-generic-scenario-coverage](../workstreams/_roles/10-generic-scenario-coverage.md) |
 | [../examples/live-vs-durable-event-flow.md](../examples/live-vs-durable-event-flow.md) | OTel, event sourcing, list/watch patterns | proves live events, journals, and trace sinks stay distinct | replay, overflow, sink repair tests | [02-events-journal-replay](../workstreams/_roles/02-events-journal-replay.md), [09-telemetry-privacy-cost](../workstreams/_roles/09-telemetry-privacy-cost.md) |
 | [../examples/external-runtime-session-lifecycle.md](../examples/external-runtime-session-lifecycle.md) | Cursor/Pi external run ideas, container lifecycle patterns | maps prewarm, restore, session ID, fingerprint, retirement, and process cleanup as host-owned | external adapter lifecycle tests | [06-isolation-execution](../workstreams/_roles/06-isolation-execution.md), [10-generic-scenario-coverage](../workstreams/_roles/10-generic-scenario-coverage.md) |
 

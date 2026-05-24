@@ -50,7 +50,7 @@ Scenario references are not normative SDK contracts. They are coverage examples 
 
 | Reference | Purpose |
 | --- | --- |
-| [../examples/README.md](../examples/README.md) | Generic desktop, CLI/headless, realtime, remote, external-runtime, telemetry, isolation, and subagent scenarios. |
+| [../examples/README.md](../examples/README.md) | Generic desktop/web chat, CLI/headless, realtime, remote, external-runtime, telemetry, structured-output, stream-rule, isolation, subagent, extension, and output-delivery scenarios. |
 
 ## Host-Owned Boundaries
 

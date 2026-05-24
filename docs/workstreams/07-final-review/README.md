@@ -10,6 +10,6 @@ Run this final phase after [Phase 06](../06-scenario-coverage/README.md) exits.
 
 ## Exit Gate
 
-- [ ] Final link, ownership, product-neutrality, no-code, and review-matrix audits pass.
-- [ ] Accepted proposal blocks are reconciled into shared docs.
-- [ ] Any remaining blocker before coding is explicit, concrete, and assigned.
+- [x] Final link, ownership, product-neutrality, no-code, and review-matrix audits pass.
+- [x] Accepted proposal blocks are reconciled into shared docs.
+- [x] Any remaining blocker before coding is explicit, concrete, and assigned.
