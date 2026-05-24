@@ -9,7 +9,8 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 - The authoritative Agent SDK packet lives in `/Users/clawdia/clawdia_sdk`.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
-- Parallel implementation ownership lives in [workstreams](workstreams/README.md).
+- Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
+- Future Rust implementation launch sequencing lives in [implementation-workstreams](implementation-workstreams/README.md).
 
 ## Navigation
 
@@ -24,7 +25,8 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 | [architecture/coverage-gap-matrix.md](architecture/coverage-gap-matrix.md) | Current coverage gaps and implementation candidates. |
 | [contracts/README.md](contracts/README.md) | Normative implementation contracts for API, events, loop, package, journal/replay, policy, tools, isolation, extension, and telemetry. |
 | [examples/README.md](examples/README.md) | Mermaid-heavy scenario examples for complex host workflows and SDK boundaries. |
-| [workstreams/README.md](workstreams/README.md) | Phase-gated Codex goal folders: what must run first, what can run in parallel, owner roles, and what closes each gate. |
+| [workstreams/README.md](workstreams/README.md) | Completed phase-gated contract packet: what ran first, what ran in parallel, owner roles, and what closed each gate. |
+| [implementation-workstreams/README.md](implementation-workstreams/README.md) | Future Rust coding launch map: phase dependencies, parallel-safe launch targets, and implementation exit gates. |
 | [workstreams/validation-gates.md](workstreams/validation-gates.md) | Shared validation levels, required evidence, and target commands for every workstream. |
 | [reference/feature-to-primitive-matrix.md](reference/feature-to-primitive-matrix.md) | Feature-to-primitive mapping and primitive decision ladder used by Phase 00, Phase 01, and Phase 02. |
 | [reference/sdk-review-checklist.md](reference/sdk-review-checklist.md) | SDK review rubric for simplicity, product-neutrality, observability, durability, privacy, and API quality. |

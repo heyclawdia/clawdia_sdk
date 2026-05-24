@@ -19,10 +19,11 @@ The authoritative standards live at [docs/architecture/coding-standards.md](docs
 2. [docs/start-here.md](docs/start-here.md)
 3. [docs/architecture/coding-standards.md](docs/architecture/coding-standards.md)
 4. [docs/workstreams/README.md](docs/workstreams/README.md)
-5. [docs/workstreams/validation-gates.md](docs/workstreams/validation-gates.md)
-6. [docs/reference/sdk-review-checklist.md](docs/reference/sdk-review-checklist.md)
-7. [docs/reference/simplicity-audit.md](docs/reference/simplicity-audit.md)
+5. [docs/implementation-workstreams/README.md](docs/implementation-workstreams/README.md)
+6. [docs/workstreams/validation-gates.md](docs/workstreams/validation-gates.md)
+7. [docs/reference/sdk-review-checklist.md](docs/reference/sdk-review-checklist.md)
+8. [docs/reference/simplicity-audit.md](docs/reference/simplicity-audit.md)
 
 ## Completion Rule
 
-An SDK phase goal is not complete until its contract tests, golden fixtures, smoke tests, and cross-contract audits named in the goal and owner role docs have evidence. Passing docs review alone is not implementation confidence.
+An SDK implementation launch target is not complete until its contract tests, golden fixtures, smoke tests, and cross-contract audits named in the launch doc have evidence. Passing docs review alone is not implementation confidence.

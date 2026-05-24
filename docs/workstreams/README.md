@@ -1,8 +1,8 @@
 # Agent SDK Phase Workstreams
 
-Use this folder to launch SDK planning and coding goals.
+Use this folder to review the completed SDK contract-planning packet. Future Rust coding launch targets live in [../implementation-workstreams](../implementation-workstreams/README.md).
 
-The rule is intentionally simple: **run phases in numeric order, and run every goal file inside the current numbered phase folder in parallel**. If a goal depends on another goal, it belongs in a later numbered folder.
+The rule for this completed packet is intentionally simple: **run phases in numeric order, and run every goal file inside the current numbered phase folder in parallel**. If a goal depends on another goal, it belongs in a later numbered folder.
 
 ## Launch Order
 
