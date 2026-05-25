@@ -1,6 +1,6 @@
 [package]
 name = "agent-sdk-toolkit"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/agent-sdk-toolkit"
 readme = "README.md"
 
 [dependencies]
-agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.1" }
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.2" }
 base64 = "0.22.1"
 flate2 = "1.1.9"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "ico", "jpeg", "png", "tiff", "webp"] }

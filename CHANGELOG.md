@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-alpha.2
+
+Status: second public alpha crates.io release.
+
+### Changed
+
+- Added the Rust API Guidelines review gate to the SDK coding standards and reviewer checklist.
+- Reduced large public error payloads so common `Result` APIs stay cheaper to pass: `AgentError` and `ContentResolutionError` now box large internal payloads where needed, and structured-output validation returns boxed validation reports on failure.
+- Made the remaining Clippy API-shape decisions explicit with local `#[expect(..., reason = "...")]` annotations for durable serde enums and wide lineage constructors that intentionally keep direct record ergonomics.
+
+### Validation
+
+- `cargo clippy --workspace --all-targets -- -D warnings` now passes as a release gate.
+- Public API regression tests cover error-size and serialized JSON shape preservation.
+
 ## 0.1.0-alpha.1
 
 Status: first public alpha crates.io release.
