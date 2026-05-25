@@ -697,6 +697,10 @@ impl OutputDeliveryResultRecord {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "status projection mirrors output-delivery effect fields; grouping belongs with a dedicated result-builder API"
+    )]
     fn from_status(
         request: &OutputDeliveryRequest,
         dispatch_status: OutputDispatchStatus,
@@ -949,6 +953,10 @@ pub struct OutputDeliveryEventRecord {
 #[serde(tag = "record_type", content = "record", rename_all = "snake_case")]
 /// Enumerates the finite output delivery record cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "output-delivery records are durable serde payloads; direct variants stay explicit until a fixture-reviewed envelope migration"
+)]
 pub enum OutputDeliveryRecord {
     /// Use this variant when the contract needs to represent intent; selecting it has no side effect by itself.
     Intent(OutputDeliveryIntentRecord),
@@ -1044,6 +1052,10 @@ pub fn build_output_delivery_dedupe_key(request: &OutputDeliveryRequest) -> Dedu
     DedupeKey::new(format!("dedupe.output_delivery.{digest:x}"))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private output-delivery journal constructor mirrors effect and event lineage fields for auditability"
+)]
 fn output_delivery_effect_record(
     base: OutputDeliveryJournalBase,
     record_kind: JournalRecordKind,

@@ -177,6 +177,8 @@ Reviewers must check:
 
 Intentional deviations from this gate must be recorded in the review packet or phase exit report with an SDK-specific reason. "The code compiles" is not enough for public API approval.
 
+Clippy is part of the Rust API review gate for implementation handoffs. Run `cargo clippy --workspace --all-targets -- -D warnings` before approval. Prefer structural fixes when Clippy identifies large public `Result` errors or cheap ownership problems. When a lint is intentionally accepted because a durable serde record, explicit lineage constructor, or public DTO should stay direct until a larger API migration, record that choice at the narrowest code site with `#[expect(..., reason = "...")]` and mirror the rationale in the review packet. Do not use global lint allows for SDK API hygiene.
+
 - Use `Result<T, AgentError>` for fallible SDK operations. Error variants should preserve typed context and causal IDs.
 - Prefer enums for finite state: stop reasons, approval decisions, permission outcomes, stream item kinds, recovery actions, and policy decisions.
 - Use newtype IDs instead of raw strings at public boundaries.

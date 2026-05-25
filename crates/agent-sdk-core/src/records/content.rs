@@ -235,6 +235,10 @@ impl ContentRef {
     /// Creates a new records::content value with explicit
     /// caller-provided inputs. This constructor is data-only and
     /// performs no I/O or external side effects.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "ContentRef::new is the explicit durable DTO constructor; a builder would be a separate public API ergonomics pass"
+    )]
     pub fn new(
         content_id: ContentId,
         version: ContentVersion,
@@ -500,7 +504,7 @@ pub struct ContentResolutionError {
     pub kind: ContentResolutionErrorKind,
     /// Content reference where payload bytes or structured tool output are
     /// stored.
-    pub content_ref: ContentRef,
+    pub content_ref: Box<ContentRef>,
     /// Policy references that govern admission, projection, execution, or
     /// delivery.
     pub policy_refs: Vec<PolicyRef>,
@@ -544,7 +548,7 @@ pub(crate) fn resolution_error(
     ContentResolutionError {
         kind,
         redacted_summary: content_ref.redacted_summary.clone(),
-        content_ref,
+        content_ref: Box::new(content_ref),
         policy_refs,
     }
 }

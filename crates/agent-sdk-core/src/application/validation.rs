@@ -72,7 +72,7 @@ pub trait StructuredOutputValidator {
         contract: &OutputContract,
         validation_attempt_id: ValidationAttemptId,
         candidate: &OutputCandidate,
-    ) -> Result<ValidationSuccess, ValidationErrorReport>;
+    ) -> Result<ValidationSuccess, Box<ValidationErrorReport>>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -104,7 +104,7 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
         contract: &OutputContract,
         validation_attempt_id: ValidationAttemptId,
         candidate: &OutputCandidate,
-    ) -> Result<ValidationSuccess, ValidationErrorReport> {
+    ) -> Result<ValidationSuccess, Box<ValidationErrorReport>> {
         let mut schema_errors = ErrorCollector::new(contract.validation.max_errors_returned);
 
         if contract.dialect != OutputSchemaDialect::JsonSchema2020_12Subset {
@@ -162,17 +162,17 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
                 .errors
                 .iter()
                 .any(|error| error.code.is_schema_rejection());
-            return Err(ValidationErrorReport::new(
+            return Err(Box::new(ValidationErrorReport::new(
                 contract,
                 validation_attempt_id,
                 candidate,
                 schema_errors.into_errors(),
                 schema_rejected,
-            ));
+            )));
         }
 
         if candidate.text.len() as u64 > contract.validation.max_candidate_bytes {
-            return Err(ValidationErrorReport::new(
+            return Err(Box::new(ValidationErrorReport::new(
                 contract,
                 validation_attempt_id,
                 candidate,
@@ -182,13 +182,13 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
                     "candidate exceeds configured structured output byte limit",
                 )],
                 false,
-            ));
+            )));
         }
 
         let value = match serde_json::from_str::<Value>(&candidate.text) {
             Ok(value) => value,
             Err(_) => {
-                return Err(ValidationErrorReport::new(
+                return Err(Box::new(ValidationErrorReport::new(
                     contract,
                     validation_attempt_id,
                     candidate,
@@ -198,7 +198,7 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
                         "candidate is not valid JSON",
                     )],
                     false,
-                ));
+                )));
             }
         };
 
@@ -213,13 +213,13 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
         );
 
         if !candidate_errors.is_empty() {
-            return Err(ValidationErrorReport::new(
+            return Err(Box::new(ValidationErrorReport::new(
                 contract,
                 validation_attempt_id,
                 candidate,
                 candidate_errors.into_errors(),
                 false,
-            ));
+            )));
         }
 
         let record = validation_record_succeeded(

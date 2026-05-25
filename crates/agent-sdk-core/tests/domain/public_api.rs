@@ -325,6 +325,64 @@ fn public_error_type_is_small_and_keeps_constructor_accessor_contract() {
     );
 }
 
+#[test]
+fn public_large_error_payloads_are_cheap_without_changing_json_contracts() {
+    assert!(
+        size_of::<agent_sdk_core::ContentResolutionError>() <= 128,
+        "content resolver errors should stay cheap for public Result APIs"
+    );
+    assert!(
+        size_of::<
+            Result<agent_sdk_core::ValidationSuccess, Box<agent_sdk_core::ValidationErrorReport>>,
+        >() < size_of::<agent_sdk_core::ValidationErrorReport>(),
+        "validation failures should be returned behind indirection"
+    );
+
+    let content_ref = agent_sdk_core::ContentRef::new(
+        agent_sdk_core::ContentId::new("content.public_api.error"),
+        agent_sdk_core::ContentVersion::new("v1"),
+        agent_sdk_core::ContentKind::Document,
+        agent_sdk_core::ContentScope::Run,
+        EntityRef::run(RunId::new("run.public_api.error")),
+        SourceRef::with_kind(SourceKind::Host, "source.public_api.error"),
+        agent_sdk_core::AdapterRef::new("adapter.public_api.content"),
+        "content error fixture",
+    );
+    let content_error = agent_sdk_core::ContentResolutionError {
+        kind: agent_sdk_core::ContentResolutionErrorKind::Missing,
+        content_ref: Box::new(content_ref),
+        policy_refs: vec![PolicyRef::with_kind(
+            PolicyKind::RuntimePackage,
+            "policy.public_api.content",
+        )],
+        redacted_summary: "content missing".to_string(),
+    };
+    let serialized_content_error =
+        serde_json::to_value(&content_error).expect("content error serializes");
+    assert_eq!(
+        serialized_content_error["content_ref"]["content_id"], "content.public_api.error",
+        "boxing ContentResolutionError internals must not change the serialized content-ref shape"
+    );
+
+    let validator = agent_sdk_core::JsonSchemaSubsetValidator::default();
+    let validation_result = agent_sdk_core::StructuredOutputValidator::validate_candidate(
+        &validator,
+        &OutputContract::for_type::<PublicTodo>(),
+        agent_sdk_core::ValidationAttemptId::new("validation.public_api.error"),
+        &agent_sdk_core::OutputCandidate::new(
+            agent_sdk_core::AttemptId::new("attempt.public_api.error"),
+            agent_sdk_core::domain::ContentRef::new("content.validation.public_api.error"),
+            "{}",
+        ),
+    );
+    let report = validation_result.expect_err("invalid typed output returns report");
+    let serialized_report = serde_json::to_value(&report).expect("validation report serializes");
+    assert_eq!(
+        serialized_report["candidate_content_ref"], "content.validation.public_api.error",
+        "boxing the validation Result error must not change the report JSON shape"
+    );
+}
+
 struct RunEvidence {
     result: RunResult,
     provider: FakeProvider,

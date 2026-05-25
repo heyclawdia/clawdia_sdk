@@ -264,6 +264,10 @@ impl HookMutationJournalPlan {
     /// Builds the accepted response value.
     /// This is data construction and performs no I/O, journal append, event publication, or
     /// process work.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "hook response records are durable audit DTOs and keep their lineage fields explicit until a record-builder pass"
+    )]
     pub fn accepted_response(
         journal_seq: u64,
         record_id: impl Into<String>,

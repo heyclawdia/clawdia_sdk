@@ -90,6 +90,7 @@ Suggested fix:
 - Predictable methods/type-safe parameters/builders:
 - Future-proofing/SemVer/dependencies/licenses:
 - Intentional deviations:
+- Clippy/API hygiene: does `cargo clippy --workspace --all-targets -- -D warnings` pass? Are large public `Result` errors fixed structurally or boxed intentionally? Are any remaining `#[expect]` lint decisions local, reasoned, and reflected in the review packet rather than hidden behind global allows?
 
 ## Event/Journal Pass
 

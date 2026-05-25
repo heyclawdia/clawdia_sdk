@@ -34,7 +34,7 @@ pub trait ContentResolver {
         Err(ContentResolutionError {
             kind: ContentResolutionErrorKind::StorageUnavailable,
             redacted_summary: content_ref.redacted_summary.clone(),
-            content_ref: content_ref.clone(),
+            content_ref: Box::new(content_ref.clone()),
             policy_refs: Vec::new(),
         })
     }

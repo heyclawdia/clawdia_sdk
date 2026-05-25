@@ -431,6 +431,10 @@ impl OutputDeliveryService {
             })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "append-failure reconciliation keeps request, intent, result, receipt, and error evidence explicit for durable recovery"
+    )]
     fn output_reconciliation_after_append_failure(
         &self,
         _context: OutputDeliveryContext,

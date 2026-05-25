@@ -802,6 +802,10 @@ fn fallback_allows(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private isolation helper keeps downgrade evidence explicit; grouping belongs with a broader selection-outcome builder"
+)]
 fn denied_outcome(
     status: IsolationMatchStatus,
     environment: &ExecutionEnvironment,
@@ -834,6 +838,10 @@ fn denied_outcome(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private isolation helper mirrors the durable downgrade decision record fields for auditability"
+)]
 fn downgrade_record(
     environment: &ExecutionEnvironment,
     selected_runtime_ref: &IsolationRuntimeRef,

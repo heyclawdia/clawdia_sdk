@@ -642,6 +642,10 @@ impl<T> StructuredOutputResult<T> {
 #[serde(tag = "type", content = "record", rename_all = "snake_case")]
 /// Enumerates the finite validated output publication step cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "publication steps are serialized contract records; boxing variants should be handled as a fixture-reviewed API migration"
+)]
 pub enum ValidatedOutputPublicationStep {
     /// Use this variant when the contract needs to represent validation report; selecting it has no side effect by itself.
     ValidationReport(ValidationReportRecord),

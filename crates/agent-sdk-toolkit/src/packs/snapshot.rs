@@ -13,6 +13,10 @@ use agent_sdk_core::{
 /// Returns tool snapshot for the current value.
 /// This is a read-only or data-construction helper unless the method body explicitly calls a
 /// port or store.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "toolkit snapshot assembly mirrors the core capability sidecar fields; a builder is a separate toolkit API ergonomics pass"
+)]
 pub fn tool_snapshot(
     capability_id: &str,
     tool_name: &str,

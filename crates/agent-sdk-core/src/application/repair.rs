@@ -288,7 +288,7 @@ where
                 }
                 Err(report) => {
                     validation_records.push(report.record.clone());
-                    reports.push(report.clone());
+                    reports.push((*report).clone());
 
                     match self
                         .repair_controller
@@ -299,7 +299,7 @@ where
                             repair_records.push(record.clone());
                             if candidates.peek().is_none() {
                                 return Ok(ValidationRepairOutcome::RepairRequested {
-                                    latest_report: report,
+                                    latest_report: *report,
                                     prompt,
                                     validation_records,
                                     repair_records,

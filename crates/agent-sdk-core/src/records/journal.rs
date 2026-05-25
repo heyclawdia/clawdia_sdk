@@ -378,6 +378,10 @@ impl JournalRecord {
     /// Builds the feature record record or result value.
     /// This is data-only and does not perform I/O, call host ports, append journals, publish
     /// events, or start processes.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "feature records intentionally expose journal/event lineage fields; replacing this with a builder needs a separate public API review"
+    )]
     pub fn feature_record(
         base: JournalRecordBase,
         record_kind: JournalRecordKind,
@@ -531,6 +535,10 @@ impl JournalRecordBase {
 #[serde(tag = "type", rename_all = "snake_case")]
 /// Enumerates the finite journal record payload cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "journal payloads are durable serde records; direct variant payloads are intentionally preserved until a fixture-reviewed envelope redesign"
+)]
 pub enum JournalRecordPayload {
     /// Use this variant when the contract needs to represent run lifecycle; selecting it has no side effect by itself.
     RunLifecycle(RunLifecycleRecord),
@@ -584,6 +592,10 @@ pub enum JournalRecordPayload {
 #[serde(tag = "record_type", content = "record", rename_all = "snake_case")]
 /// Enumerates the finite structured output record cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "structured-output payloads preserve serde and pattern-match ergonomics; boxing variants should be a dedicated contract migration"
+)]
 pub enum StructuredOutputRecord {
     /// Use this variant when the contract needs to represent lifecycle; selecting it has no side effect by itself.
     Lifecycle(StructuredOutputLifecycleRecord),

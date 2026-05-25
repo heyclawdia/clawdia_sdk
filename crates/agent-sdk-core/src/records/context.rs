@@ -805,6 +805,10 @@ impl ContextProjection {
     /// Finishes builder validation and returns the configured value.
     /// This is data-only unless the surrounding builder explicitly
     /// documents adapter or store access.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "ContextProjection::build intentionally captures all projection inputs; a projection builder should be designed as a separate API pass"
+    )]
     pub fn build(
         projection_id: ContextProjectionId,
         source_messages: Vec<AgentMessage>,

@@ -315,6 +315,10 @@ pub fn run_p0_text(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "run-loop journaling helper keeps attempt, provider, event, and fingerprint evidence explicit until grouped run-loop command structs are introduced"
+)]
 fn append_model_attempt_completion(
     runtime: &AgentRuntime,
     request: &RunRequest,
@@ -400,6 +404,10 @@ fn append_model_attempt_completion(
     Ok(response)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "terminal append helper mirrors journal and event envelope evidence; grouping is a broader run-loop refactor"
+)]
 fn append_message_and_terminal(
     runtime: &AgentRuntime,
     handle: &RunHandle,
@@ -487,6 +495,10 @@ struct P1StructuredOutputSuccess {
     artifacts: StructuredOutputArtifacts,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "structured-output request journaling keeps lineage fields explicit until the run-loop record builder is redesigned"
+)]
 fn append_structured_output_requested(
     runtime: &AgentRuntime,
     request: &RunRequest,
@@ -531,6 +543,10 @@ fn append_structured_output_requested(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "P1 driver coordinates validator, provider, contract, and run context; splitting into a session object is a dedicated API/loop refactor"
+)]
 fn drive_p1_structured_output(
     runtime: &AgentRuntime,
     request: &RunRequest,
@@ -749,6 +765,7 @@ fn drive_p1_structured_output(
                 });
             }
             Err(report) => {
+                let report = *report;
                 let failed_cursor = journal.append(structured_output_journal_record(
                     runtime,
                     request,
@@ -890,6 +907,10 @@ fn drive_p1_structured_output(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "repair-attempt journaling keeps provider attempt evidence explicit until grouped run-loop command structs are introduced"
+)]
 fn append_provider_repair_attempt_started(
     runtime: &AgentRuntime,
     request: &RunRequest,
@@ -1013,6 +1034,10 @@ fn repair_provider_request(
     request
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private structured-output journal constructor mirrors durable record fields for auditability"
+)]
 fn structured_output_journal_record(
     runtime: &AgentRuntime,
     request: &RunRequest,
@@ -1161,6 +1186,10 @@ fn build_text_projection(
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private journal constructor intentionally spells out durable envelope fields; a builder migration should be fixture-reviewed"
+)]
 fn journal_record(
     run_id: &RunId,
     agent_id: &AgentId,
@@ -1239,6 +1268,10 @@ fn journal_record(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private event constructor mirrors the published event envelope to keep lineage and cursor evidence explicit"
+)]
 fn event_frame(
     run_id: &RunId,
     agent_id: &AgentId,

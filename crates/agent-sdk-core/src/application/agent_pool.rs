@@ -542,6 +542,10 @@ impl AgentPool {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "journal-backed pool records intentionally spell out lineage, refs, and payload until a dedicated record-builder API replaces this private helper"
+    )]
     fn journal_record(
         &self,
         run_id: RunId,
@@ -616,6 +620,10 @@ impl AgentPool {
         })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "event publication mirrors the durable event envelope fields so lineage stays explicit at the call site"
+    )]
     fn publish_agent_pool_event(
         &self,
         run_id: RunId,
@@ -1011,6 +1019,10 @@ pub struct AgentPoolStoreRecord {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 /// Finite pool-store record variants.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "pool store payloads are durable serde records; preserve direct variant ergonomics until a separate storage-envelope redesign"
+)]
 pub enum AgentPoolStoreRecordPayload {
     /// Pool metadata was opened or initialized.
     PoolOpened {

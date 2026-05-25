@@ -217,6 +217,10 @@ impl ApprovalBroker {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "approval terminal journaling needs explicit status, decision, and summary fields until this becomes a terminal-result command object"
+    )]
     fn append_terminal_result(
         &self,
         request: &ApprovalRequest,

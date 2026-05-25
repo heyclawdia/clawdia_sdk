@@ -401,6 +401,10 @@ impl SubagentSupervisor {
     /// Rolls child usage into parent-visible subagent accounting.
     /// This dedupes by child usage ref, appends the parent subagent usage record, and stores the
     /// rollup in supervisor state; it does not call a provider or sink.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "usage rollup is a durable subagent audit record constructor; a parameter object should be a separate public API pass"
+    )]
     pub fn rollup_usage(
         &self,
         child_run_id: RunId,
