@@ -41,10 +41,10 @@ pub enum AgentError {
         /// Retry used by this record or request.
         retry: RetryClassification,
         /// Context used by this record or request.
-        context: ErrorContext,
+        context: Box<ErrorContext>,
         /// Identifiers used to select or correlate causal values.
         /// Use them for typed lookup, filtering, or lineage instead of stringly typed matching.
-        causal_ids: CausalIds,
+        causal_ids: Box<CausalIds>,
     },
 }
 
@@ -60,8 +60,8 @@ impl AgentError {
         Self::Classified {
             kind,
             retry,
-            context: ErrorContext::new(message),
-            causal_ids: CausalIds::default(),
+            context: Box::new(ErrorContext::new(message)),
+            causal_ids: Box::default(),
         }
     }
 
@@ -73,7 +73,7 @@ impl AgentError {
             Self::MissingRequiredField { .. } => AgentErrorKind::InvalidPackage,
             Self::ContractViolation { .. } => AgentErrorKind::InvalidStateTransition,
             Self::HostConfigurationNeeded { .. } => AgentErrorKind::HostConfigurationNeeded,
-            Self::Classified { kind, .. } => kind.clone(),
+            Self::Classified { kind, .. } => *kind,
         }
     }
 
@@ -86,7 +86,7 @@ impl AgentError {
                 RetryClassification::HostConfigurationNeeded
             }
             Self::ContractViolation { .. } => RetryClassification::RepairNeeded,
-            Self::Classified { retry, .. } => retry.clone(),
+            Self::Classified { retry, .. } => *retry,
         }
     }
 
@@ -101,7 +101,7 @@ impl AgentError {
             Self::ContractViolation { message } | Self::HostConfigurationNeeded { message } => {
                 ErrorContext::new(message.clone())
             }
-            Self::Classified { context, .. } => context.clone(),
+            Self::Classified { context, .. } => context.as_ref().clone(),
         }
     }
 
@@ -110,7 +110,7 @@ impl AgentError {
     /// process work.
     pub fn causal_ids(&self) -> CausalIds {
         match self {
-            Self::Classified { causal_ids, .. } => causal_ids.clone(),
+            Self::Classified { causal_ids, .. } => causal_ids.as_ref().clone(),
             _ => CausalIds::default(),
         }
     }
@@ -157,13 +157,13 @@ impl AgentError {
                 kind,
                 retry,
                 context,
-                causal_ids,
+                causal_ids: Box::new(causal_ids),
             },
             other => Self::Classified {
                 kind: other.kind(),
                 retry: other.retry(),
-                context: other.context(),
-                causal_ids,
+                context: Box::new(other.context()),
+                causal_ids: Box::new(causal_ids),
             },
         }
     }
@@ -204,13 +204,13 @@ impl AgentError {
         Self::Classified {
             kind,
             retry,
-            context,
-            causal_ids,
+            context: Box::new(context),
+            causal_ids: Box::new(causal_ids),
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Error, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Error, Eq, PartialEq, Serialize)]
 /// Enumerates the finite agent error kind cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum AgentErrorKind {
@@ -276,7 +276,7 @@ pub enum AgentErrorKind {
     HostConfigurationNeeded,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 /// Enumerates the finite retry classification cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum RetryClassification {

@@ -111,8 +111,8 @@ impl OutputDeliveryService {
             content_refs: candidate.content_refs.clone(),
             redacted_summary: candidate.redacted_summary.clone(),
             raw_content: candidate.raw_content.clone(),
-            privacy: candidate.privacy.clone(),
-            retention: candidate.retention.clone(),
+            privacy: candidate.privacy,
+            retention: candidate.retention,
             policy_refs: candidate.policy.policy_refs(),
             idempotency_key: Some(IdempotencyKey::new(format!(
                 "idempotency.{}",

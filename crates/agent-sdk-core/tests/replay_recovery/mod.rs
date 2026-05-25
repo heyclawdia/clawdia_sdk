@@ -224,7 +224,7 @@ fn anti_entropy_reports_sink_repair_cursors_and_updates_internal_views_only() {
             request.destination.clone(),
         ),
     ];
-    let scanner = AntiEntropyScanner::default();
+    let scanner = AntiEntropyScanner;
     let mut view = scanner.derived_view("view.output_sink_repair", None);
 
     let report = scanner

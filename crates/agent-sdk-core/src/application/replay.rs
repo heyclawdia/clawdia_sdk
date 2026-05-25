@@ -279,15 +279,14 @@ impl ReplayReducer {
             JournalRecordPayload::Checkpoint(checkpoint) => {
                 checkpoint
                     .validate_against_latest_seq(record.journal_seq)
-                    .map_err(|error| {
+                    .inspect_err(|error| {
                         self.repair(
                             ReplayRepairKind::CheckpointInvalid,
                             &record.record_id,
                             record.journal_seq,
-                            error.context().message,
+                            error.context().message.clone(),
                             RetryClassification::RepairNeeded,
                         );
-                        error
                     })?;
                 self.observe_content_refs(
                     &record.record_id,

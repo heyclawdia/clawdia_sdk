@@ -16,12 +16,13 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 /// Enumerates the finite context handoff policy cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ContextHandoffPolicy {
     /// Use this variant when the contract needs to represent none; selecting it has no side effect by itself.
+    #[default]
     None,
     /// Use this variant when the contract needs to represent summary only; selecting it has no side effect by itself.
     SummaryOnly {
@@ -55,12 +56,6 @@ pub enum ContextHandoffPolicy {
         /// boundary without audit proof.
         projection_audit_required: bool,
     },
-}
-
-impl Default for ContextHandoffPolicy {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl ContextHandoffPolicy {
@@ -248,7 +243,7 @@ impl ChildRuntimePackagePolicy {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 /// Enumerates the finite subagent tool policy cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
@@ -256,6 +251,7 @@ pub enum SubagentToolPolicy {
     /// Use this variant when the contract needs to represent inherit allowlist; selecting it has no side effect by itself.
     InheritAllowlist,
     /// Use this variant when the contract needs to represent read only; selecting it has no side effect by itself.
+    #[default]
     ReadOnly,
     /// Use this variant when the contract needs to represent no tools; selecting it has no side effect by itself.
     NoTools,
@@ -264,12 +260,6 @@ pub enum SubagentToolPolicy {
         /// Capability identifiers affected by this package or sidecar record.
         capability_ids: Vec<CapabilityId>,
     },
-}
-
-impl Default for SubagentToolPolicy {
-    fn default() -> Self {
-        Self::ReadOnly
-    }
 }
 
 impl SubagentToolPolicy {

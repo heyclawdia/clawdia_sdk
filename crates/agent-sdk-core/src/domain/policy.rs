@@ -356,8 +356,8 @@ impl PermissionPolicy {
             source: Some(request.source.clone()),
             destination: Some(request.destination.clone()),
             policy_refs: vec![self.policy_ref.clone()],
-            privacy: request.privacy.clone(),
-            retention: request.retention.clone(),
+            privacy: request.privacy,
+            retention: request.retention,
         }
     }
 }

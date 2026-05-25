@@ -58,7 +58,7 @@ pub(super) fn render_bounded_prefix_read(
         WorkspaceFileKind::Text | WorkspaceFileKind::Markdown | WorkspaceFileKind::Json => {
             let safe_text = String::from_utf8_lossy(bytes);
             let mut rendered = text::render_text(&safe_text, max_output_bytes, true, false);
-            if !matches!(std::str::from_utf8(bytes), Ok(_)) {
+            if std::str::from_utf8(bytes).is_err() {
                 rendered.warnings.push(
                     "bounded prefix ended inside an invalid UTF-8 sequence; replacement characters may appear at the prefix boundary"
                         .to_string(),

@@ -171,7 +171,7 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
             ));
         }
 
-        if candidate.text.as_bytes().len() as u64 > contract.validation.max_candidate_bytes {
+        if candidate.text.len() as u64 > contract.validation.max_candidate_bytes {
             return Err(ValidationErrorReport::new(
                 contract,
                 validation_attempt_id,
@@ -795,7 +795,7 @@ fn validate_value_against_schema(
         }
         Some("string") => validate_string_schema(schema, value, path, errors),
         Some("integer") => {
-            if !value.as_i64().is_some() && !value.as_u64().is_some() {
+            if value.as_i64().is_none() && value.as_u64().is_none() {
                 errors.push(type_mismatch(path, "integer"));
             }
         }

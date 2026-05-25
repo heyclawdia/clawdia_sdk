@@ -438,7 +438,7 @@ fn approval_journal_record(
             related_refs: Vec::new(),
             correlation_keys: Vec::new(),
             tags: vec!["approval".to_string()],
-            privacy_class: base.privacy.clone(),
+            privacy_class: base.privacy,
             delivery_semantics: "journal_backed".to_string(),
         },
         timestamp_millis: base.timestamp_millis,

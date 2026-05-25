@@ -311,7 +311,7 @@ impl ExtensionActionEvent {
             effect_id,
             policy_refs: record.policy_refs.clone(),
             runtime_package_fingerprint: runtime_package_fingerprint.into(),
-            privacy: record.privacy.clone(),
+            privacy: record.privacy,
             redacted_summary: redacted_summary.into(),
         }
     }

@@ -50,7 +50,7 @@ impl ToolkitPackBundle {
                 sidecar_refs: vec![sidecar_ref.clone()],
                 effect_class: tool.effect_class.clone(),
                 risk_class: tool.risk_class.clone(),
-                privacy: tool.privacy.clone(),
+                privacy: tool.privacy,
                 retention: RetentionClass::RunScoped,
             })
             .collect();

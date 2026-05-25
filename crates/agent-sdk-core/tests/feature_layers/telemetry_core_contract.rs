@@ -348,7 +348,7 @@ fn sink_failure_and_recovery_records_carry_repair_cursor() {
         failure_record.repair_cursor,
         Some(TelemetrySourceCursor::Journal(_))
     ));
-    assert_eq!(failure_record.terminal_preserved, true);
+    assert!(failure_record.terminal_preserved);
 
     let TelemetryRecordPayload::SinkRecovered(recovery_record) = &recovery.records[0].payload
     else {

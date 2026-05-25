@@ -105,7 +105,7 @@ impl Agent {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 /// Holds agent builder application-layer state or configuration.
 /// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentBuilder {
@@ -159,16 +159,5 @@ impl AgentBuilder {
             instructions: self.instructions,
             default_package_id: self.default_package_id,
         })
-    }
-}
-
-impl Default for AgentBuilder {
-    fn default() -> Self {
-        Self {
-            id: None,
-            name: None,
-            instructions: None,
-            default_package_id: None,
-        }
     }
 }

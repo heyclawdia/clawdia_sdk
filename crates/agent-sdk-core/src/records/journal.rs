@@ -521,7 +521,7 @@ impl JournalRecordBase {
             related_refs: Vec::new(),
             correlation_keys: Vec::new(),
             tags: self.tags.clone(),
-            privacy_class: self.privacy.clone(),
+            privacy_class: self.privacy,
             delivery_semantics: "journal_backed".to_string(),
         }
     }

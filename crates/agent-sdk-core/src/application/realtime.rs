@@ -151,8 +151,8 @@ impl RealtimeSessionController {
         requested.direction = Some(StreamDirection::InputToProvider);
         requested.media_kind = frame.media_kind;
         requested.content_refs = frame.content_refs.clone();
-        requested.privacy = frame.privacy.clone();
-        requested.retention = frame.retention.clone();
+        requested.privacy = frame.privacy;
+        requested.retention = frame.retention;
         self.append_realtime_record(requested)?;
 
         self.adapter.send(&state.session_id, frame.clone())?;
@@ -432,7 +432,7 @@ impl RealtimeSessionController {
             record.provider_route_ref.clone(),
         ));
         base.runtime_package_fingerprint = self.runtime_package_fingerprint.clone();
-        base.privacy = record.privacy.clone();
+        base.privacy = record.privacy;
         base.redaction_policy_id = record
             .policy_refs
             .first()

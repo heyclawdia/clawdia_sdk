@@ -285,7 +285,7 @@ impl ToolPackSnapshot {
                     policy_ref,
                     sidecar_refs: vec![sidecar_ref.clone()],
                     isolation_ref: None,
-                    privacy: tool.privacy.clone(),
+                    privacy: tool.privacy,
                     readiness: active_tool_pack_readiness(),
                 })
             })

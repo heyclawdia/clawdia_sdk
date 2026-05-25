@@ -1,5 +1,6 @@
 use std::{
     any::type_name,
+    mem::size_of,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -7,15 +8,15 @@ use std::{
 };
 
 use agent_sdk_core::{
-    Agent, AgentError, AgentEvent, AgentEventBus, AgentId, AgentRuntime, CapabilitySpec,
-    ContentResolver, ContextItem, ContextProjection, EntityRef, EventFamily, EventKind,
-    InMemoryAgentEventBus, JournalRecord, JournalRecordPayload, OutputContract, OutputSchemaId,
-    OutputSchemaRef, PolicyDecision, PolicyKind, PolicyOutcome, PolicyRef, PolicyStage,
-    PrivacyClass, ProviderAdapter, ProviderHintPolicy, ProviderRouteSnapshot, RetentionClass,
-    RunId, RunJournal, RunRequest, RunResult, RunStatus, RuntimePackage, RuntimePackageBuilder,
-    RuntimePackageId, RuntimePolicyPort, SchemaVersion, SourceKind, SourceRef,
-    StructuredOutputRecord, TelemetryContentCaptureMode, TelemetryTerminalStatus, TypedOutputModel,
-    ValidatedOutput,
+    Agent, AgentError, AgentErrorKind, AgentEvent, AgentEventBus, AgentId, AgentRuntime,
+    CapabilitySpec, ContentResolver, ContextItem, ContextProjection, EntityRef, EventFamily,
+    EventKind, InMemoryAgentEventBus, JournalRecord, JournalRecordPayload, OutputContract,
+    OutputSchemaId, OutputSchemaRef, PolicyDecision, PolicyKind, PolicyOutcome, PolicyRef,
+    PolicyStage, PrivacyClass, ProviderAdapter, ProviderHintPolicy, ProviderRouteSnapshot,
+    RetentionClass, RunId, RunJournal, RunRequest, RunResult, RunStatus, RuntimePackage,
+    RuntimePackageBuilder, RuntimePackageId, RuntimePolicyPort, SchemaVersion, SourceKind,
+    SourceRef, StructuredOutputRecord, TelemetryContentCaptureMode, TelemetryTerminalStatus,
+    TypedOutputModel, ValidatedOutput,
     event::ContentCaptureMode as EventContentCaptureMode,
     policy::ContentCaptureMode as PolicyContentCaptureMode,
     terminal_run_projection_from_event,
@@ -279,6 +280,49 @@ fn prelude_exports_common_app_building_surface_without_new_behavior() {
     ];
 
     assert!(exported.iter().all(|path| path.contains("agent_sdk_core")));
+}
+
+#[test]
+fn public_error_type_is_small_and_keeps_constructor_accessor_contract() {
+    assert!(
+        size_of::<AgentError>() <= 128,
+        "AgentError should remain cheap enough for public Result<T, AgentError> APIs"
+    );
+
+    let error = AgentError::new(
+        AgentErrorKind::PolicyDenial,
+        agent_sdk_core::RetryClassification::UserActionNeeded,
+        "approval required",
+    )
+    .with_policy_ref(PolicyRef::with_kind(
+        PolicyKind::RuntimePackage,
+        "policy.public_api.error",
+    ))
+    .with_causal_ids(agent_sdk_core::CausalIds {
+        run_id: Some(RunId::new("run.public_api.error")),
+        ..agent_sdk_core::CausalIds::default()
+    });
+
+    assert_eq!(error.kind(), AgentErrorKind::PolicyDenial);
+    assert_eq!(
+        error.retry(),
+        agent_sdk_core::RetryClassification::UserActionNeeded
+    );
+    assert_eq!(error.context().message, "approval required");
+    assert_eq!(
+        error.causal_ids().run_id.as_ref().map(RunId::as_str),
+        Some("run.public_api.error")
+    );
+
+    let serialized = serde_json::to_value(&error).expect("AgentError serializes");
+    assert_eq!(
+        serialized["Classified"]["context"]["message"], "approval required",
+        "boxing AgentError internals must not change the stable serialized context shape"
+    );
+    assert_eq!(
+        serialized["Classified"]["causal_ids"]["run_id"], "run.public_api.error",
+        "boxing AgentError internals must not change the stable serialized causal-id shape"
+    );
 }
 
 struct RunEvidence {

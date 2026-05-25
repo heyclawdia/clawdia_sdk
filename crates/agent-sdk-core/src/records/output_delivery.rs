@@ -570,8 +570,8 @@ impl OutputDeliveryIntentRecord {
             content_mode: request.content_mode,
             content_refs: request.content_refs.clone(),
             redacted_summary: request.redacted_summary.clone(),
-            privacy: request.privacy.clone(),
-            retention: request.retention.clone(),
+            privacy: request.privacy,
+            retention: request.retention,
             policy_refs: request.policy_refs.clone(),
             idempotency_key: request.idempotency_key.clone(),
             dedupe_key: request.dedupe_key.clone(),
@@ -594,7 +594,7 @@ impl OutputDeliveryIntentRecord {
             EntityRef::new(EntityKind::OutputDelivery, self.delivery_id.as_str()),
             self.destination.clone(),
             self.policy_refs.clone(),
-            self.privacy.clone(),
+            self.privacy,
         )
     }
 }
@@ -1090,7 +1090,7 @@ fn output_delivery_effect_record(
             related_refs,
             correlation_keys: Vec::new(),
             tags: vec!["output_delivery".to_string()],
-            privacy_class: privacy.clone(),
+            privacy_class: privacy,
             delivery_semantics: "journal_backed".to_string(),
         },
         timestamp_millis: base.timestamp_millis,

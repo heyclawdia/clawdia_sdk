@@ -229,8 +229,8 @@ impl ToolExecutionCoordinator {
             sidecar_refs: resolved.route.sidecar_refs.clone(),
             effect_class: resolved.route.effect_class.clone(),
             risk_class: resolved.route.risk_class.clone(),
-            privacy: resolved.route.privacy.clone(),
-            retention: resolved.route.retention.clone(),
+            privacy: resolved.route.privacy,
+            retention: resolved.route.retention,
             requested_args_refs: resolved.request.requested_args_refs.clone(),
             redacted_args_summary: resolved.request.redacted_args_summary.clone(),
             idempotency_key: resolved.request.idempotency_key.clone(),
@@ -355,7 +355,7 @@ impl ToolExecutionContext {
         base.destination = destination;
         base.timestamp_millis = self.timestamp_millis + offset;
         base.runtime_package_fingerprint = self.runtime_package_fingerprint.clone();
-        base.privacy = self.privacy.clone();
+        base.privacy = self.privacy;
         base.redaction_policy_id = self.redaction_policy_id.clone();
         base.tags = vec!["tool_execution".to_string()];
         base

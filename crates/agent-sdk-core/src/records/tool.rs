@@ -396,8 +396,8 @@ impl ToolResultRef {
                 .redacted_result_summary
                 .clone()
                 .unwrap_or_else(|| "tool result redacted".to_string()),
-            privacy: record.privacy.clone(),
-            retention: record.retention.clone(),
+            privacy: record.privacy,
+            retention: record.retention,
         })
     }
 }
@@ -479,7 +479,7 @@ pub fn tool_call_journal_record(
             related_refs,
             correlation_keys: Vec::new(),
             tags: vec!["tool_execution".to_string()],
-            privacy_class: base.privacy.clone(),
+            privacy_class: base.privacy,
             delivery_semantics: "journal_backed".to_string(),
         },
         timestamp_millis: base.timestamp_millis,

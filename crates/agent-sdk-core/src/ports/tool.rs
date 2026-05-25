@@ -392,12 +392,13 @@ impl ToolExecutionOutput {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// Enumerates the finite tool execution strategy cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ToolExecutionStrategy {
     /// Use this variant when the contract needs to represent sequential; selecting it has no side effect by itself.
+    #[default]
     Sequential,
     /// Use this variant when the contract needs to represent bounded concurrent; selecting it has no side effect by itself.
     BoundedConcurrent {
@@ -409,12 +410,6 @@ pub enum ToolExecutionStrategy {
         /// Maximum concurrent operations allowed by this strategy.
         max_in_flight: usize,
     },
-}
-
-impl Default for ToolExecutionStrategy {
-    fn default() -> Self {
-        Self::Sequential
-    }
 }
 
 /// Port or behavior contract for tool policy port. Implementors should

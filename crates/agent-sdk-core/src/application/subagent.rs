@@ -386,7 +386,7 @@ impl SubagentSupervisor {
             ),
             child_journal_cursor: event.envelope.journal_cursor.clone(),
             child_journal_ref: child.handle.child_journal_ref.clone(),
-            privacy: event.envelope.privacy.clone(),
+            privacy: event.envelope.privacy,
         };
         self.append_parent_subagent_record(
             &child.request,
@@ -865,9 +865,7 @@ fn child_start_intent(request: &SubagentRequest) -> EffectIntent {
 
 fn subagent_content_refs(record: &SubagentRecord) -> Vec<ContentRefId> {
     match record {
-        SubagentRecord::Started(record) => {
-            record.effect_intent.content_refs.iter().cloned().collect()
-        }
+        SubagentRecord::Started(record) => record.effect_intent.content_refs.to_vec(),
         SubagentRecord::Handoff(record) => record.selected_content_refs.clone(),
         SubagentRecord::Completed(record) => record.result_ref.iter().cloned().collect(),
         SubagentRecord::WrappedEvent(_)

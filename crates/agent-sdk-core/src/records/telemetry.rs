@@ -84,12 +84,13 @@ pub enum TelemetrySinkKind {
     Test,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// Enumerates the finite telemetry content capture mode cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum TelemetryContentCaptureMode {
     /// Use this variant when the contract needs to represent off; selecting it has no side effect by itself.
+    #[default]
     Off,
     /// Use this variant when the contract needs to represent metadata only; selecting it has no side effect by itself.
     MetadataOnly,
@@ -107,12 +108,6 @@ impl TelemetryContentCaptureMode {
     /// events, or start processes.
     pub fn captures_raw_content(&self) -> bool {
         matches!(self, Self::RawContent)
-    }
-}
-
-impl Default for TelemetryContentCaptureMode {
-    fn default() -> Self {
-        Self::Off
     }
 }
 
@@ -644,8 +639,8 @@ impl TelemetryRecord {
             agent_id: projection.agent_id.clone(),
             source_cursor: projection.source_record.source_cursor.clone(),
             runtime_package_fingerprint: projection.runtime_package_fingerprint.clone(),
-            privacy: projection.privacy.clone(),
-            retention: projection.retention.clone(),
+            privacy: projection.privacy,
+            retention: projection.retention,
             content_capture: projection.content_capture.clone(),
             redaction_policy_id: projection.redaction_policy_id.clone(),
             policy_refs: projection.policy_refs.clone(),
