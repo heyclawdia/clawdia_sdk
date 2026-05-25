@@ -27,6 +27,10 @@ agent-sdk-core = { git = "https://github.com/heyclawdia/clawdia_sdk.git", packag
 agent-sdk-toolkit = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-toolkit", optional = true }
 ```
 
+The repository checkout can be ahead of the latest published alpha. Treat
+crate-level READMEs and tests as the source of truth for current local API
+surfaces, then publish only after the release-readiness gates pass.
+
 ## Core Map
 
 ```mermaid
@@ -57,6 +61,21 @@ flowchart TD
 10. [Feature To Primitive Matrix](docs/reference/feature-to-primitive-matrix.md): how features layer over the shared kernel.
 11. [Simplicity Audit](docs/reference/simplicity-audit.md): current simplification opportunities without losing features.
 12. [Decision Register](docs/reference/open-questions-and-ambiguities.md): resolved decisions, deferred details, and non-questions for the first Rust slice.
+
+## Agent Crawl Protocol
+
+Agents auditing or building on this SDK should follow the current implementation
+path before reading historical phase evidence:
+
+1. Read `AGENTS.md`, this README, [Start Here](docs/start-here.md), and [Coding Standards](coding_standards.md).
+2. For current Rust work, use [Implementation Workstreams](docs/implementation-workstreams/README.md), the matching phase exit report, and the exact launch target that owns the files being edited.
+3. For API/user ergonomics, start from [API Review](docs/implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](docs/reference/simplicity-audit.md), `crates/agent-sdk-core/src/lib.rs`, and `crates/agent-sdk-core/tests/domain/public_api.rs`.
+4. For release or broad handoff checks, use [Release Readiness](docs/implementation-workstreams/13-release-readiness/13a-release-readiness.md), the feature flag matrix, the contract-to-code traceability matrix, and `scripts/public-release-audit.sh`.
+5. Treat [Contract Workstreams](docs/workstreams/README.md) as historical contract-packet evidence unless a task explicitly asks to reopen contract planning.
+
+The common core import path for apps is `agent_sdk_core::prelude::*`. Advanced
+users should still import explicit crate-root items, `agent_sdk_core::ports`, or
+`agent_sdk_core::testing` when implementing host ports or conformance tests.
 
 ## What Is Normative
 

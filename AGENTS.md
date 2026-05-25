@@ -1,10 +1,11 @@
 # Agent SDK Workspace Instructions
 
-This workspace is the authoritative documentation and planning home for the new standalone Rust-first Agent SDK.
+This workspace is the authoritative documentation, planning, and implementation home for the standalone Rust-first Agent SDK.
 
 ## Scope
 
 - Treat `<repo-root>` as the source of truth for Agent SDK architecture, contracts, examples, workstreams, and open questions.
+- Treat `docs/workstreams/` as the historical contract-packet launch map and `docs/implementation-workstreams/` as the active Rust implementation launch map.
 - Keep the SDK packet product-neutral. Do not add product-specific host adapters or examples to the active handoff unless the user explicitly requests a separate external task.
 - Do not create or maintain parallel Agent SDK packets outside this workspace.
 - Do not create branches unless the user explicitly approves.
@@ -22,9 +23,9 @@ This workspace is the authoritative documentation and planning home for the new 
 - Read `coding_standards.md` and `docs/workstreams/validation-gates.md` before editing any implementation contract.
 - Use `docs/reference/sdk-review-checklist.md` when reviewing SDK changes, especially for simplicity and product-neutrality.
 - Use `docs/architecture/primitive-map.md` when deciding whether a new concept is a core primitive, a feature layer, an optional adapter, or host-owned behavior.
-- Use `docs/workstreams/README.md` when launching parallel Codex goals. Numbered folders define dependency phases; all goal files inside the current numbered folder are parallel-safe.
-- Pick exactly one goal file under `docs/workstreams/<NN-phase>/` as your launch target.
-- Only edit files listed as writable in that goal file and its owner role doc under `docs/workstreams/_roles/`.
+- Use `docs/workstreams/README.md` for historical contract-packet work and `docs/implementation-workstreams/README.md` for current Rust implementation work. Numbered folders define dependency phases; all direct launch files inside the current numbered folder are parallel-safe.
+- Pick exactly one launch file under the relevant numbered phase folder as your launch target.
+- Only edit files listed as writable in that launch file and its owner/phase authority. For broad current-state guidance, explicitly name the stitching-owned files before editing.
 - Read dependencies listed by the goal and owner role before editing.
 - Non-stitching workstreams should record cross-cutting proposals in their handoff unless their writable list explicitly includes `docs/reference/cross-cutting-proposals.md`. The stitching owner reconciles accepted proposals into that file and shared indices.
 - The integration/stitching owner is the only role that should reconcile public names, ID taxonomy, shared indices, event/journal alignment, runtime-package fingerprint inputs, and final whole-packet validation.

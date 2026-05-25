@@ -69,3 +69,33 @@ journal intents, and adding the missing provider-request and approval-dispatch
 intent steps to the scenario matrix.
 
 Einstein re-reviewed the fix and returned PASS. Phase 12 may advance to Phase 13.
+
+## Post-Phase API Simplicity Addendum
+
+Current-state audit plan:
+[SDK Simplicity And Agent Guidance Audit Plan](../../../plans/2026-05-25-sdk-simplicity-agent-guidance-audit-plan.md).
+
+Public facade change:
+
+- Added `agent_sdk_core::prelude` as a facade-only common import surface for SDK applications.
+- The prelude re-exports existing crate-root public items; it does not add helper behavior, hidden defaults, runtime state, package authority, event streams, journal paths, policy decisions, telemetry sinks, redaction logic, or toolkit dependencies.
+- Advanced imports remain the crate root, `agent_sdk_core::ports`, `agent_sdk_core::testing`, and documented feature modules.
+
+SemVer/API review note:
+
+- This is an additive public module namespace over already public types.
+- No existing public item was renamed, removed, moved, or behaviorally changed.
+- Future additions to `prelude` should stay conservative and common-path only; feature-layer, testing-only, and toolkit helpers must remain in their documented namespaces unless a later API review blesses them.
+
+Validation evidence for this addendum:
+
+- `cargo test -p agent-sdk-core --test public_api`: PASS.
+- `cargo test -p agent-sdk-core --doc`: PASS.
+- `cargo test --workspace`: PASS.
+- `cargo test -p agent-sdk-core --no-default-features`: PASS.
+- `cargo test -p agent-sdk-core --all-features`: PASS.
+- `cargo fmt --check`: PASS.
+- `git diff --check`: PASS.
+- `scripts/public-release-audit.sh`: PASS.
+- Source-layout audits from `docs/workstreams/validation-gates.md`: PASS; root source remains facade-only, root integration tests remain two-line shims, fakes stay under `src/testing`, and `records/` still has no adapter/fake/conformance behavior.
+- Touched-file product-neutrality audit: PASS after excluding the expected repository URL and the public API denylist literal.

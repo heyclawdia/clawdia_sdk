@@ -1,6 +1,6 @@
 # Agent SDK Coding Standards
 
-These standards apply to the future Rust-first `agent_sdk` design. They are grounded in TDD, SDK package design, Rust async practice, observability requirements, and DDD where it clarifies the domain vocabulary.
+These standards apply to the Rust-first `agent_sdk` crate family. They are grounded in TDD, SDK package design, Rust async practice, observability requirements, and DDD where it clarifies the domain vocabulary.
 
 ## Architecture Standards
 
@@ -15,7 +15,7 @@ These standards apply to the future Rust-first `agent_sdk` design. They are grou
 
 ## Test-First Standards
 
-The current workspace is documentation-only, but implementation should start with tests before code.
+The current workspace includes Rust crates under `crates/`. New implementation should still start with tests before code, and documentation-only tasks must not create source files, package manifests, executable tests, or fixtures.
 
 - Mockability is non-negotiable. Every public port, adapter boundary, policy edge, side-effect path, and scenario surface must be easy to fake, script, and assert against without live providers, real containers, product UI, network telemetry, wall-clock time, or random IDs.
 - The SDK should ship reusable test-support helpers so downstream SDK users can validate their own providers, tools, output sinks, isolation runtimes, extension bridges, telemetry sinks, and host adapters against the same contract shapes used by the SDK.

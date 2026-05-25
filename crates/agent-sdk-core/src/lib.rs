@@ -587,3 +587,41 @@ pub use validation::{
     HostileSchemaLimits, JsonSchemaSubsetValidator, OutputCandidate, StructuredOutputValidator,
     TerminalValidationFailure, ValidationErrorReport, ValidationSuccess,
 };
+
+/// Common imports for applications built on `agent-sdk-core`.
+///
+/// The prelude is a facade over stable crate-root exports. It does not define
+/// helper behavior or alternate execution paths; common helpers still lower into
+/// the canonical `RunRequest`, `RuntimePackage`, event, journal, policy,
+/// telemetry, lineage, and redaction contracts.
+///
+/// ```
+/// use agent_sdk_core::prelude::*;
+///
+/// let agent = Agent::builder()
+///     .id(AgentId::new("agent.docs.prelude"))
+///     .name("docs prelude")
+///     .build()?;
+///
+/// let request = RunRequest::text(
+///     RunId::new("run.docs.prelude"),
+///     agent.id().clone(),
+///     SourceRef::with_kind(SourceKind::Host, "source.docs.prelude"),
+///     "hello",
+/// );
+///
+/// assert_eq!(request.agent_id, agent.id().clone());
+/// # Ok::<(), agent_sdk_core::AgentError>(())
+/// ```
+pub mod prelude {
+    pub use crate::{
+        Agent, AgentBuilder, AgentError, AgentEvent, AgentEventBus, AgentId, AgentMessage,
+        AgentRuntime, CapabilitySpec, ContentResolver, ContextContribution, ContextItem,
+        ContextProjection, DestinationKind, DestinationRef, EntityRef, EventCursor, EventFilter,
+        EventFrame, JournalRecord, OutputContract, OutputSchemaId, OutputSchemaRef, PolicyDecision,
+        PolicyKind, PolicyOutcome, PolicyRef, PolicyStage, PrivacyClass, ProviderAdapter,
+        RetentionClass, RunHandle, RunId, RunJournal, RunRequest, RunResult, RunStatus,
+        RuntimePackage, RuntimePackageBuilder, RuntimePolicyPort, SchemaVersion, SourceKind,
+        SourceRef, TrustClass, TypedOutputModel, ValidatedOutput,
+    };
+}

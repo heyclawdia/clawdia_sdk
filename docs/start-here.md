@@ -7,10 +7,22 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 ## Current Packet
 
 - The authoritative Agent SDK packet lives in `<repo-root>`.
+- The current checkout includes Rust crates under `crates/agent-sdk-core` and `crates/agent-sdk-toolkit`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
 - Rust implementation launch sequencing and phase exit evidence live in [implementation-workstreams](implementation-workstreams/README.md).
+
+## Agent Crawl Order
+
+Use this order when an agent needs to build on the SDK instead of only reviewing
+the old contract packet:
+
+1. Read `<repo-root>/AGENTS.md`, `<repo-root>/README.md`, this file, and `<repo-root>/coding_standards.md`.
+2. Confirm the current phase or task owner in [implementation-workstreams](implementation-workstreams/README.md).
+3. For user-facing API ergonomics, read [API Review](implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](reference/simplicity-audit.md), `../crates/agent-sdk-core/README.md`, and `../crates/agent-sdk-core/tests/domain/public_api.rs`.
+4. For app construction, prefer `agent_sdk_core::prelude::*` for common core types, explicit crate-root imports for advanced surfaces, `agent_sdk_core::ports` for host adapters, and `agent_sdk_core::testing` for deterministic conformance checks.
+5. Before handoff, run the commands named by the launch target plus `scripts/public-release-audit.sh` for any release or broad documentation handoff.
 
 ## Navigation
 

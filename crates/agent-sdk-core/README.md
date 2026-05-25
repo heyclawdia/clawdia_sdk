@@ -6,13 +6,17 @@
 
 SDK consumers should import through the crate root and documented namespaces:
 
+- `agent_sdk_core::prelude::*` for common app-building imports
 - `agent_sdk_core::{Agent, AgentRuntime, RunRequest, RunHandle, RuntimePackage}`
 - `agent_sdk_core::{AgentEvent, EventFrame, RunJournal, JournalRecord}`
 - `agent_sdk_core::{OutputContract, ValidatedOutput, PolicyDecision}`
 - `agent_sdk_core::ports` for host-implemented adapter contracts
 - `agent_sdk_core::testing` for deterministic fake adapters and conformance helpers
 
-Deep implementation modules are review surfaces until a release explicitly blesses them.
+`prelude` is facade-only: it re-exports stable crate-root items and does not add
+helper behavior or bypass the canonical run, package, policy, event, journal,
+telemetry, lineage, or redaction paths. Deep implementation modules are review
+surfaces until a release explicitly blesses them.
 
 ## Package Shape
 

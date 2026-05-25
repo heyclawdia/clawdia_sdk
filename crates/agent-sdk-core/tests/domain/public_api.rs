@@ -209,12 +209,76 @@ fn public_facade_is_product_neutral_and_semver_documented() {
         "pub use policy::{",
         "pub use ports::{",
         "pub mod testing;",
+        "pub mod prelude {",
     ] {
         assert!(
             crate_root.contains(required_export),
             "missing expected public facade export marker: {required_export}"
         );
     }
+}
+
+#[test]
+fn prelude_exports_common_app_building_surface_without_new_behavior() {
+    use agent_sdk_core::prelude::*;
+
+    let agent = Agent::builder()
+        .id(AgentId::new("agent.public_api.prelude"))
+        .name("prelude")
+        .build()
+        .expect("agent builds");
+    let source = SourceRef::with_kind(SourceKind::Host, "source.public_api.prelude");
+    let request = agent.typed_text_request::<PublicTodo>(
+        RunId::new("run.public_api.prelude"),
+        source.clone(),
+        "extract with prelude",
+    );
+    let canonical = RunRequest::text(
+        RunId::new("run.public_api.prelude"),
+        agent.id().clone(),
+        source,
+        "extract with prelude",
+    )
+    .with_output_contract(OutputContract::for_type::<PublicTodo>());
+
+    assert_eq!(
+        request, canonical,
+        "prelude imports must not create a behavior path separate from canonical lowering"
+    );
+
+    let exported = [
+        type_name::<AgentRuntime>(),
+        type_name::<RuntimePackage>(),
+        type_name::<RuntimePackageBuilder>(),
+        type_name::<CapabilitySpec>(),
+        type_name::<AgentEvent>(),
+        type_name::<EventFrame>(),
+        type_name::<EventFilter>(),
+        type_name::<JournalRecord>(),
+        type_name::<ContextContribution>(),
+        type_name::<ContextItem>(),
+        type_name::<ContextProjection>(),
+        type_name::<AgentMessage>(),
+        type_name::<OutputSchemaRef>(),
+        type_name::<OutputSchemaId>(),
+        type_name::<SchemaVersion>(),
+        type_name::<ValidatedOutput>(),
+        type_name::<PolicyDecision>(),
+        type_name::<PolicyOutcome>(),
+        type_name::<PrivacyClass>(),
+        type_name::<RetentionClass>(),
+        type_name::<TrustClass>(),
+        type_name::<SourceKind>(),
+        type_name::<DestinationKind>(),
+        type_name::<EntityRef>(),
+        type_name::<dyn ProviderAdapter>(),
+        type_name::<dyn RunJournal>(),
+        type_name::<dyn AgentEventBus>(),
+        type_name::<dyn ContentResolver>(),
+        type_name::<dyn RuntimePolicyPort>(),
+    ];
+
+    assert!(exported.iter().all(|path| path.contains("agent_sdk_core")));
 }
 
 struct RunEvidence {
