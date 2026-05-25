@@ -6,7 +6,7 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 
 ## Current Packet
 
-- The authoritative Agent SDK packet lives in `/Users/clawdia/clawdia_sdk`.
+- The authoritative Agent SDK packet lives in `<repo-root>`.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).

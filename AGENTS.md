@@ -4,11 +4,17 @@ This workspace is the authoritative documentation and planning home for the new 
 
 ## Scope
 
-- Treat `/Users/clawdia/clawdia_sdk` as the source of truth for Agent SDK architecture, contracts, examples, workstreams, and open questions.
+- Treat `<repo-root>` as the source of truth for Agent SDK architecture, contracts, examples, workstreams, and open questions.
 - Keep the SDK packet product-neutral. Do not add product-specific host adapters or examples to the active handoff unless the user explicitly requests a separate external task.
 - Do not create or maintain parallel Agent SDK packets outside this workspace.
 - Do not create branches unless the user explicitly approves.
 - Do not create Rust source files, executable tests, package manifests, or fixtures while the task is documentation-only.
+
+## Public Repository Criteria
+
+- Treat this repository as public by default. Before any release, publish, or broad documentation handoff, run `scripts/public-release-audit.sh` or an equivalent checked audit.
+- The public audit must fail on likely personal information, local absolute paths such as `/Users/<name>/...`, tracked env/credential/private-key files, common secret token formats, and missing `.gitignore` coverage for local, credential, build, log, and temporary artifacts.
+- Do not publish when the public audit fails. Fix the source-of-truth docs or ignore rules first, then rerun the audit and record the evidence.
 
 ## Workstream Discipline
 

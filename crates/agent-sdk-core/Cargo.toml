@@ -1,12 +1,13 @@
 [package]
 name = "agent-sdk-core"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 description = "Product-neutral primitive kernel and contracts for a Rust-first Agent SDK."
 documentation = "https://docs.rs/agent-sdk-core"
 readme = "README.md"
-publish = false
 
 [features]
 default = []

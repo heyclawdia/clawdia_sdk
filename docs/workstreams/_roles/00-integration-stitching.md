@@ -6,24 +6,24 @@ One senior integration agent. This role is serialized and should not be split ac
 
 ## Writable Files
 
-- `/Users/clawdia/clawdia_sdk/README.md`
-- `/Users/clawdia/clawdia_sdk/AGENTS.md`
-- `/Users/clawdia/clawdia_sdk/docs/start-here.md`
-- `/Users/clawdia/clawdia_sdk/docs/architecture/architecture-proposal.md`
-- `/Users/clawdia/clawdia_sdk/docs/architecture/primitive-map.md`
-- `/Users/clawdia/clawdia_sdk/docs/architecture/observability-and-lineage.md`
-- `/Users/clawdia/clawdia_sdk/docs/architecture/external-sdk-lessons.md`
-- `/Users/clawdia/clawdia_sdk/docs/architecture/coding-standards.md`
-- `/Users/clawdia/clawdia_sdk/docs/architecture/coverage-gap-matrix.md`
-- `/Users/clawdia/clawdia_sdk/docs/contracts/README.md`
-- `/Users/clawdia/clawdia_sdk/docs/contracts/review-matrix.md`
-- `/Users/clawdia/clawdia_sdk/docs/contracts/runtime-package-schema.md`
-- `/Users/clawdia/clawdia_sdk/docs/workstreams/README.md`
-- `/Users/clawdia/clawdia_sdk/docs/workstreams/validation-gates.md`
-- `/Users/clawdia/clawdia_sdk/docs/workstreams/[0-9][0-9]-*/**`
-- `/Users/clawdia/clawdia_sdk/docs/reference/open-questions-and-ambiguities.md`
-- `/Users/clawdia/clawdia_sdk/docs/reference/cross-cutting-proposals.md`
-- `/Users/clawdia/clawdia_sdk/docs/reference/feature-to-primitive-matrix.md`
+- `<repo-root>/README.md`
+- `<repo-root>/AGENTS.md`
+- `<repo-root>/docs/start-here.md`
+- `<repo-root>/docs/architecture/architecture-proposal.md`
+- `<repo-root>/docs/architecture/primitive-map.md`
+- `<repo-root>/docs/architecture/observability-and-lineage.md`
+- `<repo-root>/docs/architecture/external-sdk-lessons.md`
+- `<repo-root>/docs/architecture/coding-standards.md`
+- `<repo-root>/docs/architecture/coverage-gap-matrix.md`
+- `<repo-root>/docs/contracts/README.md`
+- `<repo-root>/docs/contracts/review-matrix.md`
+- `<repo-root>/docs/contracts/runtime-package-schema.md`
+- `<repo-root>/docs/workstreams/README.md`
+- `<repo-root>/docs/workstreams/validation-gates.md`
+- `<repo-root>/docs/workstreams/[0-9][0-9]-*/**`
+- `<repo-root>/docs/reference/open-questions-and-ambiguities.md`
+- `<repo-root>/docs/reference/cross-cutting-proposals.md`
+- `<repo-root>/docs/reference/feature-to-primitive-matrix.md`
 
 ## Read-Only Inputs
 
@@ -49,7 +49,7 @@ Exception: when the user explicitly asks for a whole-packet stitching/reconcilia
 
 ## Required Validation
 
-- Run the whole-packet Markdown link audit over `/Users/clawdia/clawdia_sdk`.
+- Run the whole-packet Markdown link audit over `<repo-root>`.
 - Run the workstream ownership audit proving no duplicated writable files and no non-stitching writes to `docs/architecture/*` or `docs/reference/*`.
 - Verify contract index excludes product-specific host-adapter references from normative contract tables.
 - Verify every owner role has `## Required Validation`, every goal doc has `## Validation And Review`, and both name tests, fixtures, smoke checks, or docs audits.

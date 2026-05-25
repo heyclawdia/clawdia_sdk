@@ -1,2 +1,30 @@
+# macOS and editor local state
 .DS_Store
+.idea/
+.vscode/
+
+# Rust build output
 target/
+**/*.rs.bk
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+.netrc
+.npmrc
+.cargo/credentials
+.cargo/credentials.toml
+*.pem
+*.key
+*.p8
+*.p12
+id_rsa
+id_ed25519
+
+# Logs, coverage, and temporary artifacts
+*.log
+tmp/
+temp/
+coverage/
+dist/

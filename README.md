@@ -11,7 +11,15 @@ This is a monorepo with separable Rust crates:
 
 Keep this package boundary deliberate. New capabilities with heavy parser/runtime/provider dependencies should live in optional crates layered over `agent-sdk-core`, not as default core dependencies. Core must remain usable by hosts that only need the primitive SDK contracts.
 
-Until the first publish/tag release, consumers can depend on either crate from the repository:
+The first public alpha release is available from crates.io:
+
+```toml
+[dependencies]
+agent-sdk-core = "0.1.0-alpha.1"
+agent-sdk-toolkit = { version = "0.1.0-alpha.1", optional = true }
+```
+
+Consumers can also depend on either crate from the repository:
 
 ```toml
 [dependencies]
@@ -75,4 +83,4 @@ For contract-packet review, use [docs/workstreams](docs/workstreams/README.md). 
 
 The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core` and `crates/agent-sdk-toolkit`. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
 
-This handoff is not a publish/tag release. It includes deterministic fake/test-kit support and optional toolkit helpers, but it does not claim live provider, concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or host-adapter support.
+This alpha release includes deterministic fake/test-kit support and optional toolkit helpers, but it does not claim live provider, concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or host-adapter support.

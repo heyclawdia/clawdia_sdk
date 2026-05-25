@@ -77,7 +77,7 @@ flowchart TD
 For a phase folder, launch one Codex run per non-README markdown file directly inside that folder. Point each run at one launch target:
 
 ```text
-/goal Work in /Users/clawdia/clawdia_sdk using the exact launch file path, for example docs/implementation-workstreams/01-shared-kernel/01a-typed-ids.md, as the launch doc.
+/goal Work in <repo-root> using the exact launch file path, for example docs/implementation-workstreams/01-shared-kernel/01a-typed-ids.md, as the launch doc.
 Read README.md, docs/start-here.md, coding_standards.md, docs/implementation-workstreams/README.md, docs/workstreams/validation-gates.md, docs/reference/sdk-review-checklist.md, docs/architecture/primitive-map.md, the phase README, the launch doc, and all named contract inputs.
 Do not create a branch.
 Edit only the implementation surfaces named in the launch doc. If a named path does not exist yet, create it only when that launch doc owns it.

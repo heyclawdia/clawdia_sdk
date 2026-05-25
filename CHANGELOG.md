@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.0 Implementation Handoff
+## 0.1.0-alpha.1
 
-Status: release-readiness handoff only. The workspace is not published or tagged.
+Status: first public alpha crates.io release.
 
 ### Added
 
@@ -11,12 +11,14 @@ Status: release-readiness handoff only. The workspace is not published or tagged
 - `agent-sdk-toolkit` optional helper crate for filesystem workspace tools, resource reads, discovery, and shell helper contracts layered over core policy, content refs, capabilities, and effect lineage.
 - Golden fixtures for event, journal, package, replay, OTel, extension, output delivery, scenario, privacy, and typed-output contract surfaces.
 - Phase-gated implementation reports under `docs/implementation-workstreams`.
+- GitHub Actions publish workflow for release-triggered crates.io publication in dependency order.
+- Public-repo release audit for personal/sensitive content and `.gitignore` guardrails.
 
 ### Package Boundaries
 
 - `agent-sdk-core` has an empty default feature set and does not depend on the optional toolkit crate.
 - `agent-sdk-toolkit` depends on `agent-sdk-core`; core never imports toolkit helpers.
-- Current package metadata sets `publish = false` until an explicit publish/tag release is requested and a real repository/release owner is configured.
+- Release metadata is configured for crates.io publication from the public GitHub repository.
 
 ### Unsupported
 

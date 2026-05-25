@@ -4,6 +4,8 @@
 
 PASS.
 
+Post-handoff update: the first explicit publish request moved the package metadata from handoff-only to `0.1.0-alpha.1` crates.io release readiness. The release execution adds `.github/workflows/publish-crates.yml` plus `scripts/public-release-audit.sh` so GitHub releases validate formatting, tests, public-repo sensitive-content criteria, and package metadata before publishing.
+
 ## Scope Completed
 
 Changed release-readiness surfaces:
@@ -23,7 +25,7 @@ Changed release-readiness surfaces:
 ## Package Metadata
 
 - Both current crates now have crate-level READMEs and descriptions.
-- Both current crates use `publish = false` for this handoff because no publish/tag release was requested and no live/provider/container/product-host support is included.
+- Both current crates used `publish = false` for the original handoff because no publish/tag release had been requested and no live/provider/container/product-host support was included. The explicit alpha publish request removes that block while preserving the unsupported-path release notes.
 - The invalid placeholder repository metadata was removed from the workspace package metadata.
 
 ## Feature Flag Matrix

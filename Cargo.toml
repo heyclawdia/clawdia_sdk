@@ -5,6 +5,8 @@ resolver = "3"
 [workspace.package]
 edition = "2024"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/heyclawdia/clawdia_sdk"
+rust-version = "1.85"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

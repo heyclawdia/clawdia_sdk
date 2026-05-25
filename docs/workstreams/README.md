@@ -39,7 +39,7 @@ For multi-goal phases, subagent workers should not edit shared architecture or r
 For a phase folder, launch one Codex goal per non-README goal file in that folder; all sibling goals are parallel-safe by contract. Point each Codex run at one goal file directly:
 
 ```text
-/goal Work in /Users/clawdia/clawdia_sdk using docs/workstreams/<NN-phase>/<goal>.md as the launch doc.
+/goal Work in <repo-root> using docs/workstreams/<NN-phase>/<goal>.md as the launch doc.
 Read README.md, docs/start-here.md, coding_standards.md, docs/workstreams/validation-gates.md, docs/reference/sdk-review-checklist.md, docs/architecture/primitive-map.md, the phase README, the goal doc, the owner role doc, and its read-only dependencies.
 Do not create a branch. For documentation-only work, do not create Rust source, executable tests, package manifests, or fixtures.
 Edit only the writable files listed in the goal doc and owner role doc.

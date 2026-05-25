@@ -1,15 +1,16 @@
 [package]
 name = "agent-sdk-toolkit"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 description = "Optional tool-pack helpers layered over agent-sdk-core primitive contracts."
 documentation = "https://docs.rs/agent-sdk-toolkit"
 readme = "README.md"
-publish = false
 
 [dependencies]
-agent-sdk-core = { path = "../agent-sdk-core" }
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.1" }
 base64 = "0.22.1"
 flate2 = "1.1.9"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "ico", "jpeg", "png", "tiff", "webp"] }

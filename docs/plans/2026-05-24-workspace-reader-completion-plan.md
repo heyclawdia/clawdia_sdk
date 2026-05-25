@@ -10,7 +10,7 @@ The common model-facing API stays `workspace_read`. Format complexity belongs in
 
 ## Relevant Existing Context
 
-- `AGENTS.md`: no branch creation without explicit approval; implementation belongs in `/Users/clawdia/clawdia_sdk`; avoid confusing catch-all files.
+- `AGENTS.md`: no branch creation without explicit approval; implementation belongs in `<repo-root>`; avoid confusing catch-all files.
 - `README.md` and `docs/start-here.md`: the toolkit is optional and product-neutral; `agent-sdk-core` must not absorb broad file, OCR, SQLite, archive, URL, or product host behavior.
 - `coding_standards.md` and `docs/workstreams/validation-gates.md`: helpers must lower into package/policy/content-ref/effect contracts, keep `mod.rs` facades small, and prove implementation with tests/fixtures once code exists.
 - `docs/contracts/tool-pack-contract.md`: read/search/edit/write/resource tools need policy refs, hashes, bounded output, parser metadata, content refs, truncation state, and no raw binary exposure by default.

@@ -16,7 +16,7 @@ This plan keeps the SDK Rust-first, product-neutral, and profile-gated:
 ## Relevant Existing Context
 
 - `AGENTS.md`: do not create branches; start from `README.md` and `docs/start-here.md`; read `coding_standards.md` and `docs/workstreams/validation-gates.md`; implementation workstreams are phase-gated; keep the packet product-neutral.
-- `README.md`: `/Users/clawdia/clawdia_sdk` is authoritative; future Rust implementation starts from `docs/implementation-workstreams`.
+- `README.md`: `<repo-root>` is authoritative; future Rust implementation starts from `docs/implementation-workstreams`.
 - `docs/start-here.md`: MVP readiness profiles are P0 text run, P1 typed output, and P2 side effects; host scenarios are coverage constraints, not core architecture.
 - `coding_standards.md` and `docs/architecture/coding-standards.md`: TDD, SDK package architecture, and domain modeling are required. Implementation must start with tests, use typed domain primitives, preserve a stable public facade, keep source/tests grouped by SDK responsibility, and preserve observability, journal durability, lineage, privacy, policy, and recovery.
 - SDK layout research checked on 2026-05-24: Cargo package/test layout, Rust API Guidelines, AWS SDK Rust/JavaScript modular package structure, Stripe Go backend injection/mocking, Kubernetes client-go testing package, and Twilio Go generated-client separation all support the same rule: stable public facades, separated generated/spec code, explicit ports/backends, and visible test/fake support.
