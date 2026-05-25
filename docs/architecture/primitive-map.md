@@ -37,7 +37,7 @@ The SDK should grow from a small kernel, not from one primitive per feature. The
 | Kernel content/context/output | `AgentMessage`, `AgentInputPart`, `AgentOutputPart`, `ArtifactRef`, `ContentRef`, `ContextContribution`, `ContextItem`, `ContextProjection`, `OutputContract`, `ValidatedOutput` | Keeps content references, context admission/projection, and typed output inside lineage-aware paths. Not all content becomes provider context. |
 | Kernel side effects | `EffectIntent`, `EffectResult`, `IdempotencyKey`, `DedupeKey`, `PolicyDecision` | Gives tools, provider calls, output delivery, extension actions, memory writes, process actions, and child starts one journaled side-effect spine. |
 | Kernel observability | `AgentEvent`, `EventEnvelope`, `EventFrame`, `EventFilter`, `EventCursor`, `RunJournal`, `JournalRecord`, `JournalCursor` | Separates live observation from durable truth. |
-| Kernel ports | `ProviderAdapter`, fake `ToolExecutor`, approval policy/broker port, `OutputSink`, journal/store ports | Lets hosts and optional crates supply behavior without owning SDK semantics. |
+| Kernel ports | `ProviderAdapter`, fake `ToolExecutor`, approval policy/broker port, `OutputSink`, journal/store ports, `AgentPoolStore` | Lets hosts and optional crates supply behavior without owning SDK semantics. |
 | Kernel boundaries | `EntityRef`, `SourceRef`, `DestinationRef`, typed IDs, `PrivacyClass`, `RetentionClass`, `TrustClass`, `LineageRef` | Makes origin, destination, policy, privacy, retention, trust, and causality explicit. |
 
 Feature primitives must layer on the kernel:
@@ -49,7 +49,8 @@ Feature primitives must layer on the kernel:
 - Memory, tool results, skills, host input, subagents, and compaction may create `ContextContribution` candidates. `ContextAssembler` admits only selected items into `ContextItem` and `ContextProjection` under policy and budget.
 - Isolation is `ExecutionEnvironment` plus an `IsolationRuntime` port; concrete runtimes stay optional or host-owned.
 - Agent pools are feature-layer coordination scopes over existing runs, messages,
-  event subscriptions, and wake conditions. They are not workflow engines.
+  event subscriptions, wake conditions, and optional pool-scoped store/watch
+  adapters. They are not workflow engines.
 - Subagents are higher-order supervised child-run presets over `AgentPool` with
   stripped `RuntimePackage` snapshots, parent-owned lifecycle, wrapped events,
   and usage rollup.
@@ -187,7 +188,8 @@ New primitives must pass the decision ladder above before they are added.
 
 | Primitive | Owns | Key methods | Must not own |
 | --- | --- | --- | --- |
-| `AgentPool` | Feature-layer coordination scope for run membership, generic run messages, topic fan-out, event subscriptions, and wake registration. | `start_run`, `send`, `subscribe`, `suspend_until`. | Workflow/DAG/barrier engines, product swarm UI, global archive ownership, or semantic relationship roles. |
+| `AgentPool` | Feature-layer coordination scope for run membership, generic run messages, topic fan-out, event subscriptions, wake registration, and optional pool-scoped rehydration/watch. | `start_run`, `join_run`, `send`, `subscribe`, `suspend_until`, `snapshot`, `watch_pool`. | Workflow/DAG/barrier engines, product swarm UI, global archive ownership, concrete store deployment, or semantic relationship roles. |
+| `AgentPoolStore` | Pool-scoped durable coordination port for lifecycle, membership, message status, wake status, dedupe, snapshots, and watch cursors. | `open_pool`, `snapshot`, `join_member`, `record_message`, `record_wake`, `watch`. | Global event archive ownership, scheduler/broker behavior, product workflow, or access to other pools' journals/events. |
 | `RunMessage` / `WakeCondition` | Durable run-to-run communication and event-filter-based suspend/resume. | `send`, `reply_to`, `delivery_status`, `wake_on`, `timeout`. | Provider prompt injection, direct user chat ownership, or scheduling/compensation logic. |
 | `SubagentSupervisor` | Higher-order helper over `AgentPool`, child `RunRequest`, stripped child package, lifecycle policy, event wrapping, and usage rollup. | `spawn_child`, `stream_child`, `cancel_child`, `rollup_usage`. | Generic coordination, direct user chat ownership, or recursive agent societies. |
 | `RemoteChannelAdapter` | Inbound/outbound remote messages and source/destination metadata. | `receive`, `send`, `ack`, `dedupe`. | Agent loop policy. |

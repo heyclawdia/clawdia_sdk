@@ -9,6 +9,7 @@ SDK consumers should import through the crate root and documented namespaces:
 - `agent_sdk_core::prelude::*` for common app-building imports
 - `agent_sdk_core::{Agent, AgentRuntime, RunRequest, RunHandle, RuntimePackage}`
 - `agent_sdk_core::{AgentEvent, EventFrame, RunJournal, JournalRecord}`
+- `agent_sdk_core::{AgentPool, AgentPoolStore, InMemoryAgentPoolStore, RunMessage, WakeCondition}`
 - `agent_sdk_core::{OutputContract, ValidatedOutput, PolicyDecision}`
 - `agent_sdk_core::ports` for host-implemented adapter contracts
 - `agent_sdk_core::testing` for deterministic fake adapters and conformance helpers

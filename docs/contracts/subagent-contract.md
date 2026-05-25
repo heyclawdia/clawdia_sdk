@@ -1,11 +1,12 @@
 # Subagent Contract
 
 Subagents are parent-owned child-run presets over the generic `AgentPool`
-coordination contract. They lower into `AgentPool`, `RunMessage`,
-`WakeCondition`, child `RunRequest`, stripped child `RuntimePackage` snapshots,
-`RunJournal`, `AgentEvent`, `PolicyRef`, `ContentRef`, usage/cost records, and
-typed refs. They are not user-chatable conversations unless a host explicitly
-promotes them outside the core SDK contract.
+coordination contract. They lower into `AgentPool`, optional `AgentPoolStore`
+rehydration/watch, `RunMessage`, `WakeCondition`, child `RunRequest`, stripped
+child `RuntimePackage` snapshots, `RunJournal`, `AgentEvent`, `PolicyRef`,
+`ContentRef`, usage/cost records, and typed refs. They are not user-chatable
+conversations unless a host explicitly promotes them outside the core SDK
+contract.
 
 This is a higher-order feature over agent-pool coordination. It must not create a
 second run loop, package registry, event stream, journal, policy path, context
@@ -123,7 +124,9 @@ flow through `ContextContribution`, `ContextAssembler`, `ContextItem`, and
    provider-visible capability has an executor and policy ref.
 3. Convert allowed handoff content into `ContextContribution` candidates. Only
    policy-admitted items become child `ContextItem` values.
-4. Create or join an `AgentPool` scoped to the parent run and child run.
+4. Create or join an `AgentPool` scoped to the parent run and child run. If a
+   durable `AgentPoolStore` is configured, this step opens the same logical pool
+   and rehydrates only store-backed membership, messages, and wakes.
 5. Create a child `RunRequest` with `source = SourceRef::subagent(parent_run_id)`,
    `destination = DestinationRef::child_agent(child_run_id)`, and the stripped
    child package ref.
@@ -198,6 +201,11 @@ Rules:
 - The agent-pool message surface is not a user-chat transport. It is a
   policy-scoped control surface addressed by typed refs and replayed from
   `RunJournal`.
+- A durable `AgentPoolStore` may let parent and child handles live in different
+  processes or hosts, but the subagent contract still communicates only through
+  `RunMessage`, `WakeCondition`, pool-scoped watches, event envelopes, and
+  journals. It does not add a scheduler, daemon, global event bus, or product
+  routing layer.
 - A parent may deny, narrow, summarize, or redact a child handoff or message
   reply. Denial is journaled as a typed policy outcome and returns a typed child
   result, not provider narrative promotion.

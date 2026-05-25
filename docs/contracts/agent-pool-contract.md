@@ -28,9 +28,19 @@ pub struct AgentPool {
 
 impl AgentPool {
     pub async fn start_run(&self, request: RunRequest) -> Result<RunHandle, AgentError>;
+    pub fn join_run(&self, member: AgentPoolMember) -> Result<(), AgentError>;
+    pub fn leave_run(&self, run_id: &RunId) -> Result<AgentPoolMember, AgentError>;
+    pub fn members(&self) -> Result<Vec<AgentPoolMember>, AgentError>;
+    pub fn snapshot(&self) -> Result<AgentPoolSnapshot, AgentError>;
     pub async fn send(&self, message: RunMessage) -> Result<MessageReceipt, AgentError>;
     pub fn subscribe(&self, filter: EventFilter, cursor: Option<EventCursor>) -> Result<AgentEventStream, AgentError>;
+    pub fn watch_pool(&self, cursor: Option<AgentPoolStoreCursor>) -> Result<AgentPoolStoreStream, AgentError>;
     pub async fn suspend_until(&self, run_id: RunId, condition: WakeCondition) -> Result<WakeRegistration, AgentError>;
+}
+
+impl AgentPoolBuilder {
+    pub fn store<S: AgentPoolStore + 'static>(self, store: S) -> Self;
+    pub fn shared_store(self, store: Arc<dyn AgentPoolStore>) -> Self;
 }
 
 pub struct RunAddress {
@@ -100,6 +110,21 @@ pub enum WakeRegistrationStatus {
     Cancelled,
     Failed,
 }
+
+pub trait AgentPoolStore {
+    fn open_pool(&self, pool_id: AgentPoolId, config: AgentPoolStoreConfig) -> Result<AgentPoolSnapshot, AgentError>;
+    fn snapshot(&self, pool_id: &AgentPoolId) -> Result<AgentPoolSnapshot, AgentError>;
+    fn record_pool_created(&self, pool_id: &AgentPoolId) -> Result<AgentPoolStoreCursor, AgentError>;
+    fn join_member(&self, pool_id: &AgentPoolId, member: AgentPoolMember) -> Result<AgentPoolStoreCursor, AgentError>;
+    fn leave_member(&self, pool_id: &AgentPoolId, run_id: &RunId) -> Result<(AgentPoolMember, AgentPoolStoreCursor), AgentError>;
+    fn message_receipt(&self, pool_id: &AgentPoolId, idempotency_key: &IdempotencyKey) -> Result<Option<MessageReceipt>, AgentError>;
+    fn record_message(&self, pool_id: &AgentPoolId, message: RunMessage, receipt: MessageReceipt) -> Result<AgentPoolStoreCursor, AgentError>;
+    fn wake_registration(&self, pool_id: &AgentPoolId, idempotency_key: &IdempotencyKey) -> Result<Option<WakeRegistration>, AgentError>;
+    fn wake(&self, pool_id: &AgentPoolId, condition_id: &WakeConditionId) -> Result<Option<AgentPoolStoredWake>, AgentError>;
+    fn record_wake(&self, pool_id: &AgentPoolId, condition: WakeCondition, filter: CompiledEventFilter, registration: WakeRegistration) -> Result<AgentPoolStoreCursor, AgentError>;
+    fn watch(&self, pool_id: &AgentPoolId, cursor: Option<AgentPoolStoreCursor>) -> Result<AgentPoolStoreStream, AgentError>;
+    fn next_event_sequence(&self, pool_id: &AgentPoolId) -> Result<u64, AgentError>;
+}
 ```
 
 `RunAddress` is an ergonomic wrapper over existing `RunId`, `AgentId`,
@@ -151,6 +176,41 @@ journaled in `RunMessageRecord`. Resolution rules are finite:
   narrative failure.
 - A pool may expose topics for fan-out, but topic membership and topic delivery
   are policy-gated and journaled.
+
+## Durable Store And Watch
+
+`AgentPoolStore` is the SDK-owned port for shared pool coordination. It is a
+pool-scoped record and snapshot surface for membership, message status, wake
+registrations, dedupe indexes, lifecycle, topics, and watch cursors. It is not a
+daemon, scheduler, broker, workflow engine, or second event system.
+
+The default core store is in-memory and process-local. Cloned
+`InMemoryAgentPoolStore` values share one backing map for fake/conformance tests.
+Concrete durable stores, such as a SQLite file opened by two terminal processes,
+belong in toolkit or host adapters and implement the same port.
+
+Rules:
+
+- `AgentPool::builder(...).build()` creates or opens the named pool through the
+  configured store. Reopening the same `AgentPoolId` must rehydrate from durable
+  records only.
+- Store records are pool-scoped coordination projections linked to journal-backed
+  operations. They do not replace `RunJournal`, `AgentEventBus`, `EventArchive`,
+  or telemetry.
+- `watch_pool(cursor)` returns durable pool-store records after a pool cursor. It
+  must not widen access to global event streams, journals, or other pools.
+- `RunMessage` delivery still appends run-message journal records and emits
+  `RunMessage*` events. The store records message status and idempotency so a
+  second handle can dedupe and rehydrate.
+- `WakeCondition` remains an event-filter registration. The store records the
+  condition, compiled envelope-only filter, latest status, and idempotency so a
+  different handle can trigger or poll it from matching pool events.
+- Store conflicts, config mismatches, corrupt records, or concurrent append
+  failures fail closed with typed errors or retry classifications. An adapter must
+  not silently fork logical pool state.
+- A store may expose RPC, MCP, socket, file, SQL, or network transport behind the
+  port, but core callers still coordinate through `AgentPool`, `RunMessage`,
+  `WakeCondition`, snapshots, and pool-scoped watches.
 
 ## Subagent Lowering
 
@@ -258,8 +318,10 @@ pool.suspend_until(parent_run_id, WakeCondition {
 Replaceable ports:
 
 - The pool uses the configured `AgentRuntime`, `AgentEventBus`, `RunJournal`, and
-  optional `EventArchive`; it does not own concrete storage or transport.
-- Hosts may provide durable archive/index implementations for cross-run replay.
+  optional `EventArchive`; core owns the `AgentPoolStore` port but not a concrete
+  durable storage or transport choice.
+- Hosts and toolkit adapters may provide durable store/archive/index
+  implementations for cross-run and cross-process replay.
 - Optional workflow crates may build barriers and schedules over pool events.
 
 Wiring:
@@ -271,7 +333,7 @@ Wiring:
 4. A parked run resumes when its `WakeCondition` matches a journal-backed event or
    times out.
 5. Reconnect and replay use normal `EventCursor`, `JournalCursor`, and optional
-   `ArchiveCursor` semantics.
+   `ArchiveCursor` semantics plus pool-scoped `AgentPoolStoreCursor` semantics.
 
 Events:
 
@@ -302,9 +364,11 @@ Policies and failures:
 SDK owns / Host owns:
 
 - SDK owns pool membership records, message/wake DTOs, event/journal semantics,
-  policy refs, redaction defaults, and replay/idempotency behavior.
-- Host owns UI, durable global archive implementation, product workflow logic,
-  dashboards, schedules, and external compensation.
+  policy refs, redaction defaults, pool-store records, pool-scoped watch
+  semantics, and replay/idempotency behavior.
+- Host owns UI, durable global archive implementation, concrete pool store
+  deployment choices, product workflow logic, dashboards, schedules, and external
+  compensation.
 
 Tests:
 
@@ -317,4 +381,8 @@ Tests:
 - `pool_subscription_intersects_filter_with_membership_and_policy`
 - `wake_condition_matches_event_filter_without_payload_parsing`
 - `wake_timeout_does_not_cancel_target_run`
+- `shared_store_handles_see_members_messages_and_rehydrate_state`
+- `shared_store_wake_registered_by_one_handle_triggers_from_other_handle_message`
+- `shared_store_missing_target_fails_closed_and_dedupes_across_handles`
+- `shared_store_subscriptions_remain_scoped_to_pool_members`
 - `agent_pool_does_not_own_barrier_or_dag_logic`

@@ -5,6 +5,9 @@
 //! product-neutral and only sees runtime-package capabilities, tool executor
 //! refs, policy refs, content refs, and effect lineage.
 
+/// Public agent-pool toolkit namespace. Use it for concrete pool-store
+/// adapters layered over `agent-sdk-core` coordination ports.
+pub mod agent_pool;
 pub mod discovery;
 /// Public packs namespace. Use it for the documented packs API surface;
 /// prefer crate-root re-exports for common imports. Module items must
@@ -37,6 +40,7 @@ pub mod testing;
 /// described in this file.
 pub mod workspace;
 
+pub use agent_pool::SqliteAgentPoolStore;
 pub use discovery::{ToolDiscoveryExecutor, ToolDiscoveryIndex, ToolDiscoveryRequest};
 pub use packs::{ToolkitPackBundle, tool_snapshot};
 pub use protocol::{

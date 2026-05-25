@@ -555,9 +555,12 @@ pub mod validation;
 
 pub use agent::{Agent, AgentBuilder};
 pub use agent_pool::{
-    AgentPool, AgentPoolBuilder, AgentPoolMember, AgentPoolMessagePolicy, AgentPoolWakePolicy,
-    MessageReceipt, MessageResponseContract, MessageStatus, ResumeInputPolicy, RunAddress,
-    RunAddressTarget, RunMessage, WakeCondition, WakeRegistration, WakeRegistrationStatus,
+    AgentPool, AgentPoolBuilder, AgentPoolMember, AgentPoolMessagePolicy, AgentPoolSnapshot,
+    AgentPoolStore, AgentPoolStoreConfig, AgentPoolStoreCursor, AgentPoolStoreRecord,
+    AgentPoolStoreRecordPayload, AgentPoolStoreStream, AgentPoolStoredMessage, AgentPoolStoredWake,
+    AgentPoolWakePolicy, InMemoryAgentPoolStore, MessageReceipt, MessageResponseContract,
+    MessageStatus, ResumeInputPolicy, RunAddress, RunAddressTarget, RunMessage, WakeCondition,
+    WakeRegistration, WakeRegistrationStatus,
 };
 pub use anti_entropy::{
     AntiEntropyRepair, AntiEntropyReport, AntiEntropyScanner, DerivedViewKind, DerivedViewState,

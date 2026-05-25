@@ -1,13 +1,14 @@
 use serde_json::{Value, json};
 
 use agent_sdk_core::{
-    Agent, AgentError, AgentEventBus, AgentId, AgentPool, AgentPoolId, AgentPoolMember,
-    AgentPoolMessagePolicy, DestinationKind, DestinationRef, EntityRef, EventEnvelope, EventFrame,
-    EventId, IdempotencyKey, InMemoryAgentEventBus, MessageId, MessageStatus, PolicyDecision,
+    Agent, AgentError, AgentErrorKind, AgentEventBus, AgentId, AgentPool, AgentPoolId,
+    AgentPoolMember, AgentPoolMessagePolicy, AgentPoolStoreRecordPayload, DestinationKind,
+    DestinationRef, EntityRef, EventEnvelope, EventFrame, EventId, IdempotencyKey,
+    InMemoryAgentEventBus, InMemoryAgentPoolStore, MessageId, MessageStatus, PolicyDecision,
     PolicyKind, PolicyOutcome, PolicyRef, PolicyStage, PrivacyClass, ProviderRouteSnapshot,
-    RetentionClass, RunAddress, RunAddressTarget, RunId, RunMessage, RuntimePackage,
-    RuntimePackageId, RuntimePolicyPort, SourceKind, SourceRef, TopicId, TraceId, WakeCondition,
-    WakeConditionId, WakeRegistrationStatus,
+    RetentionClass, RetryClassification, RunAddress, RunAddressTarget, RunId, RunMessage,
+    RuntimePackage, RuntimePackageId, RuntimePolicyPort, SourceKind, SourceRef, TopicId, TraceId,
+    WakeCondition, WakeConditionId, WakeRegistrationStatus,
     domain::ContentRef as ContentRefId,
     event::{
         ContentCaptureMode, EVENT_SCHEMA_VERSION, EventDeliverySemantics, EventFamily, EventFilter,
@@ -236,6 +237,292 @@ fn duplicate_wake_registration_is_deduped_by_idempotency_key() {
         1,
         "dedupe returns the first wake registration without duplicate wake records"
     );
+}
+
+#[test]
+fn shared_store_handles_see_members_messages_and_rehydrate_state() {
+    let store = InMemoryAgentPoolStore::default();
+    let pool_a = pool_with_shared_store(
+        "pool.shared.rehydrate",
+        store.clone(),
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+    let pool_b = pool_with_shared_store(
+        "pool.shared.rehydrate",
+        store.clone(),
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+
+    pool_a
+        .join_run(AgentPoolMember::new(
+            RunId::new("run.shared.a"),
+            AgentId::new("agent.shared.a"),
+        ))
+        .expect("run a joins");
+    assert_eq!(
+        member_run_ids(pool_b.members().unwrap()),
+        vec![RunId::new("run.shared.a")]
+    );
+
+    pool_b
+        .join_run(AgentPoolMember::new(
+            RunId::new("run.shared.b"),
+            AgentId::new("agent.shared.b"),
+        ))
+        .expect("run b joins");
+    assert_eq!(
+        member_run_ids(pool_a.members().unwrap()),
+        vec![RunId::new("run.shared.a"), RunId::new("run.shared.b")]
+    );
+
+    let message = run_message(
+        "message.shared.cross",
+        "run.shared.a",
+        RunAddress::run(RunId::new("run.shared.b")),
+    );
+    let receipt = pool_a.send(message.clone()).expect("cross-handle send");
+    assert_eq!(receipt.status, MessageStatus::Delivered);
+    assert_eq!(receipt.delivered_to, vec![RunId::new("run.shared.b")]);
+
+    let second = pool_b.send(message).expect("deduped by shared store");
+    assert_eq!(second, receipt);
+
+    let message_records = pool_b
+        .watch_pool(None)
+        .expect("watch records")
+        .filter_map(|record| match record.payload {
+            AgentPoolStoreRecordPayload::RunMessage { stored } => Some(stored),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(message_records.len(), 2);
+    assert_eq!(
+        message_records.last().unwrap().receipt.status,
+        MessageStatus::Delivered
+    );
+
+    drop(pool_a);
+    drop(pool_b);
+
+    let rehydrated = pool_with_shared_store(
+        "pool.shared.rehydrate",
+        store,
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+    let snapshot = rehydrated.snapshot().expect("rehydrated snapshot");
+    assert_eq!(
+        member_run_ids(snapshot.members),
+        vec![RunId::new("run.shared.a"), RunId::new("run.shared.b")]
+    );
+    assert_eq!(snapshot.messages.len(), 1);
+    assert_eq!(
+        snapshot.messages[0].receipt.status,
+        MessageStatus::Delivered
+    );
+}
+
+#[test]
+fn shared_store_wake_registered_by_one_handle_triggers_from_other_handle_message() {
+    let store = InMemoryAgentPoolStore::default();
+    let pool_a = pool_with_shared_store(
+        "pool.shared.wake",
+        store.clone(),
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+    let pool_b = pool_with_shared_store(
+        "pool.shared.wake",
+        store,
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+    pool_a
+        .join_run(AgentPoolMember::new(
+            RunId::new("run.shared.wake.a"),
+            AgentId::new("agent.shared.wake.a"),
+        ))
+        .expect("run a joins");
+    pool_b
+        .join_run(AgentPoolMember::new(
+            RunId::new("run.shared.wake.b"),
+            AgentId::new("agent.shared.wake.b"),
+        ))
+        .expect("run b joins");
+
+    let condition = wake_condition(
+        "wake.shared.message",
+        "run.shared.wake.b",
+        EventFilter {
+            run_ids: EventFilterSet::Include(vec![RunId::new("run.shared.wake.a")]),
+            families: EventFilterSet::Include(vec![EventFamily::AgentPool]),
+            kinds: EventFilterSet::Include(vec![EventKind::RunMessageDelivered]),
+            ..EventFilter::default()
+        },
+    );
+    let registered = pool_b
+        .suspend_until(RunId::new("run.shared.wake.b"), condition)
+        .expect("wake registered");
+    assert_eq!(registered.status, WakeRegistrationStatus::Registered);
+
+    pool_a
+        .send(run_message(
+            "message.shared.wake",
+            "run.shared.wake.a",
+            RunAddress::run(RunId::new("run.shared.wake.b")),
+        ))
+        .expect("message sent");
+
+    let triggered = pool_b
+        .poll_wake(&WakeConditionId::new("wake.shared.message"))
+        .expect("wake state rehydrated from store");
+    assert_eq!(triggered.status, WakeRegistrationStatus::Triggered);
+    assert_eq!(pool_b.snapshot().unwrap().wakes.len(), 1);
+    assert_eq!(
+        pool_b.snapshot().unwrap().wakes[0].registration.status,
+        WakeRegistrationStatus::Triggered
+    );
+}
+
+#[test]
+fn shared_store_missing_target_fails_closed_and_dedupes_across_handles() {
+    let store = InMemoryAgentPoolStore::default();
+    let pool_a = pool_with_shared_store(
+        "pool.shared.missing",
+        store.clone(),
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+    let pool_b = pool_with_shared_store(
+        "pool.shared.missing",
+        store,
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+    pool_a
+        .join_run(AgentPoolMember::new(
+            RunId::new("run.shared.missing.sender"),
+            AgentId::new("agent.shared.missing.sender"),
+        ))
+        .expect("sender joins");
+
+    let message = run_message(
+        "message.shared.missing",
+        "run.shared.missing.sender",
+        RunAddress::run(RunId::new("run.shared.missing.target")),
+    );
+    let failed = pool_a.send(message.clone()).expect("failed closed");
+    assert_eq!(failed.status, MessageStatus::Failed);
+    assert!(failed.delivered_to.is_empty());
+
+    let deduped = pool_b.send(message).expect("deduped failure");
+    assert_eq!(deduped, failed);
+    let failed_records = pool_b
+        .watch_pool(None)
+        .expect("watch records")
+        .filter(|record| {
+            matches!(
+                &record.payload,
+                AgentPoolStoreRecordPayload::RunMessage { stored }
+                    if stored.receipt.status == MessageStatus::Failed
+            )
+        })
+        .count();
+    assert_eq!(failed_records, 1);
+}
+
+#[test]
+fn shared_store_subscriptions_remain_scoped_to_pool_members() {
+    let store = InMemoryAgentPoolStore::default();
+    let event_bus = InMemoryAgentEventBus::default();
+    let pool_a = pool_with_shared_store(
+        "pool.shared.scope",
+        store.clone(),
+        FakeJournalStore::default(),
+        event_bus.clone(),
+    );
+    let pool_b = pool_with_shared_store(
+        "pool.shared.scope",
+        store,
+        FakeJournalStore::default(),
+        event_bus.clone(),
+    );
+    pool_a
+        .join_run(AgentPoolMember::new(
+            RunId::new("run.shared.scope.visible"),
+            AgentId::new("agent.shared.scope.visible"),
+        ))
+        .expect("visible run joins");
+
+    event_bus
+        .publish(runtime_event_frame(
+            "run.shared.scope.visible",
+            "agent.shared.scope.visible",
+            11,
+            EventKind::RunCompleted,
+        ))
+        .expect("visible event");
+    event_bus
+        .publish(runtime_event_frame(
+            "run.shared.scope.outside",
+            "agent.shared.scope.outside",
+            12,
+            EventKind::RunCompleted,
+        ))
+        .expect("outside event");
+
+    let frames = pool_b
+        .subscribe(
+            EventFilter {
+                families: EventFilterSet::Include(vec![EventFamily::Run]),
+                ..EventFilter::default()
+            },
+            None,
+        )
+        .expect("scoped subscription")
+        .collect::<Vec<_>>();
+
+    assert_eq!(frames.len(), 1);
+    assert_eq!(
+        frames[0].event.envelope.run_id,
+        RunId::new("run.shared.scope.visible")
+    );
+}
+
+#[test]
+fn shared_store_config_conflict_fails_closed() {
+    let store = InMemoryAgentPoolStore::default();
+    let _pool = pool_with_shared_store(
+        "pool.shared.conflict",
+        store.clone(),
+        FakeJournalStore::default(),
+        InMemoryAgentEventBus::default(),
+    );
+
+    let err = match AgentPool::builder(AgentPoolId::new("pool.shared.conflict"))
+        .runtime(
+            agent_pool_runtime(
+                FakeJournalStore::default(),
+                InMemoryAgentEventBus::default(),
+            )
+            .build()
+            .expect("runtime builds"),
+        )
+        .message_policy(AgentPoolMessagePolicy {
+            required_policy_refs: Vec::new(),
+            include_sender_in_pool_broadcast: true,
+        })
+        .store(store)
+        .build()
+    {
+        Ok(_) => panic!("conflicting pool config must fail closed"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err.kind(), AgentErrorKind::InvalidStateTransition);
+    assert_eq!(err.retry(), RetryClassification::RepairNeeded);
 }
 
 #[test]
@@ -567,6 +854,32 @@ fn pool_with_ports(
         builder = builder.message_policy(policy);
     }
     builder.build().expect("pool builds")
+}
+
+fn pool_with_shared_store(
+    pool_id: &str,
+    store: InMemoryAgentPoolStore,
+    journal: FakeJournalStore,
+    event_bus: InMemoryAgentEventBus,
+) -> AgentPool {
+    AgentPool::builder(AgentPoolId::new(pool_id))
+        .runtime(
+            agent_pool_runtime(journal, event_bus)
+                .build()
+                .expect("runtime builds"),
+        )
+        .store(store)
+        .build()
+        .expect("pool builds")
+}
+
+fn member_run_ids(members: Vec<AgentPoolMember>) -> Vec<RunId> {
+    let mut run_ids = members
+        .into_iter()
+        .map(|member| member.run_id)
+        .collect::<Vec<_>>();
+    run_ids.sort();
+    run_ids
 }
 
 fn agent_pool_runtime(

@@ -5,7 +5,7 @@
 //! events through the configured runtime ports.
 //!
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{Arc, Mutex},
 };
 
@@ -42,7 +42,7 @@ use crate::{
 pub struct AgentPool {
     pool_id: AgentPoolId,
     runtime: AgentRuntime,
-    state: Arc<Mutex<AgentPoolState>>,
+    store: Arc<dyn AgentPoolStore>,
 }
 
 impl AgentPool {
@@ -56,6 +56,7 @@ impl AgentPool {
             message_policy: AgentPoolMessagePolicy::bounded_defaults(),
             wake_policy: AgentPoolWakePolicy::safe_defaults(),
             policy_refs: Vec::new(),
+            store: None,
         }
     }
 
@@ -79,8 +80,8 @@ impl AgentPool {
     /// can target the run.
     pub fn join_run(&self, member: AgentPoolMember) -> Result<(), AgentError> {
         let should_create = {
-            let state = self.state()?;
-            !state.created
+            let snapshot = self.snapshot()?;
+            !snapshot.created
         };
 
         if should_create {
@@ -90,13 +91,10 @@ impl AgentPool {
                 AgentPoolLifecycleStatus::Created,
                 EventKind::AgentPoolCreated,
             )?;
-            self.state()?.created = true;
+            self.store.record_pool_created(&self.pool_id)?;
         }
 
-        {
-            let mut state = self.state()?;
-            state.index_member(member.clone());
-        }
+        self.store.join_member(&self.pool_id, member.clone())?;
 
         self.append_pool_record(
             &member.run_id,
@@ -110,7 +108,21 @@ impl AgentPool {
     /// Returns the members currently held by this value.
     /// This reads current pool membership without starting, stopping, or messaging runs.
     pub fn members(&self) -> Result<Vec<AgentPoolMember>, AgentError> {
-        Ok(self.state()?.members.values().cloned().collect())
+        Ok(self.snapshot()?.members)
+    }
+
+    /// Records that a run has left the pool.
+    /// This removes membership from the shared store, appends a lifecycle record, and publishes
+    /// a pool event. It does not cancel or otherwise mutate the run itself.
+    pub fn leave_run(&self, run_id: &RunId) -> Result<AgentPoolMember, AgentError> {
+        let (member, _) = self.store.leave_member(&self.pool_id, run_id)?;
+        self.append_pool_record(
+            &member.run_id,
+            &member.agent_id,
+            AgentPoolLifecycleStatus::RunLeft,
+            EventKind::AgentPoolRunLeft,
+        )?;
+        Ok(member)
     }
 
     /// Sends a run message through the pool coordinator.
@@ -119,10 +131,8 @@ impl AgentPool {
     /// agent-pool events, and deduplicates repeated calls by idempotency key.
     pub fn send(&self, message: RunMessage) -> Result<MessageReceipt, AgentError> {
         if let Some(receipt) = self
-            .state()?
-            .message_dedupe
-            .get(&message.idempotency_key)
-            .cloned()
+            .store
+            .message_receipt(&self.pool_id, &message.idempotency_key)?
         {
             return Ok(receipt);
         }
@@ -139,27 +149,18 @@ impl AgentPool {
         if terminal_status == MessageStatus::Expired {
             let receipt =
                 self.record_message_status(&message, MessageStatus::Expired, Vec::new())?;
-            self.state()?
-                .message_dedupe
-                .insert(message.idempotency_key.clone(), receipt.clone());
             return Ok(receipt);
         }
 
         if terminal_status == MessageStatus::Failed {
             let receipt =
                 self.record_message_status(&message, MessageStatus::Failed, Vec::new())?;
-            self.state()?
-                .message_dedupe
-                .insert(message.idempotency_key.clone(), receipt.clone());
             return Ok(receipt);
         }
 
         self.record_message_status(&message, MessageStatus::Accepted, delivered_to.clone())?;
         let receipt =
             self.record_message_status(&message, MessageStatus::Delivered, delivered_to)?;
-        self.state()?
-            .message_dedupe
-            .insert(message.idempotency_key.clone(), receipt.clone());
         Ok(receipt)
     }
 
@@ -177,7 +178,7 @@ impl AgentPool {
         let journal = self.runtime.journal_port(&message.from)?;
         let record = self.run_message_record(message, status.clone(), delivered_to.clone())?;
         let cursor = journal.append(record)?;
-        self.publish_agent_pool_event(
+        let frame = self.publish_agent_pool_event(
             message.from.clone(),
             source_member.agent_id,
             status.event_kind(),
@@ -191,12 +192,16 @@ impl AgentPool {
             status.redacted_summary(),
         )?;
 
-        Ok(MessageReceipt {
+        let receipt = MessageReceipt {
             message_id: message.message_id.clone(),
             status,
             delivered_to,
             journal_cursor: Some(cursor),
-        })
+        };
+        self.store
+            .record_message(&self.pool_id, message.clone(), receipt.clone())?;
+        self.trigger_matching_wakes(&frame)?;
+        Ok(receipt)
     }
 
     /// Subscribe.
@@ -226,8 +231,8 @@ impl AgentPool {
         let allowed_runs = self.observable_member_runs();
         filter.run_ids = intersect_run_ids(&filter.run_ids, &allowed_runs);
         let envelope_only = self
-            .state()
-            .map(|state| state.wake_policy.envelope_only)
+            .snapshot()
+            .map(|snapshot| snapshot.wake_policy.envelope_only)
             .unwrap_or(true);
         if envelope_only {
             filter.payload_access = PayloadAccessMode::EnvelopeOnly;
@@ -252,10 +257,8 @@ impl AgentPool {
         }
 
         if let Some(registration) = self
-            .state()?
-            .wake_dedupe
-            .get(&condition.idempotency_key)
-            .cloned()
+            .store
+            .wake_registration(&self.pool_id, &condition.idempotency_key)?
         {
             return Ok(registration);
         }
@@ -268,15 +271,6 @@ impl AgentPool {
             WakeRegistrationStatus::Registered,
             None,
         )?;
-
-        self.state()?.wakes.insert(
-            condition.condition_id.clone(),
-            StoredWake {
-                condition: condition.clone(),
-                compiled_filter: compiled.clone(),
-                status: WakeRegistrationStatus::Registered,
-            },
-        );
 
         if condition.timeout_millis == Some(0) {
             registration = self.record_wake_status(
@@ -298,9 +292,6 @@ impl AgentPool {
             )?;
         }
 
-        self.state()?
-            .wake_dedupe
-            .insert(condition.idempotency_key.clone(), registration.clone());
         Ok(registration)
     }
 
@@ -312,19 +303,12 @@ impl AgentPool {
         condition_id: &WakeConditionId,
     ) -> Result<WakeRegistration, AgentError> {
         let stored = self
-            .state()?
-            .wakes
-            .get(condition_id)
-            .cloned()
+            .store
+            .wake(&self.pool_id, condition_id)?
             .ok_or_else(|| AgentError::contract_violation("wake condition is not registered"))?;
 
-        if stored.status != WakeRegistrationStatus::Registered {
-            return Ok(WakeRegistration {
-                condition_id: stored.condition.condition_id,
-                run_id: stored.condition.run_id,
-                status: stored.status,
-                journal_cursor: None,
-            });
+        if stored.registration.status != WakeRegistrationStatus::Registered {
+            return Ok(stored.registration);
         }
 
         let Some(frame) = self
@@ -332,12 +316,7 @@ impl AgentPool {
             .subscribe_events(stored.compiled_filter.clone(), None)?
             .next()
         else {
-            return Ok(WakeRegistration {
-                condition_id: stored.condition.condition_id,
-                run_id: stored.condition.run_id,
-                status: WakeRegistrationStatus::Registered,
-                journal_cursor: None,
-            });
+            return Ok(stored.registration);
         };
 
         self.record_wake_status(
@@ -356,10 +335,8 @@ impl AgentPool {
         condition_id: &WakeConditionId,
     ) -> Result<WakeRegistration, AgentError> {
         let stored = self
-            .state()?
-            .wakes
-            .get(condition_id)
-            .cloned()
+            .store
+            .wake(&self.pool_id, condition_id)?
             .ok_or_else(|| AgentError::contract_violation("wake condition is not registered"))?;
         self.record_wake_status(
             &stored.condition,
@@ -427,13 +404,12 @@ impl AgentPool {
             journal_cursor: Some(cursor),
         };
 
-        let mut state = self.state()?;
-        if let Some(stored) = state.wakes.get_mut(&condition.condition_id) {
-            stored.status = registration.status.clone();
-        }
-        state
-            .wake_dedupe
-            .insert(condition.idempotency_key.clone(), registration.clone());
+        self.store.record_wake(
+            &self.pool_id,
+            condition.clone(),
+            compiled_filter,
+            registration.clone(),
+        )?;
 
         Ok(registration)
     }
@@ -446,14 +422,14 @@ impl AgentPool {
         event_kind: EventKind,
     ) -> Result<(), AgentError> {
         let journal = self.runtime.journal_port(run_id)?;
-        let (member_run_ids, topics, policy_refs) = {
-            let state = self.state()?;
-            (
-                state.members.keys().cloned().collect::<Vec<_>>(),
-                state.topics.keys().cloned().collect::<Vec<_>>(),
-                state.policy_refs.clone(),
-            )
-        };
+        let snapshot = self.snapshot()?;
+        let member_run_ids = snapshot
+            .members
+            .iter()
+            .map(|member| member.run_id.clone())
+            .collect::<Vec<_>>();
+        let topics = snapshot.topics;
+        let policy_refs = snapshot.policy_refs;
 
         let record = AgentPoolRecord {
             pool_id: self.pool_id.clone(),
@@ -653,15 +629,11 @@ impl AgentPool {
         policy_refs: Vec<PolicyRef>,
         journal_cursor: Option<JournalCursor>,
         summary: impl Into<String>,
-    ) -> Result<(), AgentError> {
+    ) -> Result<EventFrame, AgentError> {
         if let Some(condition_id) = wake_condition_id {
             related_refs.push(EntityRef::wake_condition(condition_id));
         }
-        let event_counter = {
-            let mut state = self.state()?;
-            state.next_event_counter += 1;
-            state.next_event_counter
-        };
+        let event_counter = self.store.next_event_sequence(&self.pool_id)?;
         let fingerprint = self
             .runtime
             .run_snapshot(&run_id)
@@ -722,45 +694,51 @@ impl AgentPool {
         };
         self.runtime
             .event_bus_port(&frame.event.envelope.run_id)?
-            .publish(frame)
+            .publish(frame.clone())?;
+        Ok(frame)
     }
 
     fn resolve_address(&self, message: &RunMessage) -> Vec<RunId> {
-        let Ok(state) = self.state() else {
+        let Ok(snapshot) = self.snapshot() else {
             return Vec::new();
         };
-        if !state.members.contains_key(&message.from) || !state.message_policy.allows(message) {
+        let members = snapshot
+            .members
+            .iter()
+            .cloned()
+            .map(|member| (member.run_id.clone(), member))
+            .collect::<BTreeMap<_, _>>();
+        let topics = topics_from_members(&snapshot.members);
+
+        if !members.contains_key(&message.from) || !snapshot.message_policy.allows(message) {
             return Vec::new();
         }
 
         let mut candidates = match &message.to.target {
             RunAddressTarget::Run { run_id } => vec![run_id.clone()],
-            RunAddressTarget::Agent { agent_id } => state
-                .members
+            RunAddressTarget::Agent { agent_id } => members
                 .values()
                 .filter(|member| &member.agent_id == agent_id)
                 .map(|member| member.run_id.clone())
                 .collect::<Vec<_>>(),
-            RunAddressTarget::Topic { topic_id } => state
-                .topics
+            RunAddressTarget::Topic { topic_id } => topics
                 .get(topic_id)
                 .map(|runs| runs.iter().cloned().collect::<Vec<_>>())
                 .unwrap_or_default(),
             RunAddressTarget::Pool { pool_id } if pool_id == &self.pool_id => {
-                state.members.keys().cloned().collect::<Vec<_>>()
+                members.keys().cloned().collect::<Vec<_>>()
             }
             RunAddressTarget::Pool { .. } => Vec::new(),
         };
 
         candidates.retain(|run_id| {
-            state
-                .members
+            members
                 .get(run_id)
                 .is_some_and(|member| member.allows_message_policies(&message.policy_refs))
         });
 
         if matches!(message.to.target, RunAddressTarget::Pool { .. })
-            && !state.message_policy.include_sender_in_pool_broadcast
+            && !snapshot.message_policy.include_sender_in_pool_broadcast
         {
             candidates.retain(|run_id| run_id != &message.from);
         }
@@ -771,32 +749,75 @@ impl AgentPool {
     }
 
     fn observable_member_runs(&self) -> Vec<RunId> {
-        self.state()
-            .map(|state| {
-                state
+        self.snapshot()
+            .map(|snapshot| {
+                snapshot
                     .members
-                    .values()
-                    .filter(|member| member.allows_message_policies(&state.policy_refs))
+                    .iter()
+                    .filter(|member| member.allows_message_policies(&snapshot.policy_refs))
                     .map(|member| member.run_id.clone())
-                    .collect::<Vec<_>>()
+                    .collect()
             })
             .unwrap_or_default()
     }
 
     fn member(&self, run_id: &RunId) -> Result<AgentPoolMember, AgentError> {
-        self.state()?.members.get(run_id).cloned().ok_or_else(|| {
-            AgentError::new(
-                AgentErrorKind::InvalidStateTransition,
-                RetryClassification::NotRetryable,
-                "run is not a member of this agent pool",
-            )
-        })
+        self.snapshot()?
+            .members
+            .into_iter()
+            .find(|member| &member.run_id == run_id)
+            .ok_or_else(|| {
+                AgentError::new(
+                    AgentErrorKind::InvalidStateTransition,
+                    RetryClassification::NotRetryable,
+                    "run is not a member of this agent pool",
+                )
+            })
     }
 
-    fn state(&self) -> Result<std::sync::MutexGuard<'_, AgentPoolState>, AgentError> {
-        self.state
-            .lock()
-            .map_err(|_| AgentError::contract_violation("agent pool state lock poisoned"))
+    /// Rehydrates the current durable pool snapshot from the configured store.
+    /// This returns only pool-backed membership, message, wake, policy, and cursor state; it
+    /// does not subscribe to the global event bus or synthesize missing records.
+    pub fn snapshot(&self) -> Result<AgentPoolSnapshot, AgentError> {
+        self.store.snapshot(&self.pool_id)
+    }
+
+    fn trigger_matching_wakes(&self, frame: &EventFrame) -> Result<(), AgentError> {
+        if matches!(
+            frame.event.envelope.event_kind,
+            EventKind::WakeConditionRegistered
+                | EventKind::WakeConditionTriggered
+                | EventKind::WakeConditionTimedOut
+                | EventKind::WakeConditionCancelled
+                | EventKind::WakeConditionFailed
+        ) {
+            return Ok(());
+        }
+
+        let wakes = self.snapshot()?.wakes;
+        for wake in wakes
+            .into_iter()
+            .filter(|wake| wake.registration.status == WakeRegistrationStatus::Registered)
+        {
+            if wake.compiled_filter.matches_envelope(&frame.event.envelope) {
+                self.record_wake_status(
+                    &wake.condition,
+                    wake.compiled_filter,
+                    WakeRegistrationStatus::Triggered,
+                    Some(frame.event.envelope.event_id.clone()),
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Watches durable pool-store changes after the supplied cursor.
+    /// This is a pool-scoped coordination-record stream, not a global event bus.
+    pub fn watch_pool(
+        &self,
+        cursor: Option<AgentPoolStoreCursor>,
+    ) -> Result<AgentPoolStoreStream, AgentError> {
+        self.store.watch(&self.pool_id, cursor)
     }
 }
 
@@ -809,6 +830,7 @@ pub struct AgentPoolBuilder {
     message_policy: AgentPoolMessagePolicy,
     wake_policy: AgentPoolWakePolicy,
     policy_refs: Vec<PolicyRef>,
+    store: Option<Arc<dyn AgentPoolStore>>,
 }
 
 impl AgentPoolBuilder {
@@ -841,6 +863,25 @@ impl AgentPoolBuilder {
         self
     }
 
+    /// Returns an updated value with the pool store configured.
+    /// The store is the shared coordination authority for membership,
+    /// messages, wake registrations, dedupe, rehydration, and pool watch.
+    pub fn store<S>(mut self, store: S) -> Self
+    where
+        S: AgentPoolStore + 'static,
+    {
+        self.store = Some(Arc::new(store));
+        self
+    }
+
+    /// Returns an updated value with a dynamically dispatched pool store.
+    /// Use this when sharing one store instance across multiple pool handles
+    /// or when a host provides its own adapter.
+    pub fn shared_store(mut self, store: Arc<dyn AgentPoolStore>) -> Self {
+        self.store = Some(store);
+        self
+    }
+
     /// Finishes builder validation and returns the configured value.
     /// This is data-only unless the surrounding builder explicitly
     /// documents adapter or store access.
@@ -848,23 +889,263 @@ impl AgentPoolBuilder {
         let runtime = self
             .runtime
             .ok_or_else(|| AgentError::host_configuration_needed("agent pool requires runtime"))?;
-        Ok(AgentPool {
-            pool_id: self.pool_id,
-            runtime,
-            state: Arc::new(Mutex::new(AgentPoolState {
-                created: false,
-                members: BTreeMap::new(),
-                topics: BTreeMap::new(),
+        let store = self
+            .store
+            .unwrap_or_else(|| Arc::new(InMemoryAgentPoolStore::default()));
+        store.open_pool(
+            self.pool_id.clone(),
+            AgentPoolStoreConfig {
                 message_policy: self.message_policy,
                 wake_policy: self.wake_policy,
                 policy_refs: self.policy_refs,
-                message_dedupe: BTreeMap::new(),
-                wake_dedupe: BTreeMap::new(),
-                wakes: BTreeMap::new(),
-                next_event_counter: 0,
-            })),
+            },
+        )?;
+        Ok(AgentPool {
+            pool_id: self.pool_id,
+            runtime,
+            store,
         })
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Store configuration for one logical agent pool.
+/// This is durable pool metadata; constructing it does not open a
+/// concrete store or start coordination work.
+pub struct AgentPoolStoreConfig {
+    /// Message policy used when resolving pool messages.
+    pub message_policy: AgentPoolMessagePolicy,
+    /// Wake policy used when scoping wake filters.
+    pub wake_policy: AgentPoolWakePolicy,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Policy refs that scope pool-level observation and membership.
+    pub policy_refs: Vec<PolicyRef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Durable cursor for pool-scoped store records.
+/// Cursors are scoped by the pool passed to `watch` and should not be
+/// used as global event or journal cursors.
+pub struct AgentPoolStoreCursor {
+    /// Monotonic sequence within a logical pool store partition.
+    pub sequence: u64,
+}
+
+impl AgentPoolStoreCursor {
+    /// Builds the initial cursor before any pool-store record.
+    pub fn start() -> Self {
+        Self { sequence: 0 }
+    }
+
+    /// Builds a cursor for a known sequence.
+    pub fn new(sequence: u64) -> Self {
+        Self { sequence }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Rehydratable snapshot for one logical agent pool.
+/// The snapshot is derived only from durable store records; callers must
+/// not synthesize members, messages, or wakes outside the store.
+pub struct AgentPoolSnapshot {
+    /// Stable pool id used for typed lineage, lookup, or dedupe.
+    pub pool_id: AgentPoolId,
+    /// Whether the pool-created lifecycle record has been persisted.
+    pub created: bool,
+    /// Current members visible in the pool.
+    pub members: Vec<AgentPoolMember>,
+    /// Current topic ids known to the pool.
+    pub topics: Vec<TopicId>,
+    /// Message policy used when resolving pool messages.
+    pub message_policy: AgentPoolMessagePolicy,
+    /// Wake policy used when scoping wake filters.
+    pub wake_policy: AgentPoolWakePolicy,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Policy refs that scope pool-level observation and membership.
+    pub policy_refs: Vec<PolicyRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Durable run-message status records known to the pool.
+    pub messages: Vec<AgentPoolStoredMessage>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Durable wake registrations known to the pool.
+    pub wakes: Vec<AgentPoolStoredWake>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Latest store cursor represented by this snapshot.
+    pub cursor: Option<AgentPoolStoreCursor>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Durable message status stored for pool rehydration and dedupe.
+pub struct AgentPoolStoredMessage {
+    /// Original run message request.
+    pub message: RunMessage,
+    /// Receipt for the stored status transition.
+    pub receipt: MessageReceipt,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Durable wake state stored for pool rehydration and cross-handle wake
+/// triggering.
+pub struct AgentPoolStoredWake {
+    /// Original wake condition.
+    pub condition: WakeCondition,
+    /// Scoped, compiled filter used for envelope matching.
+    pub compiled_filter: CompiledEventFilter,
+    /// Latest durable registration status.
+    pub registration: WakeRegistration,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// One append-only pool-store record. These records are a durable
+/// coordination view linked to journal-backed events; they are not a
+/// replacement for `AgentEventBus`.
+pub struct AgentPoolStoreRecord {
+    /// Stable pool id used for typed lineage, lookup, or dedupe.
+    pub pool_id: AgentPoolId,
+    /// Cursor assigned by the store.
+    pub cursor: AgentPoolStoreCursor,
+    /// Stored pool change.
+    pub payload: AgentPoolStoreRecordPayload,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+/// Finite pool-store record variants.
+pub enum AgentPoolStoreRecordPayload {
+    /// Pool metadata was opened or initialized.
+    PoolOpened {
+        /// Configuration persisted for this pool.
+        config: AgentPoolStoreConfig,
+    },
+    /// Pool lifecycle was marked created by a journal-backed operation.
+    PoolCreated,
+    /// A run joined the pool.
+    MemberJoined {
+        /// Joined member.
+        member: AgentPoolMember,
+    },
+    /// A run left the pool.
+    MemberLeft {
+        /// Left member.
+        member: AgentPoolMember,
+    },
+    /// A run-message status was persisted.
+    RunMessage {
+        /// Stored message transition.
+        stored: AgentPoolStoredMessage,
+    },
+    /// A wake status was persisted.
+    Wake {
+        /// Stored wake transition.
+        stored: AgentPoolStoredWake,
+    },
+}
+
+#[derive(Clone, Debug)]
+/// Iterator over durable pool-store records for one logical pool.
+pub struct AgentPoolStoreStream {
+    records: VecDeque<AgentPoolStoreRecord>,
+}
+
+impl AgentPoolStoreStream {
+    /// Builds a store stream from records already loaded by a store.
+    pub fn new(records: impl IntoIterator<Item = AgentPoolStoreRecord>) -> Self {
+        Self {
+            records: records.into_iter().collect(),
+        }
+    }
+}
+
+impl Iterator for AgentPoolStoreStream {
+    type Item = AgentPoolStoreRecord;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.pop_front()
+    }
+}
+
+/// Port for durable/shared agent-pool coordination.
+/// Implementations may use memory, SQLite, RPC, MCP, or another backing
+/// service, but they must preserve the same pool-scoped records,
+/// snapshots, idempotency, and watch semantics.
+pub trait AgentPoolStore: Send + Sync {
+    /// Create or open a logical pool and return the durable snapshot.
+    fn open_pool(
+        &self,
+        pool_id: AgentPoolId,
+        config: AgentPoolStoreConfig,
+    ) -> Result<AgentPoolSnapshot, AgentError>;
+
+    /// Rehydrate the current durable pool snapshot.
+    fn snapshot(&self, pool_id: &AgentPoolId) -> Result<AgentPoolSnapshot, AgentError>;
+
+    /// Mark the pool-created lifecycle as durable.
+    fn record_pool_created(
+        &self,
+        pool_id: &AgentPoolId,
+    ) -> Result<AgentPoolStoreCursor, AgentError>;
+
+    /// Persist member join.
+    fn join_member(
+        &self,
+        pool_id: &AgentPoolId,
+        member: AgentPoolMember,
+    ) -> Result<AgentPoolStoreCursor, AgentError>;
+
+    /// Persist member leave and return the removed member.
+    fn leave_member(
+        &self,
+        pool_id: &AgentPoolId,
+        run_id: &RunId,
+    ) -> Result<(AgentPoolMember, AgentPoolStoreCursor), AgentError>;
+
+    /// Look up message dedupe state by idempotency key.
+    fn message_receipt(
+        &self,
+        pool_id: &AgentPoolId,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Option<MessageReceipt>, AgentError>;
+
+    /// Persist one message status transition.
+    fn record_message(
+        &self,
+        pool_id: &AgentPoolId,
+        message: RunMessage,
+        receipt: MessageReceipt,
+    ) -> Result<AgentPoolStoreCursor, AgentError>;
+
+    /// Look up wake dedupe state by idempotency key.
+    fn wake_registration(
+        &self,
+        pool_id: &AgentPoolId,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Option<WakeRegistration>, AgentError>;
+
+    /// Look up one stored wake by condition id.
+    fn wake(
+        &self,
+        pool_id: &AgentPoolId,
+        condition_id: &WakeConditionId,
+    ) -> Result<Option<AgentPoolStoredWake>, AgentError>;
+
+    /// Persist one wake status transition.
+    fn record_wake(
+        &self,
+        pool_id: &AgentPoolId,
+        condition: WakeCondition,
+        compiled_filter: CompiledEventFilter,
+        registration: WakeRegistration,
+    ) -> Result<AgentPoolStoreCursor, AgentError>;
+
+    /// Read durable pool changes after the supplied cursor.
+    fn watch(
+        &self,
+        pool_id: &AgentPoolId,
+        cursor: Option<AgentPoolStoreCursor>,
+    ) -> Result<AgentPoolStoreStream, AgentError>;
+
+    /// Allocate a unique event sequence for pool event IDs.
+    fn next_event_sequence(&self, pool_id: &AgentPoolId) -> Result<u64, AgentError>;
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -1405,7 +1686,7 @@ impl WakeRegistrationStatus {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct AgentPoolState {
     created: bool,
     members: BTreeMap<RunId, AgentPoolMember>,
@@ -1413,13 +1694,57 @@ struct AgentPoolState {
     message_policy: AgentPoolMessagePolicy,
     wake_policy: AgentPoolWakePolicy,
     policy_refs: Vec<PolicyRef>,
+    messages: BTreeMap<MessageId, AgentPoolStoredMessage>,
     message_dedupe: BTreeMap<IdempotencyKey, MessageReceipt>,
     wake_dedupe: BTreeMap<IdempotencyKey, WakeRegistration>,
-    wakes: BTreeMap<WakeConditionId, StoredWake>,
+    wakes: BTreeMap<WakeConditionId, AgentPoolStoredWake>,
     next_event_counter: u64,
 }
 
 impl AgentPoolState {
+    fn new(config: AgentPoolStoreConfig) -> Self {
+        Self {
+            created: false,
+            members: BTreeMap::new(),
+            topics: BTreeMap::new(),
+            message_policy: config.message_policy,
+            wake_policy: config.wake_policy,
+            policy_refs: config.policy_refs,
+            messages: BTreeMap::new(),
+            message_dedupe: BTreeMap::new(),
+            wake_dedupe: BTreeMap::new(),
+            wakes: BTreeMap::new(),
+            next_event_counter: 0,
+        }
+    }
+
+    fn config(&self) -> AgentPoolStoreConfig {
+        AgentPoolStoreConfig {
+            message_policy: self.message_policy.clone(),
+            wake_policy: self.wake_policy.clone(),
+            policy_refs: self.policy_refs.clone(),
+        }
+    }
+
+    fn snapshot(
+        &self,
+        pool_id: AgentPoolId,
+        cursor: Option<AgentPoolStoreCursor>,
+    ) -> AgentPoolSnapshot {
+        AgentPoolSnapshot {
+            pool_id,
+            created: self.created,
+            members: self.members.values().cloned().collect(),
+            topics: self.topics.keys().cloned().collect(),
+            message_policy: self.message_policy.clone(),
+            wake_policy: self.wake_policy.clone(),
+            policy_refs: self.policy_refs.clone(),
+            messages: self.messages.values().cloned().collect(),
+            wakes: self.wakes.values().cloned().collect(),
+            cursor,
+        }
+    }
+
     fn index_member(&mut self, member: AgentPoolMember) {
         for topic in &member.topics {
             self.topics
@@ -1429,13 +1754,279 @@ impl AgentPoolState {
         }
         self.members.insert(member.run_id.clone(), member);
     }
+
+    fn remove_member(&mut self, run_id: &RunId) -> Result<AgentPoolMember, AgentError> {
+        let member = self.members.remove(run_id).ok_or_else(|| {
+            AgentError::new(
+                AgentErrorKind::InvalidStateTransition,
+                RetryClassification::NotRetryable,
+                "run is not a member of this agent pool",
+            )
+        })?;
+        for topic in &member.topics {
+            let remove_topic = if let Some(runs) = self.topics.get_mut(topic) {
+                runs.remove(run_id);
+                runs.is_empty()
+            } else {
+                false
+            };
+            if remove_topic {
+                self.topics.remove(topic);
+            }
+        }
+        Ok(member)
+    }
 }
 
-#[derive(Clone)]
-struct StoredWake {
-    condition: WakeCondition,
-    compiled_filter: CompiledEventFilter,
-    status: WakeRegistrationStatus,
+#[derive(Clone, Debug, Default)]
+/// In-memory `AgentPoolStore` implementation.
+/// Cloning this value shares the same backing map, making it useful for
+/// tests that simulate two process-local `AgentPool` handles sharing one
+/// coordination authority. Separate default values are isolated.
+pub struct InMemoryAgentPoolStore {
+    pools: Arc<Mutex<BTreeMap<AgentPoolId, AgentPoolState>>>,
+    records: Arc<Mutex<BTreeMap<AgentPoolId, Vec<AgentPoolStoreRecord>>>>,
+}
+
+impl InMemoryAgentPoolStore {
+    fn with_pool_state<T>(
+        &self,
+        pool_id: &AgentPoolId,
+        f: impl FnOnce(&mut AgentPoolState) -> Result<T, AgentError>,
+    ) -> Result<T, AgentError> {
+        let mut pools = self
+            .pools
+            .lock()
+            .map_err(|_| AgentError::contract_violation("agent pool store lock poisoned"))?;
+        let state = pools.get_mut(pool_id).ok_or_else(|| {
+            AgentError::new(
+                AgentErrorKind::HostConfigurationNeeded,
+                RetryClassification::HostConfigurationNeeded,
+                "agent pool store has not opened this pool",
+            )
+        })?;
+        f(state)
+    }
+
+    fn append_record(
+        &self,
+        pool_id: &AgentPoolId,
+        payload: AgentPoolStoreRecordPayload,
+    ) -> Result<AgentPoolStoreCursor, AgentError> {
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| AgentError::contract_violation("agent pool store lock poisoned"))?;
+        let entries = records.entry(pool_id.clone()).or_default();
+        let cursor = AgentPoolStoreCursor::new(entries.len() as u64 + 1);
+        entries.push(AgentPoolStoreRecord {
+            pool_id: pool_id.clone(),
+            cursor: cursor.clone(),
+            payload,
+        });
+        Ok(cursor)
+    }
+
+    fn latest_cursor(
+        &self,
+        pool_id: &AgentPoolId,
+    ) -> Result<Option<AgentPoolStoreCursor>, AgentError> {
+        let records = self
+            .records
+            .lock()
+            .map_err(|_| AgentError::contract_violation("agent pool store lock poisoned"))?;
+        Ok(records
+            .get(pool_id)
+            .and_then(|records| records.last().map(|record| record.cursor.clone())))
+    }
+}
+
+impl AgentPoolStore for InMemoryAgentPoolStore {
+    fn open_pool(
+        &self,
+        pool_id: AgentPoolId,
+        config: AgentPoolStoreConfig,
+    ) -> Result<AgentPoolSnapshot, AgentError> {
+        {
+            let mut pools = self
+                .pools
+                .lock()
+                .map_err(|_| AgentError::contract_violation("agent pool store lock poisoned"))?;
+            if let Some(existing) = pools.get(&pool_id) {
+                if existing.config() != config {
+                    return Err(AgentError::new(
+                        AgentErrorKind::InvalidStateTransition,
+                        RetryClassification::RepairNeeded,
+                        "agent pool store config conflicts with existing pool",
+                    ));
+                }
+            } else {
+                pools.insert(pool_id.clone(), AgentPoolState::new(config.clone()));
+                drop(pools);
+                self.append_record(&pool_id, AgentPoolStoreRecordPayload::PoolOpened { config })?;
+            }
+        }
+        self.snapshot(&pool_id)
+    }
+
+    fn snapshot(&self, pool_id: &AgentPoolId) -> Result<AgentPoolSnapshot, AgentError> {
+        let cursor = self.latest_cursor(pool_id)?;
+        let pools = self
+            .pools
+            .lock()
+            .map_err(|_| AgentError::contract_violation("agent pool store lock poisoned"))?;
+        pools
+            .get(pool_id)
+            .map(|state| state.snapshot(pool_id.clone(), cursor))
+            .ok_or_else(|| {
+                AgentError::new(
+                    AgentErrorKind::HostConfigurationNeeded,
+                    RetryClassification::HostConfigurationNeeded,
+                    "agent pool store has not opened this pool",
+                )
+            })
+    }
+
+    fn record_pool_created(
+        &self,
+        pool_id: &AgentPoolId,
+    ) -> Result<AgentPoolStoreCursor, AgentError> {
+        self.with_pool_state(pool_id, |state| {
+            state.created = true;
+            Ok(())
+        })?;
+        self.append_record(pool_id, AgentPoolStoreRecordPayload::PoolCreated)
+    }
+
+    fn join_member(
+        &self,
+        pool_id: &AgentPoolId,
+        member: AgentPoolMember,
+    ) -> Result<AgentPoolStoreCursor, AgentError> {
+        self.with_pool_state(pool_id, |state| {
+            state.index_member(member.clone());
+            Ok(())
+        })?;
+        self.append_record(
+            pool_id,
+            AgentPoolStoreRecordPayload::MemberJoined { member },
+        )
+    }
+
+    fn leave_member(
+        &self,
+        pool_id: &AgentPoolId,
+        run_id: &RunId,
+    ) -> Result<(AgentPoolMember, AgentPoolStoreCursor), AgentError> {
+        let member = self.with_pool_state(pool_id, |state| state.remove_member(run_id))?;
+        let cursor = self.append_record(
+            pool_id,
+            AgentPoolStoreRecordPayload::MemberLeft {
+                member: member.clone(),
+            },
+        )?;
+        Ok((member, cursor))
+    }
+
+    fn message_receipt(
+        &self,
+        pool_id: &AgentPoolId,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Option<MessageReceipt>, AgentError> {
+        self.with_pool_state(pool_id, |state| {
+            Ok(state.message_dedupe.get(idempotency_key).cloned())
+        })
+    }
+
+    fn record_message(
+        &self,
+        pool_id: &AgentPoolId,
+        message: RunMessage,
+        receipt: MessageReceipt,
+    ) -> Result<AgentPoolStoreCursor, AgentError> {
+        let stored = AgentPoolStoredMessage { message, receipt };
+        self.with_pool_state(pool_id, |state| {
+            state.message_dedupe.insert(
+                stored.message.idempotency_key.clone(),
+                stored.receipt.clone(),
+            );
+            state
+                .messages
+                .insert(stored.message.message_id.clone(), stored.clone());
+            Ok(())
+        })?;
+        self.append_record(pool_id, AgentPoolStoreRecordPayload::RunMessage { stored })
+    }
+
+    fn wake_registration(
+        &self,
+        pool_id: &AgentPoolId,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Option<WakeRegistration>, AgentError> {
+        self.with_pool_state(pool_id, |state| {
+            Ok(state.wake_dedupe.get(idempotency_key).cloned())
+        })
+    }
+
+    fn wake(
+        &self,
+        pool_id: &AgentPoolId,
+        condition_id: &WakeConditionId,
+    ) -> Result<Option<AgentPoolStoredWake>, AgentError> {
+        self.with_pool_state(pool_id, |state| Ok(state.wakes.get(condition_id).cloned()))
+    }
+
+    fn record_wake(
+        &self,
+        pool_id: &AgentPoolId,
+        condition: WakeCondition,
+        compiled_filter: CompiledEventFilter,
+        registration: WakeRegistration,
+    ) -> Result<AgentPoolStoreCursor, AgentError> {
+        let stored = AgentPoolStoredWake {
+            condition,
+            compiled_filter,
+            registration,
+        };
+        self.with_pool_state(pool_id, |state| {
+            state.wake_dedupe.insert(
+                stored.condition.idempotency_key.clone(),
+                stored.registration.clone(),
+            );
+            state
+                .wakes
+                .insert(stored.condition.condition_id.clone(), stored.clone());
+            Ok(())
+        })?;
+        self.append_record(pool_id, AgentPoolStoreRecordPayload::Wake { stored })
+    }
+
+    fn watch(
+        &self,
+        pool_id: &AgentPoolId,
+        cursor: Option<AgentPoolStoreCursor>,
+    ) -> Result<AgentPoolStoreStream, AgentError> {
+        let start_after = cursor.map(|cursor| cursor.sequence).unwrap_or(0);
+        let records = self
+            .records
+            .lock()
+            .map_err(|_| AgentError::contract_violation("agent pool store lock poisoned"))?;
+        Ok(AgentPoolStoreStream::new(
+            records
+                .get(pool_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|record| record.cursor.sequence > start_after),
+        ))
+    }
+
+    fn next_event_sequence(&self, pool_id: &AgentPoolId) -> Result<u64, AgentError> {
+        self.with_pool_state(pool_id, |state| {
+            state.next_event_counter += 1;
+            Ok(state.next_event_counter)
+        })
+    }
 }
 
 impl From<RunAddressTarget> for RunMessageAddressTargetRecord {
@@ -1523,4 +2114,17 @@ fn intersect_run_ids(filter: &EventFilterSet<RunId>, allowed: &[RunId]) -> Event
                 .collect(),
         ),
     }
+}
+
+fn topics_from_members(members: &[AgentPoolMember]) -> BTreeMap<TopicId, BTreeSet<RunId>> {
+    let mut topics = BTreeMap::new();
+    for member in members {
+        for topic in &member.topics {
+            topics
+                .entry(topic.clone())
+                .or_insert_with(BTreeSet::new)
+                .insert(member.run_id.clone());
+        }
+    }
+    topics
 }
