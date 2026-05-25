@@ -1,3 +1,7 @@
+//! Toolkit pack assembly helpers. Use these modules to turn toolkit operations into
+//! core package capabilities, sidecars, and routes. Pack assembly is data-only and
+//! does not execute tools or mutate a runtime package until explicitly installed.
+//!
 mod bundle;
 mod snapshot;
 

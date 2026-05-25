@@ -1,3 +1,8 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls.
+//!
 mod archive;
 mod dispatch;
 mod legacy_office;

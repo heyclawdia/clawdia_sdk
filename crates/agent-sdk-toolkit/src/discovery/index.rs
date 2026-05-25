@@ -1,3 +1,7 @@
+//! Tool discovery index and activation delta helpers. Use this module to search
+//! hidden toolkit candidates and construct package deltas for later activation.
+//! Searching is data-only; applying the returned delta is a separate package step.
+//!
 use std::collections::BTreeMap;
 
 use agent_sdk_core::{
@@ -8,20 +12,30 @@ use agent_sdk_core::{
 use super::types::ToolDiscoveryCandidate;
 
 #[derive(Clone, Debug, Default)]
+/// Discovery tool discovery index request or result value.
+/// Creating the value does not register tools; discovery executors document catalog and package-bundle effects.
 pub struct ToolDiscoveryIndex {
     candidates: BTreeMap<String, ToolPackSnapshot>,
 }
 
 impl ToolDiscoveryIndex {
+    /// Creates a new discovery::index value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Adds data to this in-memory discovery::index collection. It does not
+    /// perform external I/O, execute tools, or append journals.
     pub fn insert(&mut self, snapshot: ToolPackSnapshot) {
         self.candidates
             .insert(snapshot.pack_id.as_str().to_string(), snapshot);
     }
 
+    /// Searches the in-memory discovery index for pack IDs or tool names that
+    /// contain the query string. This is read-only and does not activate the
+    /// returned candidates.
     pub fn search(&self, query: &str) -> Vec<ToolDiscoveryCandidate> {
         self.candidates
             .iter()
@@ -44,6 +58,9 @@ impl ToolDiscoveryIndex {
             .collect()
     }
 
+    /// Builds the package delta needed to activate one discovered candidate.
+    /// The active runtime package is not mutated until the caller applies the
+    /// returned delta through `RuntimePackage::apply_delta`.
     pub fn activation_delta(
         &self,
         pack_id: &str,

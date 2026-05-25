@@ -1,3 +1,7 @@
+//! Scripted ACP protocol harnesses for SDK consumers. Use these fakes in tests to
+//! prove lifecycle and message exchange without a live editor or product host.
+//! Harness methods mutate in-memory endpoint transcripts only.
+//!
 use std::collections::{BTreeMap, BTreeSet};
 
 use agent_sdk_core::AgentError;
@@ -15,12 +19,17 @@ enum ReceiveNext {
 }
 
 #[derive(Clone, Debug)]
+/// In-memory scripted acp client fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct ScriptedAcpClient {
     endpoint: JsonRpcLineEndpoint,
     next_id: i64,
 }
 
 impl ScriptedAcpClient {
+    /// Creates a new testing::protocol::acp value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(endpoint: JsonRpcLineEndpoint) -> Self {
         Self {
             endpoint,
@@ -28,10 +37,16 @@ impl ScriptedAcpClient {
         }
     }
 
+    /// Returns the endpoint currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn endpoint(&self) -> &JsonRpcLineEndpoint {
         &self.endpoint
     }
 
+    /// Initialize.
+    /// This appends the corresponding JSON-RPC frame to the scripted ACP mock transcript and
+    /// returns the request id when applicable.
     pub fn initialize(&mut self) -> Result<JsonRpcId, AgentError> {
         self.request(
             "initialize",
@@ -49,6 +64,9 @@ impl ScriptedAcpClient {
         )
     }
 
+    /// Queues an ACP `session/new` request in the scripted client transcript.
+    /// This mutates only the in-memory JSON-RPC endpoint and returns the request id; no live ACP
+    /// server, journal, event bus, or process is contacted.
     pub fn new_session(&mut self, cwd: impl Into<String>) -> Result<JsonRpcId, AgentError> {
         self.request(
             "session/new",
@@ -59,6 +77,8 @@ impl ScriptedAcpClient {
         )
     }
 
+    /// Prompt.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn prompt(
         &mut self,
         session_id: impl Into<String>,
@@ -73,12 +93,18 @@ impl ScriptedAcpClient {
         )
     }
 
+    /// Cancel.
+    /// This appends the corresponding JSON-RPC frame to the scripted ACP mock transcript and
+    /// returns the request id when applicable.
     pub fn cancel(&self, session_id: impl Into<String>) -> Result<(), AgentError> {
         self.endpoint
             .send_notification("session/cancel", json!({"sessionId": session_id.into()}))
             .map(|_| ())
     }
 
+    /// Handle next.
+    /// This consumes one queued JSON-RPC frame from the in-memory endpoint and mutates only
+    /// scripted mock state.
     pub fn handle_next(&mut self, endpoint: &JsonRpcLineEndpoint) -> Result<bool, AgentError> {
         let frame = match receive_frame_or_parse_error(endpoint)? {
             ReceiveNext::Empty => return Ok(false),
@@ -113,10 +139,15 @@ impl ScriptedAcpClient {
         Ok(true)
     }
 
+    /// Returns the response currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn response(&self) -> Result<JsonRpcResponse, AgentError> {
         expect_response(self.endpoint.receive_frame()?)
     }
 
+    /// Returns notification for this testing::protocol::acp value without
+    /// performing external I/O.
     pub fn notification(&self) -> Result<JsonRpcNotification, AgentError> {
         expect_notification(self.endpoint.receive_frame()?)
     }
@@ -131,6 +162,8 @@ impl ScriptedAcpClient {
 }
 
 #[derive(Clone, Debug)]
+/// In-memory scripted acp agent fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct ScriptedAcpAgent {
     session_id: String,
     prompt_outputs: BTreeMap<String, String>,
@@ -139,6 +172,9 @@ pub struct ScriptedAcpAgent {
 }
 
 impl ScriptedAcpAgent {
+    /// Creates a new testing::protocol::acp value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(session_id: impl Into<String>) -> Self {
         Self {
             session_id: session_id.into(),
@@ -148,6 +184,9 @@ impl ScriptedAcpAgent {
         }
     }
 
+    /// Returns this value with its prompt output setting replaced. The
+    /// method follows builder-style data construction and does not
+    /// execute external work.
     pub fn with_prompt_output(
         mut self,
         prompt: impl Into<String>,
@@ -157,6 +196,9 @@ impl ScriptedAcpAgent {
         self
     }
 
+    /// Handle next.
+    /// This consumes one queued JSON-RPC frame from the in-memory endpoint and mutates only
+    /// scripted mock state.
     pub fn handle_next(&mut self, endpoint: &JsonRpcLineEndpoint) -> Result<bool, AgentError> {
         let frame = match receive_frame_or_parse_error(endpoint)? {
             ReceiveNext::Empty => return Ok(false),
@@ -232,6 +274,8 @@ impl ScriptedAcpAgent {
         Ok(true)
     }
 
+    /// Request file read.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn request_file_read(
         &mut self,
         endpoint: &JsonRpcLineEndpoint,
@@ -248,6 +292,8 @@ impl ScriptedAcpAgent {
             .map(|_| id)
     }
 
+    /// Request terminal create.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn request_terminal_create(
         &mut self,
         endpoint: &JsonRpcLineEndpoint,
@@ -269,6 +315,8 @@ impl ScriptedAcpAgent {
             .map(|_| id)
     }
 
+    /// Request permission.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn request_permission(
         &mut self,
         endpoint: &JsonRpcLineEndpoint,
@@ -292,10 +340,15 @@ impl ScriptedAcpAgent {
             .map(|_| id)
     }
 
+    /// Returns the response currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn response(&self, endpoint: &JsonRpcLineEndpoint) -> Result<JsonRpcResponse, AgentError> {
         expect_response(endpoint.receive_frame()?)
     }
 
+    /// Cancelled sessions.
+    /// This reads the scripted ACP mock cancellation set without sending a frame.
     pub fn cancelled_sessions(&self) -> BTreeSet<String> {
         self.cancelled_sessions.clone()
     }

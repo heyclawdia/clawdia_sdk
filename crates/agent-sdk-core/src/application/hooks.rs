@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the hooks portion of that contract.
+//!
 use crate::{
     domain::{AgentError, AgentErrorKind, AgentId, DestinationRef, RunId, SourceRef},
     error::{CausalIds, RetryClassification},
@@ -13,18 +19,35 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds hook lifecycle context application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct HookLifecycleContext {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Turn identifier for one loop turn within a run.
     pub turn_id: Option<crate::domain::TurnId>,
+    /// Attempt identifier for retry, repair, provider, or tool execution
+    /// evidence.
     pub attempt_id: Option<crate::domain::AttemptId>,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Destination label or ref for this item; it is metadata and does not
+    /// deliver content by itself.
     pub destination: Option<DestinationRef>,
+    /// Deterministic package fingerprint used for stale checks, package
+    /// evidence, or replay comparisons.
     pub package_fingerprint: RuntimePackageFingerprint,
+    /// Cancellation used by this record or request.
     pub cancellation: HookCancellationToken,
 }
 
 impl HookLifecycleContext {
+    /// Creates a new application::hooks value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         run_id: RunId,
         agent_id: AgentId,
@@ -44,6 +67,8 @@ impl HookLifecycleContext {
     }
 }
 
+/// Holds hook lifecycle coordinator application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct HookLifecycleCoordinator<'a, R, J>
 where
     R: HookExecutorRegistry,
@@ -59,6 +84,9 @@ where
     R: HookExecutorRegistry,
     J: RunJournal,
 {
+    /// Creates a new application::hooks value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(registry: &'a R, journal: &'a J, next_journal_seq: u64) -> Self {
         Self {
             registry,
@@ -67,10 +95,16 @@ where
         }
     }
 
+    /// Validates the application::hooks invariants and returns a typed
+    /// error on failure. Validation is pure and does not perform I/O,
+    /// dispatch, journal appends, or adapter calls.
     pub fn validate_package_hooks(&self, specs: &[HookSpec]) -> Result<(), AgentError> {
         validate_package_hooks(specs, self.registry)
     }
 
+    /// Invoke point.
+    /// This invokes the configured hooks for one hook point and returns their responses; hook
+    /// side effects stay behind the registered hook executors.
     pub fn invoke_point(
         &mut self,
         specs: &[HookSpec],
@@ -276,6 +310,9 @@ where
     }
 }
 
+/// Validates the application::hooks invariants and returns a typed
+/// error on failure. Validation is pure and does not perform I/O,
+/// dispatch, journal appends, or adapter calls.
 pub fn validate_package_hooks<R>(specs: &[HookSpec], registry: &R) -> Result<(), AgentError>
 where
     R: HookExecutorRegistry,
@@ -297,12 +334,23 @@ where
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds hook invocation outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct HookInvocationOutcome {
+    /// Stable hook id used for typed lineage, lookup, or dedupe.
     pub hook_id: crate::package_hooks::HookId,
+    /// Finite status for this record or lifecycle stage.
     pub status: HookInvocationStatus,
+    /// Classification value for response class.
+    /// Policy and projection paths use it for finite routing decisions.
     pub response_class: Option<HookResponseClass>,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub journal_cursor: Option<JournalCursor>,
+    /// Whether journaled before apply is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub journaled_before_apply: bool,
+    /// Record used by this record or request.
     pub record: HookRecord,
 }
 
@@ -351,13 +399,22 @@ impl HookInvocationOutcome {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Enumerates the finite hook invocation status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum HookInvocationStatus {
+    /// Use this variant when the contract needs to represent completed; selecting it has no side effect by itself.
     Completed,
+    /// Use this variant when the contract needs to represent applied journaled mutation; selecting it has no side effect by itself.
     AppliedJournaledMutation,
+    /// Use this variant when the contract needs to represent rejected mutation right; selecting it has no side effect by itself.
     RejectedMutationRight,
+    /// Use this variant when the contract needs to represent rejected point matrix; selecting it has no side effect by itself.
     RejectedPointMatrix,
+    /// Use this variant when the contract needs to represent timed out fail open; selecting it has no side effect by itself.
     TimedOutFailOpen,
+    /// Use this variant when the contract needs to represent failed open; selecting it has no side effect by itself.
     FailedOpen,
+    /// Use this variant when the contract needs to represent cancelled; selecting it has no side effect by itself.
     Cancelled,
 }
 

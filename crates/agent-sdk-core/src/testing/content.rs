@@ -1,3 +1,9 @@
+//! Deterministic test-kit helpers for SDK consumers. Use these fakes and harnesses to
+//! exercise public contracts without live providers, real stores, product UI, network
+//! telemetry, or wall-clock-dependent infrastructure. They mutate only their
+//! in-memory state unless noted. This file contains the content portion of that
+//! contract.
+//!
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -14,16 +20,24 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Default)]
+/// In-memory fake content resolver fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct FakeContentResolver {
     entries: Arc<Mutex<BTreeMap<ContentId, FakeResolvedContent>>>,
 }
 
 impl FakeContentResolver {
+    /// Insert text.
+    /// This reads or mutates deterministic in-memory test state unless the method explicitly
+    /// names a fixture file.
     pub fn insert_text(&self, content_ref: &ContentRef, text: impl Into<String>) {
         self.store_resolved_content(content_ref, text.into().into_bytes())
             .expect("fake content resolver insert");
     }
 
+    /// Assert conformance.
+    /// This reads or mutates deterministic in-memory test state unless the method explicitly
+    /// names a fixture file.
     pub fn assert_conformance<R: ContentResolver>(
         resolver: &R,
         present_ref: ContentRef,

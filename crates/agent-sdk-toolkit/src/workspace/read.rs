@@ -1,3 +1,8 @@
+//! Workspace read tool executor and request lowering. Use this toolkit module for
+//! bounded reads that produce content refs and metadata. Reads touch the local
+//! workspace through an explicit bounded policy and never grant ambient provider
+//! visibility.
+//!
 use std::{fs, io::Read, sync::Arc};
 
 use agent_sdk_core::{
@@ -25,33 +30,71 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace read request request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceReadRequest {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Maximum byte budget the caller requested before truncation or summary
+    /// behavior is applied.
     pub max_bytes: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace read output request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceReadOutput {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Detected or declared MIME type used for reader selection and
+    /// provider-safe summaries.
     pub mime_type: String,
+    /// Detected used by this record or request.
     pub detected: WorkspaceReadDetection,
+    /// Collection of reader pipeline values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub reader_pipeline: Vec<WorkspaceReaderStep>,
+    /// Observed byte length for the source, sidecar, or extracted record.
     pub byte_len: u64,
+    /// Stable hash for the bytes or canonical payload used for stale checks
+    /// and fingerprints.
     pub content_hash: String,
+    /// Whether output was shortened by byte, item, page, archive, or parser
+    /// limits.
     pub truncated: bool,
+    /// Whether the input is treated as binary so raw bytes are not exposed by
+    /// default.
     pub binary: bool,
+    /// Hashline anchors and line metadata used for stale-read detection and
+    /// edit planning.
     pub anchors: Vec<HashLineAnchor>,
+    /// Bounded textual content extracted for caller use; absent for binary
+    /// summaries or denied raw access.
     pub content: String,
+    /// Redacted or bounded summary used when raw content is absent or
+    /// truncated.
     pub content_summary: Option<String>,
+    /// Media metadata extracted without exposing raw media bytes.
     pub media: Option<WorkspaceMediaMetadata>,
+    /// Document metadata such as parser, page/slide/sheet counts, and
+    /// extraction warnings.
     pub document: Option<WorkspaceDocumentMetadata>,
+    /// Archive listing metadata with truncation and decompression warnings.
     pub archive: Option<WorkspaceArchiveMetadata>,
+    /// SQLite schema/sample metadata gathered under bounded read limits.
     pub sqlite: Option<WorkspaceSqliteMetadata>,
+    /// Resource/URI metadata resolved through an explicit resolver.
     pub resource: Option<WorkspaceResourceMetadata>,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 impl BoundedWorkspace {
+    /// Reads one bounded workspace path or supported URI. The method may inspect
+    /// file bytes under `BoundedWorkspace` policy and returns structured
+    /// metadata/content, but it never mutates files.
     pub fn read(&self, request: &WorkspaceReadRequest) -> Result<WorkspaceReadOutput, AgentError> {
         let max_output_bytes = request
             .max_bytes
@@ -148,6 +191,8 @@ fn is_uri_read(path: &str) -> bool {
 }
 
 #[derive(Clone)]
+/// Workspace workspace read executor request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceReadExecutor {
     executor_ref: ExecutorRef,
     workspace: Arc<BoundedWorkspace>,
@@ -156,6 +201,9 @@ pub struct WorkspaceReadExecutor {
 }
 
 impl WorkspaceReadExecutor {
+    /// Creates a new workspace::read value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         workspace: Arc<BoundedWorkspace>,
         arguments: InMemoryJsonArgumentStore,
@@ -169,6 +217,9 @@ impl WorkspaceReadExecutor {
         }
     }
 
+    /// Pack bundle.
+    /// This returns the toolkit pack bundle that registers the operation route; it does not
+    /// execute the operation.
     pub fn pack_bundle(
         source: agent_sdk_core::SourceRef,
         policy_ref: PolicyRef,

@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the text portion of that contract.
+//!
 use agent_sdk_core::{AgentError, AgentErrorKind, RetryClassification};
 
 use super::{RenderedRead, TRUNCATION_GUIDANCE};
@@ -7,6 +13,9 @@ use crate::workspace::{
     util::{hash_line, truncate_bytes},
 };
 
+/// Render utf8 text.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_utf8_text(
     bytes: &[u8],
     max_output_bytes: u64,
@@ -22,6 +31,9 @@ pub(super) fn render_utf8_text(
     Ok(render_text(&text, max_output_bytes, editable, false))
 }
 
+/// Renders or detects bounded workspace content for workspace::readers::text.
+/// It may read already-approved local file data but does not mutate the
+/// workspace.
 pub(super) fn render_text(
     text: &str,
     max_output_bytes: u64,

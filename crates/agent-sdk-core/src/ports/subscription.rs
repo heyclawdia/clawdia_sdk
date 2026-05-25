@@ -1,3 +1,9 @@
+//! Host adapter boundaries for the SDK core. Use these traits and registries when
+//! hosts provide providers, journals, sinks, tools, isolation, extensions, telemetry,
+//! or subscriptions. Implementations may perform external side effects and must honor
+//! policy, redaction, idempotency, and replay contracts. This file contains the
+//! subscription portion of that contract.
+//!
 use std::sync::{Arc, Mutex};
 
 use crate::{
@@ -13,43 +19,70 @@ use crate::{
     event_bus::AgentEventStream,
 };
 
+/// Port or behavior contract for run subscription source. Implementors
+/// should preserve policy, redaction, idempotency, and replay
+/// expectations from the surrounding module. Implementations may
+/// perform side effects only as described by the trait methods.
 pub trait RunSubscriptionSource: Send + Sync {
+    /// Creates a read-only event stream for all visible events.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     fn subscribe_all(&self, cursor: Option<EventCursor>) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a read-only event stream scoped to one run.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     fn subscribe_run(
         &self,
         run_id: RunId,
         cursor: Option<EventCursor>,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a read-only event stream scoped to one agent.
+    /// Implementations create a read-only subscription or replay stream; the call must not
+    /// start runs, publish events, or append journal records.
     fn subscribe_agent(
         &self,
         agent_id: AgentId,
         cursor: Option<EventCursor>,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a read-only event stream matching a compiled filter.
+    /// Implementations create a read-only subscription or replay stream; the call must not
+    /// start runs, publish events, or append journal records.
     fn subscribe_events(
         &self,
         filter: CompiledEventFilter,
         cursor: Option<EventCursor>,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Replays one run from durable cursor state.
+    /// Implementations create a read-only subscription or replay stream; the call must not
+    /// start runs, publish events, or append journal records.
     fn replay_run_from_cursor(
         &self,
         run_id: RunId,
         cursor: JournalCursor,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Reads the latest terminal event for one run, when available.
+    /// Implementations read subscription state for the latest terminal frame; the lookup must
+    /// not publish events or alter run state.
     fn latest_terminal_event(&self, run_id: &RunId) -> Result<Option<EventFrame>, AgentError>;
 }
 
 #[derive(Clone, Debug, Default)]
+/// Carries in memory subscription hub data across a host-port boundary.
+/// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct InMemorySubscriptionHub {
     frames: Arc<Mutex<Vec<EventFrame>>>,
     live_floor_seq: Arc<Mutex<u64>>,
 }
 
 impl InMemorySubscriptionHub {
+    /// Mutates the in-memory event/subscription state and may wake local
+    /// subscribers. It does not persist durable journal truth or call network
+    /// sinks.
     pub fn publish(&self, frame: EventFrame) -> Result<(), AgentError> {
         self.frames
             .lock()
@@ -58,6 +91,9 @@ impl InMemorySubscriptionHub {
         Ok(())
     }
 
+    /// Mutates the in-memory event/subscription state and may wake local
+    /// subscribers. It does not persist durable journal truth or call network
+    /// sinks.
     pub fn publish_all(
         &self,
         frames: impl IntoIterator<Item = EventFrame>,
@@ -70,6 +106,9 @@ impl InMemorySubscriptionHub {
         Ok(())
     }
 
+    /// Mutates the in-memory event/subscription state and may wake local
+    /// subscribers. It does not persist durable journal truth or call network
+    /// sinks.
     pub fn expire_live_before(&self, event_seq: u64) -> Result<(), AgentError> {
         *self
             .live_floor_seq
@@ -79,6 +118,9 @@ impl InMemorySubscriptionHub {
         Ok(())
     }
 
+    /// Builds the frames value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn frames(&self) -> Result<Vec<EventFrame>, AgentError> {
         Ok(self
             .frames

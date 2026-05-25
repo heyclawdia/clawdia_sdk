@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the legacy office portion of that contract.
+//!
 use std::{
     fs,
     io::Read,
@@ -10,6 +16,9 @@ use crate::workspace::{
     util::{tool_failure, truncate_bytes},
 };
 
+/// Renders or detects bounded workspace content for
+/// workspace::readers::legacy_office. It may read already-approved local file
+/// data but does not mutate the workspace.
 pub(super) fn render_legacy_office(
     path: &Path,
     bytes: &[u8],

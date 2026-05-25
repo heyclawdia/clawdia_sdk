@@ -1,3 +1,9 @@
+//! Runtime-package records and builders. Use these items to describe the immutable
+//! per-run package that freezes provider route, capabilities, policies, sidecars,
+//! catalogs, and fingerprints. Builders are data-only and must not perform discovery
+//! or execution side effects. This file contains the subagent portion of that
+//! contract.
+//!
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -12,19 +18,41 @@ use crate::{
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite context handoff policy cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ContextHandoffPolicy {
+    /// Use this variant when the contract needs to represent none; selecting it has no side effect by itself.
     None,
+    /// Use this variant when the contract needs to represent summary only; selecting it has no side effect by itself.
     SummaryOnly {
+        /// Typed summary ref reference. Resolving or executing it is a
+        /// separate policy-gated step.
         summary_ref: ContentRefId,
+        /// Maximum allowed tokens.
+        /// Use it to keep execution, output, or diagnostics bounded.
         max_tokens: u32,
+        /// Policy reference that must be resolved by the host or runtime
+        /// before execution.
         policy_ref: PolicyRef,
     },
+    /// Use this variant when the contract needs to represent selected refs; selecting it has no side effect by itself.
     SelectedRefs {
+        /// References associated with refs.
+        /// Resolve them through the appropriate registry or content store before using
+        /// referenced data.
         refs: Vec<ContentRefId>,
+        /// Policy reference that must be resolved by the host or runtime
+        /// before execution.
         policy_ref: PolicyRef,
     },
+    /// Use this variant when the contract needs to represent full history with policy; selecting it has no side effect by itself.
     FullHistoryWithPolicy {
+        /// Policy reference that must be resolved by the host or runtime
+        /// before execution.
         policy_ref: PolicyRef,
+        /// Whether child context handoff must include provider-projection audit evidence.
+        /// Use this to fail closed when subagent context would otherwise cross a policy
+        /// boundary without audit proof.
         projection_audit_required: bool,
     },
 }
@@ -36,6 +64,9 @@ impl Default for ContextHandoffPolicy {
 }
 
 impl ContextHandoffPolicy {
+    /// Validates the package::subagent invariants and returns a typed
+    /// error on failure. Validation is pure and does not perform I/O,
+    /// dispatch, journal appends, or adapter calls.
     pub fn validate(&self) -> Result<(), AgentError> {
         match self {
             Self::None => Ok(()),
@@ -73,6 +104,9 @@ impl ContextHandoffPolicy {
         }
     }
 
+    /// Returns policy refs for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn policy_refs(&self) -> Vec<PolicyRef> {
         match self {
             Self::None => Vec::new(),
@@ -82,6 +116,9 @@ impl ContextHandoffPolicy {
         }
     }
 
+    /// Returns selected content refs for callers that need to inspect the contract state.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn selected_content_refs(&self) -> Vec<ContentRefId> {
         match self {
             Self::None | Self::FullHistoryWithPolicy { .. } => Vec::new(),
@@ -90,6 +127,9 @@ impl ContextHandoffPolicy {
         }
     }
 
+    /// Returns variant name for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn variant_name(&self) -> &'static str {
         match self {
             Self::None => "none",
@@ -102,19 +142,35 @@ impl ContextHandoffPolicy {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite route inheritance mode cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum RouteInheritanceMode {
+    /// Use this variant when the contract needs to represent inherit parent; selecting it has no side effect by itself.
     InheritParent,
+    /// Use this variant when the contract needs to represent explicit override only; selecting it has no side effect by itself.
     ExplicitOverrideOnly,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite subagent route policy cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum SubagentRoutePolicy {
+    /// Use this variant when the contract needs to represent inherit parent; selecting it has no side effect by itself.
     InheritParent,
-    UseAllowedOverride { route_id: String, model_id: String },
+    /// Use this variant when the contract needs to represent use allowed override; selecting it has no side effect by itself.
+    UseAllowedOverride {
+        /// Stable route id used for typed lineage, lookup, or dedupe.
+        route_id: String,
+        /// Stable model id used for typed lineage, lookup, or dedupe.
+        model_id: String,
+    },
 }
 
 impl SubagentRoutePolicy {
+    /// Returns selected route for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn selected_route(
         &self,
         parent: &ProviderRouteSnapshot,
@@ -140,20 +196,38 @@ impl SubagentRoutePolicy {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the child runtime package policy portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ChildRuntimePackagePolicy {
+    /// Source parent package used by this record or request.
     pub source_parent_package: RuntimePackageFingerprint,
+    /// Inherit provider route used by this record or request.
     pub inherit_provider_route: RouteInheritanceMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Allowlist for this policy or contract.
+    /// Validation uses it to reject undeclared or policy-denied values.
     pub allowed_route_overrides: Vec<String>,
+    /// Whether strip recursive subagents is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub strip_recursive_subagents: bool,
+    /// Allowlist for this policy or contract.
+    /// Validation uses it to reject undeclared or policy-denied values.
     pub strip_disallowed_tools: bool,
+    /// Child lifecycle bounds used by this record or request.
     pub child_lifecycle_bounds: PolicyRef,
+    /// Typed redaction policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub redaction_policy_ref: PolicyRef,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Identifiers used to select or correlate parent control tool values.
+    /// Use them for typed lookup, filtering, or lineage instead of stringly typed matching.
     pub parent_control_tool_ids: Vec<CapabilityId>,
 }
 
 impl ChildRuntimePackagePolicy {
+    /// Returns an updated value with strip recursive defaults configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn strip_recursive_defaults(source_parent_package: RuntimePackageFingerprint) -> Self {
         Self {
             source_parent_package,
@@ -176,11 +250,20 @@ impl ChildRuntimePackagePolicy {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite subagent tool policy cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum SubagentToolPolicy {
+    /// Use this variant when the contract needs to represent inherit allowlist; selecting it has no side effect by itself.
     InheritAllowlist,
+    /// Use this variant when the contract needs to represent read only; selecting it has no side effect by itself.
     ReadOnly,
+    /// Use this variant when the contract needs to represent no tools; selecting it has no side effect by itself.
     NoTools,
-    CustomAllowlist { capability_ids: Vec<CapabilityId> },
+    /// Use this variant when the contract needs to represent custom allowlist; selecting it has no side effect by itself.
+    CustomAllowlist {
+        /// Capability identifiers affected by this package or sidecar record.
+        capability_ids: Vec<CapabilityId>,
+    },
 }
 
 impl Default for SubagentToolPolicy {
@@ -203,13 +286,23 @@ impl SubagentToolPolicy {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the depth budget portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct DepthBudget {
+    /// Current depth used by this record or request.
     pub current_depth: u32,
+    /// Maximum allowed depth.
+    /// Use it to keep execution, output, or diagnostics bounded.
     pub max_depth: u32,
+    /// Maximum allowed children.
+    /// Use it to keep execution, output, or diagnostics bounded.
     pub max_children: u32,
 }
 
 impl DepthBudget {
+    /// Returns max depth for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn max_depth(max_depth: u32) -> Self {
         Self {
             current_depth: 0,
@@ -218,6 +311,9 @@ impl DepthBudget {
         }
     }
 
+    /// Validates the package::subagent invariants and returns a typed
+    /// error on failure. Validation is pure and does not perform I/O,
+    /// dispatch, journal appends, or adapter calls.
     pub fn validate_child_start(&self) -> Result<(), AgentError> {
         if self.max_depth == 0 || self.current_depth >= self.max_depth {
             return Err(AgentError::contract_violation(
@@ -232,6 +328,9 @@ impl DepthBudget {
         Ok(())
     }
 
+    /// Returns child budget for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn child_budget(&self) -> Self {
         Self {
             current_depth: self.current_depth + 1,
@@ -242,29 +341,57 @@ impl DepthBudget {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the child runtime package portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ChildRuntimePackage {
+    /// Package used by this record or request.
     pub package: RuntimePackage,
+    /// Deterministic fingerprint for package, event, telemetry, or validation
+    /// evidence.
     pub fingerprint: RuntimePackageFingerprint,
+    /// Strip manifest used by this record or request.
     pub strip_manifest: ChildPackageStripManifest,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the child package strip manifest portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ChildPackageStripManifest {
+    /// Deterministic parent package fingerprint used for stale checks,
+    /// package evidence, or replay comparisons.
     pub parent_package_fingerprint: RuntimePackageFingerprint,
+    /// Stable child agent id used for typed lineage, lookup, or dedupe.
     pub child_agent_id: AgentId,
+    /// Stable selected provider route id used for typed lineage, lookup, or
+    /// dedupe.
     pub selected_provider_route_id: String,
+    /// Handoff policy variant used by this record or request.
     pub handoff_policy_variant: String,
+    /// Tool policy used by this record or request.
     pub tool_policy: SubagentToolPolicy,
+    /// Whether recursive subagent strip is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub recursive_subagent_strip: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Identifiers used to select or correlate stripped capability values.
+    /// Use them for typed lookup, filtering, or lineage instead of stringly typed matching.
     pub stripped_capability_ids: Vec<CapabilityId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Identifiers used to select or correlate retained capability values.
+    /// Use them for typed lookup, filtering, or lineage instead of stringly typed matching.
     pub retained_capability_ids: Vec<CapabilityId>,
+    /// Typed lifecycle policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub lifecycle_policy_ref: PolicyRef,
+    /// Typed redaction policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub redaction_policy_ref: PolicyRef,
 }
 
 impl ChildPackageStripManifest {
+    /// Computes the stable content hash for this package::subagent
+    /// value. The computation is deterministic and side-effect free so
+    /// it can be used in package, journal, or test evidence.
     pub fn content_hash(&self) -> Result<String, AgentError> {
         let bytes = serde_json::to_vec(self).map_err(|error| {
             AgentError::contract_violation(format!(
@@ -275,6 +402,8 @@ impl ChildPackageStripManifest {
     }
 }
 
+/// Builds the build child runtime package value.
+/// This is data construction and performs no I/O, journal append, event publication, or process
 pub fn build_child_runtime_package(
     parent: &RuntimePackage,
     child_agent_id: AgentId,

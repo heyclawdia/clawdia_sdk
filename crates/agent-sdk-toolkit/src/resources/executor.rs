@@ -1,3 +1,7 @@
+//! Resource-reader executor. Use this module to resolve explicit resource URIs into
+//! content refs through a host-provided resolver and policy. Reads may touch backing
+//! stores selected by the resolver; network fetches remain host-owned.
+//!
 use agent_sdk_core::{
     AgentError, ExecutorRef, PolicyRef, ResourceReadRequest, ResourceRouteSnapshot, ResourceRouter,
     ToolExecutionOutput, ToolExecutionRequest, ToolExecutor, ToolPackId, ToolPackKind,
@@ -14,6 +18,8 @@ use crate::{
 use super::types::ResourceReaderRequest;
 
 #[derive(Clone)]
+/// Resource resource reader executor request or result value.
+/// Creating the value does not fetch content; resource executors document resolver and content-store effects.
 pub struct ResourceReaderExecutor {
     executor_ref: ExecutorRef,
     router: ResourceRouter,
@@ -22,6 +28,9 @@ pub struct ResourceReaderExecutor {
 }
 
 impl ResourceReaderExecutor {
+    /// Creates a new resources::executor value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         router: ResourceRouter,
         arguments: InMemoryJsonArgumentStore,
@@ -35,6 +44,9 @@ impl ResourceReaderExecutor {
         }
     }
 
+    /// Returns the pack bundle currently held by this value.
+    /// This returns the toolkit pack bundle that registers the executor routes; it does not
+    /// activate the pack itself.
     pub fn pack_bundle(
         source: agent_sdk_core::SourceRef,
         policy_ref: PolicyRef,

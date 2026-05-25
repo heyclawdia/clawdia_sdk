@@ -1,3 +1,9 @@
+//! Feature-layer agent-pool coordination over runs, messages, wake conditions, and
+//! subscriptions. Use this module for generic run-to-run coordination without
+//! introducing workflow-engine or product swarm behavior. Side-effecting operations may
+//! update pool membership, append source-run journal records, and publish agent-pool
+//! events through the configured runtime ports.
+//!
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{Arc, Mutex},
@@ -31,6 +37,8 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds agent pool application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentPool {
     pool_id: AgentPoolId,
     runtime: AgentRuntime,
@@ -38,6 +46,9 @@ pub struct AgentPool {
 }
 
 impl AgentPool {
+    /// Starts a builder for this application::agent_pool value.
+    /// Building is data-only; runtime side effects occur only when a
+    /// later coordinator or host port executes the built configuration.
     pub fn builder(pool_id: AgentPoolId) -> AgentPoolBuilder {
         AgentPoolBuilder {
             pool_id,
@@ -48,16 +59,24 @@ impl AgentPool {
         }
     }
 
+    /// Returns the pool id currently held by this value.
+    /// This is a data-only accessor and does not change membership or wake state.
     pub fn pool_id(&self) -> &AgentPoolId {
         &self.pool_id
     }
 
+    /// Starts a run through the shared runtime and joins it to this pool.
+    /// Runtime registration and provider-loop effects stay in `AgentRuntime`;
+    /// the pool side effect is membership tracking for coordination.
     pub fn start_run(&self, request: RunRequest) -> Result<RunHandle, AgentError> {
         let handle = self.runtime.start_run(request.clone())?;
         self.join_run(AgentPoolMember::new(request.run_id, request.agent_id))?;
         Ok(handle)
     }
 
+    /// Join run.
+    /// This records pool membership in the coordinator so later pool messages and subscriptions
+    /// can target the run.
     pub fn join_run(&self, member: AgentPoolMember) -> Result<(), AgentError> {
         let should_create = {
             let state = self.state()?;
@@ -88,10 +107,16 @@ impl AgentPool {
         Ok(())
     }
 
+    /// Returns the members currently held by this value.
+    /// This reads current pool membership without starting, stopping, or messaging runs.
     pub fn members(&self) -> Result<Vec<AgentPoolMember>, AgentError> {
         Ok(self.state()?.members.values().cloned().collect())
     }
 
+    /// Sends a run message through the pool coordinator.
+    /// This resolves the addressed members, applies pool message policy, appends accepted
+    /// and terminal delivery records to the source run journal, publishes the matching
+    /// agent-pool events, and deduplicates repeated calls by idempotency key.
     pub fn send(&self, message: RunMessage) -> Result<MessageReceipt, AgentError> {
         if let Some(receipt) = self
             .state()?
@@ -138,6 +163,10 @@ impl AgentPool {
         Ok(receipt)
     }
 
+    /// Records one run-message status transition.
+    /// This appends the status record to the source run journal, publishes the matching
+    /// agent-pool event on the runtime event bus, and returns a receipt carrying the journal
+    /// cursor. Use [`AgentPool::send`] for the full accept-to-terminal delivery flow.
     pub fn record_message_status(
         &self,
         message: &RunMessage,
@@ -170,6 +199,8 @@ impl AgentPool {
         })
     }
 
+    /// Subscribe.
+    /// This creates a read-only subscription scoped by pool membership and the supplied filter.
     pub fn subscribe(
         &self,
         filter: EventFilter,
@@ -179,6 +210,8 @@ impl AgentPool {
         self.runtime.subscribe_events(compiled, cursor)
     }
 
+    /// Computes or returns compile scoped filter for the
+    /// application::agent_pool contract without external I/O or side effects.
     pub fn compile_scoped_filter(
         &self,
         filter: EventFilter,
@@ -186,6 +219,9 @@ impl AgentPool {
         self.scope_filter(filter).compile()
     }
 
+    /// Returns scope filter derived from the supplied state.
+    /// This operates on the named coordinator state or selected port; it does not create a
+    /// parallel runtime path.
     pub fn scope_filter(&self, mut filter: EventFilter) -> EventFilter {
         let allowed_runs = self.observable_member_runs();
         filter.run_ids = intersect_run_ids(&filter.run_ids, &allowed_runs);
@@ -199,6 +235,9 @@ impl AgentPool {
         filter
     }
 
+    /// Registers a wake condition for a pool member run.
+    /// This mutates the pool's wake registry and dedupe index, scopes the event filter to current
+    /// members, and may poll the configured event subscription port to trigger immediately.
     pub fn suspend_until(
         &self,
         run_id: RunId,
@@ -265,6 +304,9 @@ impl AgentPool {
         Ok(registration)
     }
 
+    /// Polls a registered wake condition for a matching event.
+    /// This reads and may update pool wake state through `record_wake_status`; it creates a
+    /// read-only event subscription but does not cancel or advance the target run.
     pub fn poll_wake(
         &self,
         condition_id: &WakeConditionId,
@@ -306,6 +348,9 @@ impl AgentPool {
         )
     }
 
+    /// Cancel wake.
+    /// This marks a registered wake condition as cancelled in pool state; it does not cancel
+    /// the run itself.
     pub fn cancel_wake(
         &self,
         condition_id: &WakeConditionId,
@@ -756,6 +801,8 @@ impl AgentPool {
 }
 
 #[derive(Clone)]
+/// Holds agent pool builder application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentPoolBuilder {
     pool_id: AgentPoolId,
     runtime: Option<AgentRuntime>,
@@ -765,26 +812,38 @@ pub struct AgentPoolBuilder {
 }
 
 impl AgentPoolBuilder {
+    /// Returns an updated value with runtime configured.
+    /// This stores the runtime used by the pool builder; no run is started until `start_run` is
+    /// called.
     pub fn runtime(mut self, runtime: AgentRuntime) -> Self {
         self.runtime = Some(runtime);
         self
     }
 
+    /// Returns an updated value with message policy configured.
+    /// This is builder configuration only and performs no I/O or run coordination.
     pub fn message_policy(mut self, policy: AgentPoolMessagePolicy) -> Self {
         self.message_policy = policy;
         self
     }
 
+    /// Returns an updated value with wake policy configured.
+    /// This is builder configuration only and performs no I/O or run coordination.
     pub fn wake_policy(mut self, policy: AgentPoolWakePolicy) -> Self {
         self.wake_policy = policy;
         self
     }
 
+    /// Returns an updated value with policy ref configured.
+    /// This sets the policy reference on the coordination value and performs no I/O.
     pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.policy_refs.push(policy_ref);
         self
     }
 
+    /// Finishes builder validation and returns the configured value.
+    /// This is data-only unless the surrounding builder explicitly
+    /// documents adapter or store access.
     pub fn build(self) -> Result<AgentPool, AgentError> {
         let runtime = self
             .runtime
@@ -809,16 +868,28 @@ impl AgentPoolBuilder {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds agent pool member application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentPoolMember {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Policy references that govern admission, projection, execution, or
+    /// delivery.
     pub policy_refs: Vec<PolicyRef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Collection of topics values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub topics: Vec<TopicId>,
 }
 
 impl AgentPoolMember {
+    /// Creates a new application::agent_pool value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(run_id: RunId, agent_id: AgentId) -> Self {
         Self {
             run_id,
@@ -828,11 +899,16 @@ impl AgentPoolMember {
         }
     }
 
+    /// Returns an updated value with policy ref configured.
+    /// This sets the policy reference on the coordination value and performs no I/O.
     pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.policy_refs.push(policy_ref);
         self
     }
 
+    /// Returns an updated value with topic configured.
+    /// This sets the topic id on the address/filter value and performs no subscription by
+    /// itself.
     pub fn topic(mut self, topic_id: TopicId) -> Self {
         self.topics.push(topic_id);
         self
@@ -846,13 +922,22 @@ impl AgentPoolMember {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds agent pool message policy application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentPoolMessagePolicy {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Typed required policy refs references. Resolving them is separate from
+    /// constructing this record.
     pub required_policy_refs: Vec<PolicyRef>,
+    /// Whether pool broadcast delivery includes the sender run as a recipient.
+    /// Use this for explicit loopback semantics; the default coordination path should avoid
+    /// accidental self-delivery.
     pub include_sender_in_pool_broadcast: bool,
 }
 
 impl AgentPoolMessagePolicy {
+    /// Builds the bounded defaults value with the documented defaults.
+    /// This uses only local coordinator state and performs no hidden host work.
     pub fn bounded_defaults() -> Self {
         Self {
             required_policy_refs: Vec::new(),
@@ -868,11 +953,18 @@ impl AgentPoolMessagePolicy {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds agent pool wake policy application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentPoolWakePolicy {
+    /// Whether envelope only is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub envelope_only: bool,
 }
 
 impl AgentPoolWakePolicy {
+    /// Returns an updated value with safe defaults configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn safe_defaults() -> Self {
         Self {
             envelope_only: true,
@@ -881,14 +973,23 @@ impl AgentPoolWakePolicy {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds run address application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RunAddress {
+    /// Target used by this record or request.
     pub target: RunAddressTarget,
+    /// Typed destination reference that records where this item is being sent
+    /// or projected.
     pub destination_ref: DestinationRef,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Typed related refs references. Resolving them is separate from
+    /// constructing this record.
     pub related_refs: Vec<EntityRef>,
 }
 
 impl RunAddress {
+    /// Builds the run value with the documented defaults.
+    /// This uses only local coordinator state and performs no hidden host work.
     pub fn run(run_id: RunId) -> Self {
         Self {
             destination_ref: DestinationRef::with_kind(DestinationKind::Agent, run_id.as_str()),
@@ -897,6 +998,9 @@ impl RunAddress {
         }
     }
 
+    /// Returns agent for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn agent(agent_id: AgentId) -> Self {
         Self {
             destination_ref: DestinationRef::with_kind(DestinationKind::Agent, agent_id.as_str()),
@@ -905,6 +1009,9 @@ impl RunAddress {
         }
     }
 
+    /// Returns an updated value with topic configured.
+    /// This sets the topic id on the address/filter value and performs no subscription by
+    /// itself.
     pub fn topic(topic_id: TopicId) -> Self {
         Self {
             destination_ref: DestinationRef::with_kind(DestinationKind::Topic, topic_id.as_str()),
@@ -913,6 +1020,8 @@ impl RunAddress {
         }
     }
 
+    /// Builds the pool value with the documented defaults.
+    /// This uses only local coordinator state and performs no hidden host work.
     pub fn pool(pool_id: AgentPoolId) -> Self {
         Self {
             destination_ref: DestinationRef::with_kind(
@@ -927,14 +1036,35 @@ impl RunAddress {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite run address target cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum RunAddressTarget {
-    Run { run_id: RunId },
-    Agent { agent_id: AgentId },
-    Topic { topic_id: TopicId },
-    Pool { pool_id: AgentPoolId },
+    /// Use this variant when the contract needs to represent run; selecting it has no side effect by itself.
+    Run {
+        /// Run identifier used for lineage, filtering, replay, and dedupe.
+        run_id: RunId,
+    },
+    /// Use this variant when the contract needs to represent agent; selecting it has no side effect by itself.
+    Agent {
+        /// Agent identifier used for lineage, filtering, and ownership
+        /// checks.
+        agent_id: AgentId,
+    },
+    /// Use this variant when the contract needs to represent topic; selecting it has no side effect by itself.
+    Topic {
+        /// Stable topic id used for typed lineage, lookup, or dedupe.
+        topic_id: TopicId,
+    },
+    /// Use this variant when the contract needs to represent pool; selecting it has no side effect by itself.
+    Pool {
+        /// Stable pool id used for typed lineage, lookup, or dedupe.
+        pool_id: AgentPoolId,
+    },
 }
 
 impl RunAddressTarget {
+    /// Returns run id for this application::agent_pool value without
+    /// performing external I/O.
     pub fn run_id(&self) -> Option<&RunId> {
         match self {
             Self::Run { run_id } => Some(run_id),
@@ -944,24 +1074,46 @@ impl RunAddressTarget {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds run message application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RunMessage {
+    /// Message identifier for transcript, projection, or provider-response
+    /// lineage.
     pub message_id: MessageId,
+    /// From used by this record or request.
     pub from: RunId,
+    /// To used by this record or request.
     pub to: RunAddress,
+    /// Content reference where payload bytes or structured tool output are
+    /// stored.
     pub content_ref: ContentRef,
+    /// Correlation used by this record or request.
     pub correlation: EventCorrelation,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional reply to value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub reply_to: Option<MessageId>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional response contract value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub response_contract: Option<MessageResponseContract>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Time value in milliseconds for expires at millis.
+    /// Use it for timeout, ordering, or diagnostic calculations.
     pub expires_at_millis: Option<u64>,
+    /// Idempotency setting or key for deduping retries.
+    /// Use it to prevent duplicate side effects during replay or repair.
     pub idempotency_key: IdempotencyKey,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Policy references that govern admission, projection, execution, or
+    /// delivery.
     pub policy_refs: Vec<PolicyRef>,
 }
 
 impl RunMessage {
+    /// Creates a new application::agent_pool value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         message_id: MessageId,
         from: RunId,
@@ -983,6 +1135,8 @@ impl RunMessage {
         }
     }
 
+    /// Returns an updated value with policy ref configured.
+    /// This sets the policy reference on the coordination value and performs no I/O.
     pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.policy_refs.push(policy_ref);
         self
@@ -1002,13 +1156,20 @@ impl RunMessage {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds message response contract application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct MessageResponseContract {
+    /// Expected responses used by this record or request.
     pub expected_responses: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Time value in milliseconds for timeout millis.
+    /// Use it for timeout, ordering, or diagnostic calculations.
     pub timeout_millis: Option<u64>,
 }
 
 impl MessageResponseContract {
+    /// Builds the one response value with the documented defaults.
+    /// This uses only local coordinator state and performs no hidden host work.
     pub fn one_response(timeout_millis: u64) -> Self {
         Self {
             expected_responses: 1,
@@ -1018,24 +1179,43 @@ impl MessageResponseContract {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds message receipt application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct MessageReceipt {
+    /// Message identifier for transcript, projection, or provider-response
+    /// lineage.
     pub message_id: MessageId,
+    /// Finite status for this record or lifecycle stage.
     pub status: MessageStatus,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Collection of delivered to values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub delivered_to: Vec<RunId>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub journal_cursor: Option<JournalCursor>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite message status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum MessageStatus {
+    /// Use this variant when the contract needs to represent accepted; selecting it has no side effect by itself.
     Accepted,
+    /// Use this variant when the contract needs to represent delivered; selecting it has no side effect by itself.
     Delivered,
+    /// Use this variant when the contract needs to represent responded; selecting it has no side effect by itself.
     Responded,
+    /// Use this variant when the contract needs to represent failed; selecting it has no side effect by itself.
     Failed,
+    /// Use this variant when the contract needs to represent timed out; selecting it has no side effect by itself.
     TimedOut,
+    /// Use this variant when the contract needs to represent expired; selecting it has no side effect by itself.
     Expired,
+    /// Use this variant when the contract needs to represent cancelled; selecting it has no side effect by itself.
     Cancelled,
 }
 
@@ -1088,19 +1268,34 @@ impl MessageStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds wake condition application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct WakeCondition {
+    /// Stable condition id used for typed lineage, lookup, or dedupe.
     pub condition_id: WakeConditionId,
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Filter used by this record or request.
     pub filter: EventFilter,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Time value in milliseconds for timeout millis.
+    /// Use it for timeout, ordering, or diagnostic calculations.
     pub timeout_millis: Option<u64>,
+    /// Resume with used by this record or request.
     pub resume_with: ResumeInputPolicy,
+    /// Idempotency setting or key for deduping retries.
+    /// Use it to prevent duplicate side effects during replay or repair.
     pub idempotency_key: IdempotencyKey,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Policy references that govern admission, projection, execution, or
+    /// delivery.
     pub policy_refs: Vec<PolicyRef>,
 }
 
 impl WakeCondition {
+    /// Creates a new application::agent_pool value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         condition_id: WakeConditionId,
         run_id: RunId,
@@ -1118,16 +1313,23 @@ impl WakeCondition {
         }
     }
 
+    /// Returns an updated value with timeout millis configured.
+    /// This updates the wake timeout on the condition value and performs no scheduling by
+    /// itself.
     pub fn timeout_millis(mut self, timeout_millis: u64) -> Self {
         self.timeout_millis = Some(timeout_millis);
         self
     }
 
+    /// Returns an updated value with policy ref configured.
+    /// This sets the policy reference on the coordination value and performs no I/O.
     pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.policy_refs.push(policy_ref);
         self
     }
 
+    /// Computes or returns compile envelope filter for the
+    /// application::agent_pool contract without external I/O or side effects.
     pub fn compile_envelope_filter(&self) -> Result<CompiledEventFilter, AgentError> {
         let mut filter = self.filter.clone();
         filter.payload_access = PayloadAccessMode::EnvelopeOnly;
@@ -1137,28 +1339,47 @@ impl WakeCondition {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite resume input policy cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ResumeInputPolicy {
+    /// Use this variant when the contract needs to represent matching event refs; selecting it has no side effect by itself.
     MatchingEventRefs,
+    /// Use this variant when the contract needs to represent redacted summary; selecting it has no side effect by itself.
     RedactedSummary,
+    /// Use this variant when the contract needs to represent none; selecting it has no side effect by itself.
     None,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds wake registration application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct WakeRegistration {
+    /// Stable condition id used for typed lineage, lookup, or dedupe.
     pub condition_id: WakeConditionId,
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Finite status for this record or lifecycle stage.
     pub status: WakeRegistrationStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub journal_cursor: Option<JournalCursor>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite wake registration status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum WakeRegistrationStatus {
+    /// Use this variant when the contract needs to represent registered; selecting it has no side effect by itself.
     Registered,
+    /// Use this variant when the contract needs to represent triggered; selecting it has no side effect by itself.
     Triggered,
+    /// Use this variant when the contract needs to represent timed out; selecting it has no side effect by itself.
     TimedOut,
+    /// Use this variant when the contract needs to represent cancelled; selecting it has no side effect by itself.
     Cancelled,
+    /// Use this variant when the contract needs to represent failed; selecting it has no side effect by itself.
     Failed,
 }
 

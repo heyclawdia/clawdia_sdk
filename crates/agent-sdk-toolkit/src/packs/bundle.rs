@@ -1,17 +1,34 @@
+//! Toolkit pack assembly helpers. Use these modules to turn toolkit operations into
+//! core package capabilities, sidecars, and routes. Pack assembly is data-only and
+//! does not execute tools or mutate a runtime package until explicitly installed.
+//! This file contains the bundle portion of that contract.
+//!
 use agent_sdk_core::{
     AgentError, DestinationKind, DestinationRef, PackageSidecarSnapshot, RetentionClass,
     RuntimePackageBuilder, ToolPackSnapshot, ToolRoute,
 };
 
 #[derive(Clone, Debug)]
+/// Toolkit pack toolkit pack bundle value.
+/// Use it to assemble exported tool-pack configuration; installation or activation effects are documented by the bundle executor.
 pub struct ToolkitPackBundle {
+    /// Snapshot used by this record or request.
     pub snapshot: ToolPackSnapshot,
+    /// Sidecar used by this record or request.
     pub sidecar: PackageSidecarSnapshot,
+    /// Capabilities frozen into the package or returned by an adapter health
+    /// check.
     pub capabilities: Vec<agent_sdk_core::CapabilitySpec>,
+    /// Collection of routes values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub routes: Vec<ToolRoute>,
 }
 
 impl ToolkitPackBundle {
+    /// Constructs this value from snapshot. Use it when adapting
+    /// canonical SDK records without introducing a second behavior
+    /// path.
     pub fn from_snapshot(snapshot: ToolPackSnapshot) -> Result<Self, AgentError> {
         let sidecar_ref = snapshot.sidecar_ref()?;
         let sidecar = snapshot.package_sidecar_snapshot()?;
@@ -45,6 +62,9 @@ impl ToolkitPackBundle {
         })
     }
 
+    /// Install into.
+    /// This updates the provided RuntimePackageBuilder with bundle routes and sidecars; it does
+    /// not activate tools by itself.
     pub fn install_into(&self, mut builder: RuntimePackageBuilder) -> RuntimePackageBuilder {
         builder = builder.sidecar(self.sidecar.clone());
         for capability in &self.capabilities {

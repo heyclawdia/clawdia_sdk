@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the ocr portion of that contract.
+//!
 use std::{
     fs,
     io::Read,
@@ -11,11 +17,18 @@ use crate::workspace::{
     util::{tool_failure, truncate_bytes},
 };
 
+/// Workspace ocr sidecar request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub(super) struct OcrSidecar {
+    /// Text used by this record or request.
     pub text: String,
+    /// Metadata used by this record or request.
     pub metadata: WorkspaceOcrMetadata,
 }
 
+/// Read ocr sidecar.
+/// This reads the configured OCR sidecar file when present and returns bounded extracted text
+/// metadata.
 pub(super) fn read_ocr_sidecar(
     path: &Path,
     max_output_bytes: u64,

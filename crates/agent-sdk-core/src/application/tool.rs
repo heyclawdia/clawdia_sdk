@@ -1,3 +1,8 @@
+//! Tool execution coordination over the shared effect spine. Use this module after
+//! tool routing and policy have selected an executor. Execution may call tool
+//! adapters and must keep intent/result records observable through journals and
+//! events.
+//!
 use std::sync::Arc;
 
 use crate::{
@@ -17,6 +22,8 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds tool execution coordinator application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ToolExecutionCoordinator {
     router: ToolRouter,
     executors: ToolExecutorRegistry,
@@ -25,6 +32,9 @@ pub struct ToolExecutionCoordinator {
 }
 
 impl ToolExecutionCoordinator {
+    /// Creates a new application::tool value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(router: ToolRouter, executors: ToolExecutorRegistry) -> Self {
         Self {
             router,
@@ -34,16 +44,26 @@ impl ToolExecutionCoordinator {
         }
     }
 
+    /// Returns this value with its policy setting replaced. The method
+    /// follows builder-style data construction and does not execute
+    /// external work.
     pub fn with_policy(mut self, policy: Arc<dyn ToolPolicyPort>) -> Self {
         self.policy = Some(policy);
         self
     }
 
+    /// Returns this value with its strategy setting replaced. The
+    /// method follows builder-style data construction and does not
+    /// execute external work.
     pub fn with_strategy(mut self, strategy: ToolExecutionStrategy) -> Self {
         self.strategy = strategy;
         self
     }
 
+    /// Executes one tool request with journal intent/result gating.
+    /// The executor may perform host work, but this coordinator appends the
+    /// required journal records around that call and prevents execution if the
+    /// intent record cannot be persisted.
     pub fn execute<J>(
         &self,
         journal: &J,
@@ -256,20 +276,40 @@ fn policy_outcome(
 }
 
 #[derive(Clone, Debug)]
+/// Holds tool execution context application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ToolExecutionContext {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Turn identifier for one loop turn within a run.
     pub turn_id: Option<TurnId>,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Fingerprint of the runtime package snapshot in force when this value was produced.
+    /// Use it for replay, dedupe, and package-lineage checks; the field is evidence and does
+    /// not execute package behavior.
     pub runtime_package_fingerprint: String,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
+    /// Stable redaction policy id used for typed lineage, lookup, or dedupe.
     pub redaction_policy_id: String,
+    /// Next journal seq used by this record or request.
     pub next_journal_seq: u64,
+    /// Timestamp in milliseconds associated with this record.
+    /// Use it for ordering and diagnostics; durable causality still comes from ids and cursors.
     pub timestamp_millis: u64,
+    /// Record id prefix used by this record or request.
     pub record_id_prefix: String,
 }
 
 impl ToolExecutionContext {
+    /// Creates a new application::tool value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         run_id: RunId,
         agent_id: AgentId,
@@ -323,11 +363,22 @@ impl ToolExecutionContext {
 }
 
 #[derive(Clone, Debug)]
+/// Holds tool execution outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ToolExecutionOutcome {
+    /// Record used by this record or request.
     pub record: ToolCallRecord,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub intent_cursor: Option<crate::domain::JournalCursor>,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub terminal_cursor: Option<crate::domain::JournalCursor>,
+    /// Optional post tool policy value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub post_tool_policy: Option<PolicyOutcome>,
+    /// Whether recovery required is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub recovery_required: bool,
 }
 

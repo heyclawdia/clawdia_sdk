@@ -1,8 +1,17 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the pdf portion of that contract.
+//!
 use std::path::Path;
 
 use super::{RenderedRead, add_truncation_guidance, extraction_error, ocr, text};
 use crate::workspace::read_pipeline::{WorkspaceDocumentMetadata, WorkspaceReaderStep};
 
+/// Renders or detects bounded workspace content for workspace::readers::pdf.
+/// It may read already-approved local file data but does not mutate the
+/// workspace.
 pub(super) fn render_pdf(
     path: &Path,
     bytes: &[u8],

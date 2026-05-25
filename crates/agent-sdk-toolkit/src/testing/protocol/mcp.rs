@@ -1,3 +1,7 @@
+//! Scripted MCP protocol harnesses for SDK consumers. Use these fakes to test
+//! tool/resource/prompt lifecycle and host filtering without live MCP servers.
+//! Harness methods mutate in-memory endpoints and scripted response state only.
+//!
 use std::collections::{BTreeMap, BTreeSet};
 
 use agent_sdk_core::{AgentError, AgentErrorKind, RetryClassification};
@@ -15,6 +19,8 @@ enum ReceiveNext {
 }
 
 #[derive(Clone, Debug, Default)]
+/// In-memory scripted mcp server fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct ScriptedMcpServer {
     tools: BTreeMap<String, Value>,
     resources: BTreeMap<String, String>,
@@ -24,25 +30,39 @@ pub struct ScriptedMcpServer {
 }
 
 impl ScriptedMcpServer {
+    /// Creates a new testing::protocol::mcp value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Returns an updated testing::protocol::mcp value with tool applied.
+    /// This is data construction only and does not execute the configured
+    /// behavior.
     pub fn tool(mut self, name: impl Into<String>, result: Value) -> Self {
         self.tools.insert(name.into(), result);
         self
     }
 
+    /// Returns an updated value with resource configured.
+    /// This configures or reads the scripted protocol mock in memory.
     pub fn resource(mut self, uri: impl Into<String>, text: impl Into<String>) -> Self {
         self.resources.insert(uri.into(), text.into());
         self
     }
 
+    /// Adds a scripted prompt definition and returns the updated fake server.
+    /// This mutates only the builder's in-memory prompt map; request frames are appended later
+    /// when a client asks the endpoint for prompts.
     pub fn prompt(mut self, name: impl Into<String>, spec: Value) -> Self {
         self.prompts.insert(name.into(), spec);
         self
     }
 
+    /// Handle next.
+    /// This consumes one queued JSON-RPC frame from the in-memory endpoint and mutates only
+    /// scripted mock state.
     pub fn handle_next(&mut self, endpoint: &JsonRpcLineEndpoint) -> Result<bool, AgentError> {
         let frame = match receive_frame_or_parse_error(endpoint)? {
             ReceiveNext::Empty => return Ok(false),
@@ -130,6 +150,8 @@ impl ScriptedMcpServer {
         Ok(true)
     }
 
+    /// Request sampling.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn request_sampling(
         &mut self,
         endpoint: &JsonRpcLineEndpoint,
@@ -144,6 +166,8 @@ impl ScriptedMcpServer {
             .map(|_| id)
     }
 
+    /// Request elicitation.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn request_elicitation(
         &mut self,
         endpoint: &JsonRpcLineEndpoint,
@@ -158,10 +182,16 @@ impl ScriptedMcpServer {
             .map(|_| id)
     }
 
+    /// Returns the response currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn response(&self, endpoint: &JsonRpcLineEndpoint) -> Result<JsonRpcResponse, AgentError> {
         expect_response(endpoint.receive_frame()?)
     }
 
+    /// Returns the initialized currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn initialized(&self) -> bool {
         self.initialized
     }
@@ -269,6 +299,8 @@ impl ScriptedMcpServer {
 }
 
 #[derive(Clone, Debug)]
+/// In-memory mcp host proxy fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct McpHostProxy {
     endpoint: JsonRpcLineEndpoint,
     allowed_tools: BTreeSet<String>,
@@ -279,6 +311,9 @@ pub struct McpHostProxy {
 }
 
 impl McpHostProxy {
+    /// Creates a new testing::protocol::mcp value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(endpoint: JsonRpcLineEndpoint) -> Self {
         Self {
             endpoint,
@@ -290,25 +325,37 @@ impl McpHostProxy {
         }
     }
 
+    /// Returns an updated value with allow tool configured.
+    /// This configures or reads the scripted protocol mock in memory.
     pub fn allow_tool(mut self, name: impl Into<String>) -> Self {
         self.allowed_tools.insert(name.into());
         self
     }
 
+    /// Returns an updated value with allow resource configured.
+    /// This updates the scripted MCP mock allowlist in memory for later protocol calls.
     pub fn allow_resource(mut self, uri: impl Into<String>) -> Self {
         self.allowed_resources.insert(uri.into());
         self
     }
 
+    /// Returns an updated value with allow prompt configured.
+    /// This updates the scripted MCP mock allowlist in memory for later protocol calls.
     pub fn allow_prompt(mut self, name: impl Into<String>) -> Self {
         self.allowed_prompts.insert(name.into());
         self
     }
 
+    /// Returns the endpoint currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn endpoint(&self) -> &JsonRpcLineEndpoint {
         &self.endpoint
     }
 
+    /// Initialize.
+    /// This appends the corresponding JSON-RPC frame to the scripted MCP mock transcript and
+    /// returns the request id when applicable.
     pub fn initialize(&mut self) -> Result<JsonRpcId, AgentError> {
         self.request(
             "initialize",
@@ -323,24 +370,37 @@ impl McpHostProxy {
         )
     }
 
+    /// Sends the MCP `notifications/initialized` frame to the scripted server endpoint.
+    /// This appends one in-memory JSON-RPC notification; it does not contact a live MCP process or
+    /// mutate SDK runtime state.
     pub fn initialized(&self) -> Result<(), AgentError> {
         self.endpoint
             .send_notification("notifications/initialized", json!({}))
             .map(|_| ())
     }
 
+    /// List tools.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn list_tools(&mut self) -> Result<JsonRpcId, AgentError> {
         self.request("tools/list", json!({}))
     }
 
+    /// List resources.
+    /// This appends the corresponding JSON-RPC frame to the scripted MCP mock transcript and
+    /// returns the request id when applicable.
     pub fn list_resources(&mut self) -> Result<JsonRpcId, AgentError> {
         self.request("resources/list", json!({}))
     }
 
+    /// List prompts.
+    /// This appends the corresponding JSON-RPC frame to the scripted MCP mock transcript and
+    /// returns the request id when applicable.
     pub fn list_prompts(&mut self) -> Result<JsonRpcId, AgentError> {
         self.request("prompts/list", json!({}))
     }
 
+    /// Call tool.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn call_tool(&mut self, name: &str, arguments: Value) -> Result<JsonRpcId, AgentError> {
         if !self.allowed_tools.contains(name) {
             return Err(policy_denial(format!(
@@ -350,6 +410,8 @@ impl McpHostProxy {
         self.request("tools/call", json!({"name": name, "arguments": arguments}))
     }
 
+    /// Read resource.
+    /// This appends the corresponding JSON-RPC frame to the in-memory test endpoint transcript.
     pub fn read_resource(&mut self, uri: &str) -> Result<JsonRpcId, AgentError> {
         if !self.allowed_resources.contains(uri) {
             return Err(policy_denial(format!(
@@ -359,6 +421,9 @@ impl McpHostProxy {
         self.request("resources/read", json!({"uri": uri}))
     }
 
+    /// Handle next.
+    /// This consumes one queued JSON-RPC frame from the endpoint and mutates only the scripted
+    /// mock state.
     pub fn handle_next(&self, endpoint: &JsonRpcLineEndpoint) -> Result<bool, AgentError> {
         let frame = match receive_frame_or_parse_error(endpoint)? {
             ReceiveNext::Empty => return Ok(false),
@@ -379,6 +444,9 @@ impl McpHostProxy {
         Ok(true)
     }
 
+    /// Returns the response currently held by this value.
+    /// This reads scripted protocol state or a queued response without contacting an external
+    /// process.
     pub fn response(&mut self) -> Result<JsonRpcResponse, AgentError> {
         let mut response = expect_response(self.endpoint.receive_frame()?)?;
         if response.id == JsonRpcId::Null {
@@ -391,6 +459,9 @@ impl McpHostProxy {
         Ok(response)
     }
 
+    /// Returns allowed tool names from response for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn allowed_tool_names_from_response(
         &self,
         response: &JsonRpcResponse,

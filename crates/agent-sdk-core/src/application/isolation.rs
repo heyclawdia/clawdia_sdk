@@ -1,3 +1,7 @@
+//! Isolation lifecycle coordination over host-provided runtimes. Use this module when
+//! a workload requires environment preparation, process execution, signaling, stats,
+//! or cleanup. All concrete container or VM behavior remains adapter-owned.
+//!
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -30,16 +34,24 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds isolation lifecycle coordinator application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct IsolationLifecycleCoordinator {
     journal: Arc<dyn RunJournal>,
     registry: IsolationRuntimeRegistry,
 }
 
 impl IsolationLifecycleCoordinator {
+    /// Creates a new application::isolation value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(journal: Arc<dyn RunJournal>, registry: IsolationRuntimeRegistry) -> Self {
         Self { journal, registry }
     }
 
+    /// Selects an isolation runtime for a package environment.
+    /// This validates package-sidecar requirements and reads the runtime registry capability
+    /// report; it does not start a process or append journal evidence.
     pub fn select_environment(
         &self,
         package: &RuntimePackage,
@@ -58,6 +70,9 @@ impl IsolationLifecycleCoordinator {
         ))
     }
 
+    /// Starts one isolated process after package and downgrade policy checks.
+    /// This prepares the environment, appends lifecycle evidence, and delegates
+    /// only the adapter process start to the selected isolation runtime.
     pub fn start_process(
         &self,
         package: &RuntimePackage,
@@ -207,6 +222,9 @@ impl IsolationLifecycleCoordinator {
         }
     }
 
+    /// Cleanup environment.
+    /// This calls the selected isolation cleanup adapter for environment resources that the
+    /// runtime already prepared.
     pub fn cleanup_environment(
         &self,
         environment: ExecutionEnvironment,
@@ -384,17 +402,35 @@ impl IsolationLifecycleCoordinator {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds isolation lifecycle context application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct IsolationLifecycleContext {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Fingerprint of the runtime package snapshot in force when this value was produced.
+    /// Use it for replay, dedupe, and package-lineage checks; the field is evidence and does
+    /// not execute package behavior.
     pub runtime_package_fingerprint: RuntimePackageFingerprint,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
+    /// Stable redaction policy id used for typed lineage, lookup, or dedupe.
     pub redaction_policy_id: String,
+    /// Readiness state for a capability or package feature.
+    /// Launch and package validation use it to distinguish active, reserved, and blocked
+    /// surfaces.
     pub readiness_profile: IsolationReadinessProfile,
 }
 
 impl IsolationLifecycleContext {
+    /// Builds the test value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn test(runtime_package_fingerprint: RuntimePackageFingerprint) -> Self {
         Self {
             run_id: RunId::new("run.isolation.contract"),
@@ -431,43 +467,85 @@ impl IsolationLifecycleContext {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite isolation readiness profile cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum IsolationReadinessProfile {
+    /// Use this variant when the contract needs to represent production; selecting it has no side effect by itself.
     Production,
+    /// Use this variant when the contract needs to represent test only; selecting it has no side effect by itself.
     TestOnly,
 }
 
 #[derive(Clone, Debug)]
+/// Holds isolation selection outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct IsolationSelectionOutcome {
+    /// Finite status for this record or lifecycle stage.
     pub status: IsolationMatchStatus,
+    /// Typed selected runtime ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub selected_runtime_ref: Option<IsolationRuntimeRef>,
+    /// Optional capability report value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub capability_report: Option<IsolationCapabilityReport>,
+    /// Optional match record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub match_record: Option<IsolationCapabilityMatchRecord>,
+    /// Optional downgrade record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub downgrade_record: Option<IsolationDowngradeDecisionRecord>,
+    /// Optional terminal error value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub terminal_error: Option<AgentError>,
 }
 
 #[derive(Clone, Debug)]
+/// Holds isolation process outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct IsolationProcessOutcome {
+    /// Selection used by this record or request.
     pub selection: IsolationSelectionOutcome,
+    /// Finite status for this record or lifecycle stage.
     pub status: IsolationMatchStatus,
+    /// Optional intent record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub intent_record: Option<IsolationRecord>,
+    /// Optional result record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub result_record: Option<IsolationRecord>,
+    /// Collection of io frames values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub io_frames: Vec<crate::ProcessIoFrame>,
+    /// Whether recovery required is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub recovery_required: bool,
+    /// Optional terminal error value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub terminal_error: Option<AgentError>,
 }
 
 #[derive(Clone, Debug)]
+/// Holds isolation cleanup outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct IsolationCleanupOutcome {
+    /// Finite status for this record or lifecycle stage.
     pub status: CleanupStatus,
+    /// Cleanup result used by this record or request.
     pub cleanup_result: CleanupResult,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Enumerates the finite isolation match status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum IsolationMatchStatus {
+    /// Use this variant when the contract needs to represent matched; selecting it has no side effect by itself.
     Matched,
+    /// Use this variant when the contract needs to represent downgrade approved; selecting it has no side effect by itself.
     DowngradeApproved,
+    /// Use this variant when the contract needs to represent downgrade denied; selecting it has no side effect by itself.
     DowngradeDenied,
+    /// Use this variant when the contract needs to represent unsupported host; selecting it has no side effect by itself.
     UnsupportedHost,
 }
 
@@ -478,18 +556,34 @@ impl IsolationMatchStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds isolation downgrade approval application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct IsolationDowngradeApproval {
+    /// Typed decision ref reference. Resolving or executing it is a separate
+    /// policy-gated step.
     pub decision_ref: PolicyDecisionRef,
+    /// Scope used by this record or request.
     pub scope: PolicyDecisionScope,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Classification selectors for approved classes.
+    /// Policy and projection paths use them for finite routing decisions.
     pub approved_classes: Vec<IsolationClass>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Capability downgrades explicitly approved for this isolation decision.
+    /// Adapters may rely on these approvals only for the request and package fingerprint they
+    /// reference.
     pub approved_capability_downgrades: Vec<IsolationCapability>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Collection of approved trust downgrades values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub approved_trust_downgrades: Vec<IsolationTrustField>,
 }
 
 impl IsolationDowngradeApproval {
+    /// Builds the approved for isolation value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn approved_for_isolation(decision_ref: impl Into<PolicyDecisionRef>) -> Self {
         Self {
             decision_ref: decision_ref.into(),
@@ -500,6 +594,9 @@ impl IsolationDowngradeApproval {
         }
     }
 
+    /// Builds the approved for tool value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn approved_for_tool(decision_ref: impl Into<PolicyDecisionRef>) -> Self {
         Self {
             decision_ref: decision_ref.into(),
@@ -510,11 +607,17 @@ impl IsolationDowngradeApproval {
         }
     }
 
+    /// Returns an updated value with approve capability configured.
+    /// This evaluates or builds isolation policy state in memory and does not call the
+    /// isolation adapter by itself.
     pub fn approve_capability(mut self, capability: IsolationCapability) -> Self {
         self.approved_capability_downgrades.push(capability);
         self
     }
 
+    /// Returns an updated value with approve trust configured.
+    /// This evaluates or builds isolation policy state in memory and does not call the
+    /// isolation adapter by itself.
     pub fn approve_trust(mut self, field: IsolationTrustField) -> Self {
         self.approved_trust_downgrades.push(field);
         self
@@ -522,8 +625,12 @@ impl IsolationDowngradeApproval {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Enumerates the finite policy decision scope cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum PolicyDecisionScope {
+    /// Use this variant when the contract needs to represent isolation downgrade; selecting it has no side effect by itself.
     IsolationDowngrade,
+    /// Use this variant when the contract needs to represent tool approval; selecting it has no side effect by itself.
     ToolApproval,
 }
 

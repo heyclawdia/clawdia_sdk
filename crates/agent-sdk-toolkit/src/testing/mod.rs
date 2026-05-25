@@ -1,3 +1,7 @@
+//! Toolkit-specific deterministic test helpers. Use these fakes for content stores,
+//! argument stores, and scripted protocol harnesses without live editors, MCP
+//! servers, or product hosts. Helpers mutate only in-memory state unless noted.
+//!
 pub mod protocol;
 
 mod stores;

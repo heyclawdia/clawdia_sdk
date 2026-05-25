@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the stream portion of that contract.
+//!
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -11,12 +17,19 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds stream rule engine state application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct StreamRuleEngineState {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Collection of seen match keys values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub seen_match_keys: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
+/// Holds stream rule engine application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct StreamRuleEngine {
     rules: Vec<StreamRule>,
     buffers: BTreeMap<String, String>,
@@ -24,6 +37,9 @@ pub struct StreamRuleEngine {
 }
 
 impl StreamRuleEngine {
+    /// Creates a new application::stream value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(rules: Vec<StreamRule>) -> Result<Self, AgentError> {
         for rule in &rules {
             rule.validate()?;
@@ -35,6 +51,9 @@ impl StreamRuleEngine {
         })
     }
 
+    /// Builds the restore value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn restore(
         rules: Vec<StreamRule>,
         state: StreamRuleEngineState,
@@ -44,16 +63,24 @@ impl StreamRuleEngine {
         Ok(engine)
     }
 
+    /// Returns the rules currently held by this value.
+    /// This clones current stream-rule engine state for inspection without reading hidden
+    /// payloads.
     pub fn rules(&self) -> &[StreamRule] {
         &self.rules
     }
 
+    /// Returns the snapshot state currently held by this value.
+    /// This clones current stream-rule engine state for inspection without reading hidden
+    /// payloads.
     pub fn snapshot_state(&self) -> StreamRuleEngineState {
         StreamRuleEngineState {
             seen_match_keys: self.seen_match_keys.iter().cloned().collect(),
         }
     }
 
+    /// Returns repeat state for derived from the supplied state.
+    /// This uses only local coordinator state and performs no hidden host work.
     pub fn repeat_state_for(&self, rule: &StreamRule) -> StreamRuleRepeatStateSnapshot {
         let prefix = format!("{}:", rule.id.as_str());
         StreamRuleRepeatStateSnapshot {
@@ -66,6 +93,9 @@ impl StreamRuleEngine {
         }
     }
 
+    /// Observe delta.
+    /// This updates stream-rule repeat tracking from one observed delta and returns the
+    /// resulting intervention.
     pub fn observe_delta(
         &mut self,
         delta: StreamDelta,

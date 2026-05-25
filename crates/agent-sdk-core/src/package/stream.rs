@@ -1,3 +1,8 @@
+//! Runtime-package records and builders. Use these items to describe the immutable
+//! per-run package that freezes provider route, capabilities, policies, sidecars,
+//! catalogs, and fingerprints. Builders are data-only and must not perform discovery
+//! or execution side effects. This file contains the stream portion of that contract.
+//!
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -8,22 +13,43 @@ use crate::{
     stream_records::{StreamRule, hash_rule_fingerprint},
 };
 
+/// Constant value for the package::stream contract. Use it to keep SDK
+/// records and tests aligned on the same stable value.
 pub const STREAM_RULE_SIDECAR_KIND: &str = "stream_rule";
+/// Constant value for the package::stream contract. Use it to keep SDK
+/// records and tests aligned on the same stable value.
 pub const STREAM_RULE_SIDECAR_VERSION: &str = "stream_rule.sidecar.v1";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the stream rule sidecar portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct StreamRuleSidecar {
+    /// Identifier for the typed package sidecar.
     pub sidecar_id: String,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Network or stream-rule entries requested by policy.
     pub rules: Vec<StreamRule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Typed default policy refs references. Resolving them is separate from
+    /// constructing this record.
     pub default_policy_refs: Vec<PolicyRef>,
+    /// Typed redaction policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub redaction_policy_ref: PolicyRef,
+    /// Typed content capture policy ref reference. Resolving or executing it
+    /// is a separate policy-gated step.
     pub content_capture_policy_ref: PolicyRef,
+    /// Typed matcher engine ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub matcher_engine_ref: String,
 }
 
 impl StreamRuleSidecar {
+    /// Creates a new package::stream value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         sidecar_id: impl Into<String>,
         source: SourceRef,
@@ -44,11 +70,17 @@ impl StreamRuleSidecar {
         Ok(sidecar)
     }
 
+    /// Returns an updated value with default policy ref configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn default_policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.default_policy_refs.push(policy_ref);
         self
     }
 
+    /// Validates the package::stream invariants and returns a typed
+    /// error on failure. Validation is pure and does not perform I/O,
+    /// dispatch, journal appends, or adapter calls.
     pub fn validate(&self) -> Result<(), AgentError> {
         if self.sidecar_id.is_empty() {
             return Err(AgentError::missing_required_field(
@@ -71,6 +103,9 @@ impl StreamRuleSidecar {
         Ok(())
     }
 
+    /// Computes the stable content hash for this package::stream value.
+    /// The computation is deterministic and side-effect free so it can
+    /// be used in package, journal, or test evidence.
     pub fn content_hash(&self) -> Result<String, AgentError> {
         self.validate()?;
         let bytes = serde_json::to_vec(self)
@@ -78,6 +113,9 @@ impl StreamRuleSidecar {
         Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
     }
 
+    /// Converts this value into package sidecar snapshot data.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn to_package_sidecar_snapshot(&self) -> Result<PackageSidecarSnapshot, AgentError> {
         self.validate()?;
         let mut refs = Vec::new();

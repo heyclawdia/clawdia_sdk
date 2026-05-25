@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the checkpoint portion of that contract.
+//!
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -10,21 +16,38 @@ use crate::{
     journal::RunCheckpoint,
 };
 
+/// Port or behavior contract for checkpoint store. Implementors should
+/// preserve policy, redaction, idempotency, and replay expectations
+/// from the surrounding module. Implementations may perform side
+/// effects only as described by the trait methods.
 pub trait CheckpointStore: Send + Sync {
+    /// Saves checkpoint accelerator data for a run at a journal sequence.
+    /// Implementations write or replace checkpoint accelerator data for the run without
+    /// changing journal truth.
     fn save(
         &self,
         checkpoint: RunCheckpoint,
         latest_journal_seq: u64,
     ) -> Result<CheckpointSaveOutcome, AgentError>;
 
+    /// Loads the latest checkpoint accelerator data for a run.
+    /// Implementations read checkpoint storage for the requested run and return matching
+    /// checkpoint data without altering durable journal truth.
     fn load_latest(&self, run_id: &RunId) -> Result<Option<RunCheckpoint>, AgentError>;
 
+    /// Loads checkpoint accelerator data at or before the requested journal
+    /// cursor.
+    /// Implementations read checkpoint storage for the requested run and return matching
+    /// checkpoint data without altering durable journal truth.
     fn load_at_or_before(
         &self,
         run_id: &RunId,
         cursor: &JournalCursor,
     ) -> Result<Option<RunCheckpoint>, AgentError>;
 
+    /// Prunes checkpoint accelerator data according to retention policy.
+    /// Implementations remove checkpoint accelerator entries according to retention policy
+    /// without deleting journal truth.
     fn prune(
         &self,
         run_id: &RunId,
@@ -33,36 +56,63 @@ pub trait CheckpointStore: Send + Sync {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds checkpoint save outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct CheckpointSaveOutcome {
+    /// Typed checkpoint ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub checkpoint_ref: String,
+    /// Covers journal seq used by this record or request.
     pub covers_journal_seq: u64,
+    /// Whether terminal checkpoint is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub terminal_checkpoint: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds checkpoint prune policy application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct CheckpointPrunePolicy {
+    /// Prune covered before used by this record or request.
     pub prune_covered_before: u64,
+    /// Whether preserve latest terminal is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub preserve_latest_terminal: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds checkpoint prune report application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct CheckpointPruneReport {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Count of pruned items observed or included in this record.
     pub pruned_count: usize,
+    /// Count of retained items observed or included in this record.
     pub retained_count: usize,
+    /// Terminal checkpoint retained even when pruning older checkpoint accelerators.
+    /// Use it to keep terminal replay shortcuts available without treating checkpoints as
+    /// durable truth.
     pub preserved_terminal_checkpoint: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
+/// Holds in memory checkpoint store application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct InMemoryCheckpointStore {
     checkpoints: Arc<Mutex<BTreeMap<RunId, Vec<RunCheckpoint>>>>,
 }
 
 impl InMemoryCheckpointStore {
+    /// Creates a new application::checkpoint value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Save.
+    /// This stores checkpoint accelerator data in memory without changing journal truth.
     pub fn save(
         &self,
         checkpoint: RunCheckpoint,
@@ -71,10 +121,16 @@ impl InMemoryCheckpointStore {
         <Self as CheckpointStore>::save(self, checkpoint, latest_journal_seq)
     }
 
+    /// Load latest.
+    /// This reads the in-memory checkpoint store for the requested run and does not write
+    /// checkpoints or journal records.
     pub fn load_latest(&self, run_id: &RunId) -> Result<Option<RunCheckpoint>, AgentError> {
         <Self as CheckpointStore>::load_latest(self, run_id)
     }
 
+    /// Load at or before.
+    /// This reads the in-memory checkpoint store for the requested run and does not write
+    /// checkpoints or journal records.
     pub fn load_at_or_before(
         &self,
         run_id: &RunId,
@@ -83,6 +139,9 @@ impl InMemoryCheckpointStore {
         <Self as CheckpointStore>::load_at_or_before(self, run_id, cursor)
     }
 
+    /// Prune.
+    /// This prunes only the in-memory checkpoint accelerator and leaves durable journal records
+    /// untouched.
     pub fn prune(
         &self,
         run_id: &RunId,
@@ -91,6 +150,8 @@ impl InMemoryCheckpointStore {
         <Self as CheckpointStore>::prune(self, run_id, policy)
     }
 
+    /// List.
+    /// This reads all in-memory checkpoint accelerator entries for one run.
     pub fn list(&self, run_id: &RunId) -> Result<Vec<RunCheckpoint>, AgentError> {
         Ok(self
             .checkpoints

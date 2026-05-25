@@ -1,3 +1,8 @@
+//! Shell tool executor. Use this module only when a host policy explicitly allows
+//! command execution. Successful execution starts a host process and captures the
+//! current buffered stdout/stderr result for a core tool output; hosts that run
+//! untrusted commands should add output bounds before enabling this executor.
+//!
 use agent_sdk_core::{
     AgentError, EffectTerminalStatus, ExecutorRef, PolicyKind, PolicyRef, ToolExecutionOutput,
     ToolExecutionRequest, ToolExecutor, ToolPackId, ToolPackKind, ToolPackSnapshot,
@@ -13,6 +18,8 @@ use crate::{
 use super::{command::run_command, policy::ShellExecutionPolicy, types::ShellRequest};
 
 #[derive(Clone)]
+/// Shell shell executor request or result value.
+/// Creating the value does not spawn a process; shell executors document policy checks and command side effects.
 pub struct ShellExecutor {
     executor_ref: ExecutorRef,
     policy: ShellExecutionPolicy,
@@ -21,6 +28,9 @@ pub struct ShellExecutor {
 }
 
 impl ShellExecutor {
+    /// Creates a new shell::executor value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         policy: ShellExecutionPolicy,
         arguments: InMemoryJsonArgumentStore,
@@ -34,6 +44,9 @@ impl ShellExecutor {
         }
     }
 
+    /// Pack bundle.
+    /// This returns the toolkit pack bundle that registers the operation route; it does not
+    /// execute the operation.
     pub fn pack_bundle(
         source: agent_sdk_core::SourceRef,
         policy_ref: PolicyRef,

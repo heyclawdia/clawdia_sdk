@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the realtime portion of that contract.
+//!
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -23,6 +29,8 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds realtime session controller application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RealtimeSessionController {
     sidecar: crate::package::realtime::RealtimeSessionSidecar,
     adapter: Arc<dyn RealtimeProviderAdapter>,
@@ -36,6 +44,9 @@ pub struct RealtimeSessionController {
 }
 
 impl RealtimeSessionController {
+    /// Creates a new application::realtime value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         sidecar: crate::package::realtime::RealtimeSessionSidecar,
         adapter: Arc<dyn RealtimeProviderAdapter>,
@@ -58,6 +69,9 @@ impl RealtimeSessionController {
         }
     }
 
+    /// Connect.
+    /// This appends realtime connection intent/result records through the journal path and
+    /// calls the configured realtime adapter to open the session.
     pub fn connect(&mut self) -> Result<RealtimeSessionRecord, AgentError> {
         self.sidecar.validate()?;
         let session_id = RealtimeSessionId::new(format!(
@@ -115,6 +129,9 @@ impl RealtimeSessionController {
         Ok(record)
     }
 
+    /// Send.
+    /// This journals the realtime send path and forwards one frame to the configured realtime
+    /// adapter.
     pub fn send(&mut self, frame: RealtimeInputFrame) -> Result<RealtimeSessionRecord, AgentError> {
         if self
             .state
@@ -163,6 +180,9 @@ impl RealtimeSessionController {
         Ok(record)
     }
 
+    /// Receives one realtime output frame through the configured adapter.
+    /// This records a receive request, calls the adapter, appends a received record when output is
+    /// available, and updates the in-memory session cursor.
     pub fn receive(&mut self) -> Result<Option<RealtimeSessionRecord>, AgentError> {
         let state = self.connected_state()?.clone();
         let requested = self.record(
@@ -199,6 +219,9 @@ impl RealtimeSessionController {
         Ok(Some(record))
     }
 
+    /// Interrupt.
+    /// This records the interrupt path and sends the configured realtime interruption frame to
+    /// the adapter session.
     pub fn interrupt(
         &mut self,
         response_id: impl Into<String>,
@@ -227,6 +250,9 @@ impl RealtimeSessionController {
         Ok(record)
     }
 
+    /// Marks the active realtime session as beginning a restart.
+    /// This appends restart-requested and restart-started records and updates session state; the
+    /// adapter restart call happens in `complete_restart`.
     pub fn begin_restart(&mut self) -> Result<Vec<RealtimeSessionRecord>, AgentError> {
         let state = self.connected_state()?.clone();
         let mut requested = self.record(
@@ -250,6 +276,9 @@ impl RealtimeSessionController {
         Ok(vec![requested, started])
     }
 
+    /// Complete restart.
+    /// This records restart completion and updates session state after the adapter reports
+    /// success.
     pub fn complete_restart(&mut self) -> Result<Vec<RealtimeSessionRecord>, AgentError> {
         let state = self.connected_state()?.clone();
         let response = match self
@@ -287,6 +316,9 @@ impl RealtimeSessionController {
         Ok(vec![completed])
     }
 
+    /// Close.
+    /// This journals close intent/result and calls the realtime adapter to close the active
+    /// session.
     pub fn close(
         &mut self,
         reason: RealtimeCloseReason,
@@ -432,45 +464,80 @@ fn journal_failure(error: AgentError) -> AgentError {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds realtime completion gate application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RealtimeCompletionGate {
+    /// Whether final visible output seen is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub final_visible_output_seen: bool,
+    /// Whether terminal event replayable is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub terminal_event_replayable: bool,
+    /// Whether stream-intervention processing has reached its terminal completion gate.
+    /// Run completion should wait for this when stream rules can mask, abort, or retry output.
     pub stream_interventions_terminal: bool,
+    /// Whether realtime sessions terminal is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub realtime_sessions_terminal: bool,
+    /// Output delivery setting or policy.
+    /// Delivery coordinators use it to decide sink mode, dedupe, and required evidence.
     pub output_delivery_terminal: bool,
+    /// Whether approvals terminal is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub approvals_terminal: bool,
+    /// Whether journal terminal is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub journal_terminal: bool,
 }
 
 impl RealtimeCompletionGate {
+    /// Mark final visible output.
+    /// This marks the in-memory completion gate for final visible output and does not publish
+    /// events.
     pub fn mark_final_visible_output(&mut self) {
         self.final_visible_output_seen = true;
     }
 
+    /// Mark terminal event replayable.
+    /// This flips the in-memory completion gate for replayable terminal events.
     pub fn mark_terminal_event_replayable(&mut self) {
         self.terminal_event_replayable = true;
     }
 
+    /// Mark stream interventions terminal.
+    /// This operates on realtime session or completion-gate state only.
     pub fn mark_stream_interventions_terminal(&mut self) {
         self.stream_interventions_terminal = true;
     }
 
+    /// Mark realtime sessions terminal.
+    /// This flips the in-memory completion gate for terminal realtime sessions.
     pub fn mark_realtime_sessions_terminal(&mut self) {
         self.realtime_sessions_terminal = true;
     }
 
+    /// Mark output delivery terminal.
+    /// This flips the in-memory completion gate for terminal output delivery.
     pub fn mark_output_delivery_terminal(&mut self) {
         self.output_delivery_terminal = true;
     }
 
+    /// Mark approvals terminal.
+    /// This marks the in-memory completion gate for terminal approvals and does not publish
+    /// events.
     pub fn mark_approvals_terminal(&mut self) {
         self.approvals_terminal = true;
     }
 
+    /// Mark journal terminal.
+    /// This marks the in-memory completion gate for terminal journal state and does not append
+    /// a record.
     pub fn mark_journal_terminal(&mut self) {
         self.journal_terminal = true;
     }
 
+    /// Returns whether can complete run applies for this contract.
+    /// This reads the realtime completion gates and does not mutate state.
     pub fn can_complete_run(&self) -> bool {
         self.final_visible_output_seen
             && self.terminal_event_replayable

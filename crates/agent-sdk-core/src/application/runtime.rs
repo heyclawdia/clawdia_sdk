@@ -1,3 +1,8 @@
+//! Runtime coordination for starting, observing, and completing runs. Use this module
+//! when a host wires providers, package resolution, policy, journals, and event
+//! streams into the core loop. Runtime methods may call configured adapters, mutate
+//! run state, append journals, and publish events.
+//!
 use std::{
     collections::BTreeMap,
     sync::{
@@ -29,15 +34,25 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds agent runtime application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentRuntime {
     inner: Arc<RuntimeInner>,
 }
 
 impl AgentRuntime {
+    /// Starts a builder for this application::runtime value. Building
+    /// is data-only; runtime side effects occur only when a later
+    /// coordinator or host port executes the built configuration.
     pub fn builder() -> AgentRuntimeBuilder {
         AgentRuntimeBuilder::default()
     }
 
+    /// Registers a run with the runtime and returns a handle for control and
+    /// subscription.
+    /// This resolves package, provider, journal, event, content, and policy
+    /// ports, evaluates start policy, mutates the run registry, and registers
+    /// run control; it does not call the provider model.
     pub fn start_run(&self, request: RunRequest) -> Result<RunHandle, AgentError> {
         let _journal = self.journal_port(&request.run_id)?;
         let _events = self.event_bus_port(&request.run_id)?;
@@ -76,11 +91,19 @@ impl AgentRuntime {
         ))
     }
 
+    /// Runs a P0 text request to completion through the configured runtime.
+    /// This registers the run, calls the P0 loop driver, and may use provider,
+    /// journal, content, event, validation, and policy ports selected by the
+    /// resolved package.
     pub fn run_text(&self, request: RunRequest) -> Result<RunResult, AgentError> {
         let handle = self.start_run(request.clone())?;
         crate::loop_driver::run_p0_text(self, request, handle)
     }
 
+    /// Runs a typed request by attaching the model's output contract and using
+    /// the same runtime path as `run_text`.
+    /// Validation and repair side effects remain on the canonical P1 output
+    /// pipeline; this helper does not create a parallel typed-output path.
     pub fn run_typed<T: crate::typed_output_ports::TypedOutputModel>(
         &self,
         request: RunRequest,
@@ -88,6 +111,9 @@ impl AgentRuntime {
         self.run_text(request.with_output_contract(crate::output::OutputContract::for_type::<T>()))
     }
 
+    /// Resolve effective package.
+    /// This reads configured runtime package state, applies request-level tightening, and
+    /// computes the package fingerprint; it does not call provider or tool executors.
     pub fn resolve_effective_package(
         &self,
         request: &RunRequest,
@@ -145,6 +171,9 @@ impl AgentRuntime {
         })
     }
 
+    /// Cancel run.
+    /// This marks the registered run as cancellation requested and forwards the request to run
+    /// control; actual adapter cleanup happens in the owning control path.
     pub fn cancel_run(&self, run_id: &RunId) -> Result<(), AgentError> {
         let mut runs = self
             .inner
@@ -168,6 +197,8 @@ impl AgentRuntime {
         Ok(())
     }
 
+    /// Returns run snapshot for callers that need to inspect the contract state.
+    /// This reads the in-memory run registry and returns a snapshot without mutating run state.
     pub fn run_snapshot(&self, run_id: &RunId) -> Result<RunSnapshot, AgentError> {
         let runs = self
             .inner
@@ -189,6 +220,9 @@ impl AgentRuntime {
             })
     }
 
+    /// Returns registered run count for callers that need to inspect the contract state.
+    /// This reads the in-memory run registry length without starting, cancelling, or replaying
+    /// runs.
     pub fn registered_run_count(&self) -> Result<usize, AgentError> {
         Ok(self
             .inner
@@ -198,10 +232,16 @@ impl AgentRuntime {
             .len())
     }
 
+    /// Returns the configured event bus as a subscription source.
+    /// This retrieves the port so callers can subscribe; it does not publish events or drive a
+    /// run.
     pub fn events(&self) -> Result<Arc<dyn AgentEventBus>, AgentError> {
         self.event_bus_subscription_port()
     }
 
+    /// Subscribe all.
+    /// This delegates to the configured event bus to create a read-only stream for all visible
+    /// events.
     pub fn subscribe_all(
         &self,
         cursor: Option<EventCursor>,
@@ -209,6 +249,9 @@ impl AgentRuntime {
         self.event_bus_subscription_port()?.subscribe_all(cursor)
     }
 
+    /// Subscribe run.
+    /// This delegates to the configured event bus to create a read-only stream scoped to one
+    /// run.
     pub fn subscribe_run(
         &self,
         run_id: RunId,
@@ -218,6 +261,9 @@ impl AgentRuntime {
             .subscribe_run(run_id, cursor)
     }
 
+    /// Subscribe agent.
+    /// This delegates to the event-bus subscription port to create a read-only stream for
+    /// matching agent events.
     pub fn subscribe_agent(
         &self,
         agent_id: AgentId,
@@ -227,6 +273,8 @@ impl AgentRuntime {
             .subscribe_agent(agent_id, cursor)
     }
 
+    /// Subscribe events.
+    /// This delegates to the event-bus subscription port to create a read-only filtered stream.
     pub fn subscribe_events(
         &self,
         filter: CompiledEventFilter,
@@ -236,10 +284,16 @@ impl AgentRuntime {
             .subscribe_filtered(filter, cursor)
     }
 
+    /// Returns provider registry for callers that need to inspect the contract state.
+    /// This returns the configured provider registry reference; callers must still use
+    /// policy-checked runtime paths to execute providers.
     pub fn provider_registry(&self) -> &ProviderRegistry {
         &self.inner.providers
     }
 
+    /// Returns the output sinks currently held by this value.
+    /// This returns the configured sink registry; sending remains owned by output-delivery
+    /// paths.
     pub fn output_sinks(&self) -> &OutputSinkRegistry {
         &self.inner.output_sinks
     }
@@ -265,6 +319,8 @@ impl AgentRuntime {
         Ok(())
     }
 
+    /// Returns the provider adapter configured for the runtime package route.
+    /// This is a registry lookup only; the provider call happens later in the loop driver.
     pub(crate) fn provider_for(
         &self,
         package: &RuntimePackage,
@@ -289,6 +345,8 @@ impl AgentRuntime {
             })
     }
 
+    /// Returns the provider adapter configured for a route id.
+    /// This is a registry lookup only; it does not send a model request.
     pub(crate) fn provider_for_route(
         &self,
         route_id: &str,
@@ -344,6 +402,8 @@ impl AgentRuntime {
             .ok_or_else(|| missing_port_error("runtime package resolver", run_id))
     }
 
+    /// Returns the journal port currently held by this value.
+    /// This returns the journal port selected for the run and does not append a record.
     pub(crate) fn journal_port(&self, run_id: &RunId) -> Result<Arc<dyn RunJournal>, AgentError> {
         self.inner
             .journal
@@ -351,6 +411,8 @@ impl AgentRuntime {
             .ok_or_else(|| missing_port_error("run journal", run_id))
     }
 
+    /// Returns the event bus port selected for the run.
+    /// This retrieves the configured port without publishing an event.
     pub(crate) fn event_bus_port(
         &self,
         run_id: &RunId,
@@ -368,6 +430,8 @@ impl AgentRuntime {
             .ok_or_else(|| missing_runtime_port_error("agent event bus"))
     }
 
+    /// Returns the content port currently held by this value.
+    /// This returns the content resolver selected for the run and does not resolve raw content.
     pub(crate) fn content_port(
         &self,
         run_id: &RunId,
@@ -385,6 +449,9 @@ impl AgentRuntime {
             .ok_or_else(|| missing_port_error("runtime policy port", run_id))
     }
 
+    /// Seals run-control terminal state from a journal terminal record.
+    /// This delegates to the run-control store and may mutate handle state; it does not append a
+    /// new journal record or publish an event.
     pub(crate) fn seal_terminal_result_from_journal(
         &self,
         record: &JournalRecord,
@@ -395,6 +462,8 @@ impl AgentRuntime {
             .seal_terminal_result_from_journal(record, output)
     }
 
+    /// Allocates the next in-memory journal sequence number for this runtime.
+    /// This advances an atomic counter; the caller is responsible for appending the record.
     pub(crate) fn next_journal_seq(&self) -> u64 {
         self.inner.next_journal_seq.fetch_add(1, Ordering::SeqCst) + 1
     }
@@ -409,6 +478,8 @@ impl Default for AgentRuntime {
 }
 
 #[derive(Default)]
+/// Holds agent runtime builder application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct AgentRuntimeBuilder {
     providers: ProviderRegistry,
     package_resolver: Option<Arc<dyn RuntimePackageResolver>>,
@@ -422,11 +493,15 @@ pub struct AgentRuntimeBuilder {
 }
 
 impl AgentRuntimeBuilder {
+    /// Returns an updated value with providers configured.
+    /// This stores a provider registry in the builder and performs no provider calls.
     pub fn providers(mut self, providers: ProviderRegistry) -> Self {
         self.providers = providers;
         self
     }
 
+    /// Returns an updated value with provider configured.
+    /// This adds one provider adapter to the builder registry and performs no provider calls.
     pub fn provider<P>(
         mut self,
         route_id: impl Into<String>,
@@ -439,6 +514,9 @@ impl AgentRuntimeBuilder {
         Ok(self)
     }
 
+    /// Returns an updated value with package resolver configured.
+    /// This is builder configuration only; it stores the resolver for future run starts and
+    /// performs no I/O.
     pub fn package_resolver<R>(mut self, resolver: R) -> Self
     where
         R: RuntimePackageResolver + 'static,
@@ -447,22 +525,32 @@ impl AgentRuntimeBuilder {
         self
     }
 
+    /// Returns an updated value with default package id configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn default_package_id(mut self, package_id: RuntimePackageId) -> Self {
         self.default_package_id = Some(package_id);
         self
     }
 
+    /// Returns an updated value with package configured.
+    /// This reads or configures runtime state without executing a provider or tool.
     pub fn package(mut self, package: RuntimePackage) -> Self {
         self.local_packages.push(package);
         self
     }
 
+    /// Returns an updated value with default package configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn default_package(mut self, package: RuntimePackage) -> Self {
         self.default_package_id = Some(package.package_id.clone());
         self.local_packages.push(package);
         self
     }
 
+    /// Returns an updated value with journal configured.
+    /// This reads or configures runtime state without executing a provider or tool.
     pub fn journal<J>(mut self, journal: J) -> Self
     where
         J: RunJournal + 'static,
@@ -471,6 +559,8 @@ impl AgentRuntimeBuilder {
         self
     }
 
+    /// Returns an updated value with event bus configured.
+    /// This stores the event-bus port in the builder and does not publish events.
     pub fn event_bus<E>(mut self, event_bus: E) -> Self
     where
         E: AgentEventBus + 'static,
@@ -479,6 +569,8 @@ impl AgentRuntimeBuilder {
         self
     }
 
+    /// Returns an updated value with content configured.
+    /// This reads or configures runtime state without executing a provider or tool.
     pub fn content<C>(mut self, content: C) -> Self
     where
         C: ContentResolver + Send + Sync + 'static,
@@ -487,6 +579,9 @@ impl AgentRuntimeBuilder {
         self
     }
 
+    /// Returns policy for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn policy<P>(mut self, policy: P) -> Self
     where
         P: RuntimePolicyPort + 'static,
@@ -495,6 +590,9 @@ impl AgentRuntimeBuilder {
         self
     }
 
+    /// Returns output sink for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn output_sink<S>(mut self, sink: S) -> Result<Self, AgentError>
     where
         S: OutputSinkPort + 'static,
@@ -503,6 +601,9 @@ impl AgentRuntimeBuilder {
         Ok(self)
     }
 
+    /// Finishes builder validation and returns the configured value.
+    /// This is data-only unless the surrounding builder explicitly
+    /// documents adapter or store access.
     pub fn build(self) -> Result<AgentRuntime, AgentError> {
         let package_resolver = match (self.package_resolver, self.local_packages.is_empty()) {
             (Some(resolver), _) => Some(resolver),
@@ -545,44 +646,78 @@ struct RuntimeInner {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds effective runtime package application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct EffectiveRuntimePackage {
+    /// Package used by this record or request.
     pub package: RuntimePackage,
+    /// Deterministic fingerprint for package, event, telemetry, or validation
+    /// evidence.
     pub fingerprint: RuntimePackageFingerprint,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds run snapshot application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RunSnapshot {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Finite status for this record or lifecycle stage.
     pub status: RunRegistryStatus,
+    /// Stable runtime package id used for typed lineage, lookup, or dedupe.
     pub runtime_package_id: RuntimePackageId,
+    /// Fingerprint of the runtime package snapshot in force when this value was produced.
+    /// Use it for replay, dedupe, and package-lineage checks; the field is evidence and does
+    /// not execute package behavior.
     pub runtime_package_fingerprint: RuntimePackageFingerprint,
+    /// Stable provider route id used for typed lineage, lookup, or dedupe.
     pub provider_route_id: String,
+    /// Stable provider model id used for typed lineage, lookup, or dedupe.
     pub provider_model_id: String,
+    /// Whether cancellation requested is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub cancellation_requested: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Enumerates the finite run registry status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum RunRegistryStatus {
+    /// Use this variant when the contract needs to represent registered; selecting it has no side effect by itself.
     Registered,
+    /// Use this variant when the contract needs to represent cancellation requested; selecting it has no side effect by itself.
     CancellationRequested,
 }
 
 #[derive(Clone, Default)]
+/// Holds cancellation handle application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct CancellationHandle {
     cancelled: Arc<AtomicBool>,
 }
 
 impl CancellationHandle {
+    /// Creates a new application::runtime value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Cancel.
+    /// This flips the cancellation token in memory; callers still need the owning run path to
+    /// observe and apply cancellation.
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
     }
 
+    /// Reports whether this value is cancelled. The check is pure and
+    /// does not mutate SDK or host state.
     pub fn is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::SeqCst)
     }

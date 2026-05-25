@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the sqlite portion of that contract.
+//!
 use std::path::Path;
 
 use rusqlite::{Connection, OpenFlags, types::ValueRef};
@@ -13,6 +19,9 @@ const MAX_SAMPLE_ROWS: usize = 3;
 const MAX_SAMPLE_COLUMNS: usize = 12;
 const MAX_CELL_BYTES: usize = 120;
 
+/// Render sqlite.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_sqlite(
     path: &Path,
     max_output_bytes: u64,

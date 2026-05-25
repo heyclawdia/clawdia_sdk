@@ -1,3 +1,8 @@
+//! Loop driver for the first text-run proof. Use it to connect the runtime package,
+//! context projection, provider port, event bus, and journal in one canonical P0
+//! execution path. Driving the loop may call provider adapters, append journals, and
+//! publish events.
+//!
 use sha2::{Digest, Sha256};
 
 use serde_json::Value;
@@ -48,6 +53,9 @@ use crate::{
     validation::{JsonSchemaSubsetValidator, OutputCandidate, StructuredOutputValidator},
 };
 
+/// Drives the canonical P0 text run loop.
+/// This resolves runtime ports, appends journal records, publishes run/model events, calls the
+/// configured provider adapter, and seals terminal run-control state.
 pub fn run_p0_text(
     runtime: &AgentRuntime,
     request: RunRequest,

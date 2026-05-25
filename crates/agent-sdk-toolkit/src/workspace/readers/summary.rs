@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the summary portion of that contract.
+//!
 use agent_sdk_core::AgentError;
 
 use super::{RenderedRead, add_truncation_guidance, text};
@@ -6,6 +12,9 @@ use crate::workspace::{
     util::truncate_bytes,
 };
 
+/// Render binary summary.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_binary_summary(bytes: &[u8], max_output_bytes: u64) -> RenderedRead {
     let mut rendered = RenderedRead {
         content: String::new(),
@@ -31,6 +40,9 @@ pub(super) fn render_binary_summary(bytes: &[u8], max_output_bytes: u64) -> Rend
     rendered
 }
 
+/// Renders or detects bounded workspace content for
+/// workspace::readers::summary. It may read already-approved local file data
+/// but does not mutate the workspace.
 pub(super) fn render_bounded_prefix_read(
     bytes: &[u8],
     detection: &WorkspaceReadDetection,

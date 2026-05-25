@@ -1,3 +1,8 @@
+//! Reconnectable run-handle helpers. Use this module when a host needs to wait for
+//! output, stream events from a cursor, replay journal frames, or request
+//! cancellation. Handle operations read or mutate the configured run-control store
+//! and may publish cancellation intent.
+//!
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -14,6 +19,8 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds run handle application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RunHandle {
     run_id: RunId,
     control: Arc<dyn RunControlStore>,
@@ -21,6 +28,9 @@ pub struct RunHandle {
 }
 
 impl RunHandle {
+    /// Creates a new application::run_handle value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         run_id: RunId,
         control: Arc<dyn RunControlStore>,
@@ -33,10 +43,15 @@ impl RunHandle {
         }
     }
 
+    /// Returns run id for this application::run_handle value without
+    /// performing external I/O.
     pub fn run_id(&self) -> &RunId {
         &self.run_id
     }
 
+    /// Returns the terminal result once the handle store, terminal event, and
+    /// journal agree. This reads run-control state and does not drive the run or
+    /// start new side effects.
     pub fn wait(&self) -> Result<RunResult, AgentError> {
         self.consistent_terminal_result()?.ok_or_else(|| {
             AgentError::contract_violation(
@@ -45,19 +60,30 @@ impl RunHandle {
         })
     }
 
+    /// Returns the terminal result if it is already available before the
+    /// timeout budget. This first-slice implementation is non-blocking and does
+    /// not cancel or drive the run.
     pub fn wait_with_timeout(&self, _timeout: Duration) -> Result<Option<RunResult>, AgentError> {
         self.consistent_terminal_result()
     }
 
+    /// Returns the status currently held by this value.
+    /// This reads run-control status for the handle and does not change the run.
     pub fn status(&self) -> Result<RunStatus, AgentError> {
         self.control.status(&self.run_id)
     }
 
+    /// Opens an event stream for this run from the supplied live-event cursor.
+    /// This delegates to the configured subscription port to create a read-only stream; it does
+    /// not drive the run, execute tools, or call the provider.
     pub fn stream_from(&self, cursor: Option<EventCursor>) -> Result<AgentEventStream, AgentError> {
         self.subscriptions
             .subscribe_run(self.run_id.clone(), cursor)
     }
 
+    /// Opens a replay-derived stream for this run from a journal cursor.
+    /// This delegates to the subscription port's journal replay path and does not mutate run
+    /// control or execute runtime work.
     pub fn stream_from_journal(
         &self,
         cursor: JournalCursor,
@@ -66,6 +92,9 @@ impl RunHandle {
             .replay_run_from_cursor(self.run_id.clone(), cursor)
     }
 
+    /// Cancel.
+    /// This forwards cancellation to run control; adapter/process cleanup remains owned by the
+    /// run coordinator.
     pub fn cancel(&self) -> Result<(), AgentError> {
         self.control.request_cancel(&self.run_id)
     }
@@ -115,18 +144,33 @@ impl core::fmt::Debug for RunHandle {
     }
 }
 
+/// Port or behavior contract for run control store. Implementors should
+/// preserve policy, redaction, idempotency, and replay expectations
+/// from the surrounding module. Implementations may perform side
+/// effects only as described by the trait methods.
 pub trait RunControlStore: Send + Sync {
+    /// Returns the status currently held by this value.
+    /// This reads run-control status for the handle and does not change the run.
     fn status(&self, run_id: &RunId) -> Result<RunStatus, AgentError>;
+    /// Returns terminal result for callers that need to inspect the contract state.
+    /// Implementations read terminal result state for the run and do not change run status.
     fn terminal_result(&self, run_id: &RunId) -> Result<Option<RunResult>, AgentError>;
+    /// Requests cancellation for a registered run.
+    /// Implementations may mutate run-control state to record the request; provider/tool cleanup
+    /// remains owned by the run coordinator that observes the cancellation.
     fn request_cancel(&self, run_id: &RunId) -> Result<(), AgentError>;
 }
 
 #[derive(Clone, Debug, Default)]
+/// Holds in memory run control store application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct InMemoryRunControlStore {
     records: Arc<Mutex<BTreeMap<RunId, RunControlRecord>>>,
 }
 
 impl InMemoryRunControlStore {
+    /// Register run.
+    /// This inserts a run into in-memory test run-control state for deterministic handle tests.
     pub fn register_run(&self, run_id: RunId, agent_id: AgentId) -> Result<(), AgentError> {
         self.records
             .lock()
@@ -136,6 +180,8 @@ impl InMemoryRunControlStore {
         Ok(())
     }
 
+    /// Mark visible output complete.
+    /// This records final visible output in in-memory test run-control state.
     pub fn mark_visible_output_complete(
         &self,
         run_id: &RunId,
@@ -152,6 +198,9 @@ impl InMemoryRunControlStore {
         Ok(())
     }
 
+    /// Seals terminal run-control state from a journal terminal record.
+    /// This stores the derived `RunResult` in the in-memory run-control map; it does not append a
+    /// journal record, publish an event, or execute provider/tool work.
     pub fn seal_terminal_result_from_journal(
         &self,
         record: &JournalRecord,
@@ -194,6 +243,8 @@ impl InMemoryRunControlStore {
         Ok(result)
     }
 
+    /// Returns the cancel request count currently held by this value.
+    /// This reads the number of cancellation requests recorded for the run.
     pub fn cancel_request_count(&self, run_id: &RunId) -> Result<usize, AgentError> {
         Ok(self
             .records
@@ -204,6 +255,9 @@ impl InMemoryRunControlStore {
             .unwrap_or(0))
     }
 
+    /// Returns visible output for callers that need to inspect the contract state.
+    /// This reads visible output state from run control and does not change run status or
+    /// output delivery.
     pub fn visible_output(&self, run_id: &RunId) -> Result<Option<String>, AgentError> {
         Ok(self
             .records

@@ -1,3 +1,7 @@
+//! Newline-delimited JSON-RPC transport helpers. Use this module for deterministic
+//! stdio-style tests and lightweight protocol harnesses. Endpoint helpers mutate
+//! in-memory transcripts and codec helpers read or write caller-provided streams.
+//!
 use std::{
     collections::VecDeque,
     io::{BufRead, Cursor, Write},
@@ -13,9 +17,14 @@ use super::json_rpc::{
 };
 
 #[derive(Clone, Debug, Default)]
+/// Protocol json rpc line codec value used by toolkit JSON-RPC adapters.
+/// Constructing the value prepares protocol data; endpoint and transport methods own transcript or I/O effects.
 pub struct JsonRpcLineCodec;
 
 impl JsonRpcLineCodec {
+    /// Writes one newline-delimited JSON-RPC frame or raw line to the
+    /// caller-provided writer. It does not launch a process, open sockets, or
+    /// persist transport state.
     pub fn write_frame(writer: &mut impl Write, frame: &JsonRpcFrame) -> Result<(), AgentError> {
         let line = frame.to_line()?;
         writer.write_all(line.as_bytes()).map_err(stdio_error)?;
@@ -23,6 +32,9 @@ impl JsonRpcLineCodec {
         writer.flush().map_err(stdio_error)
     }
 
+    /// Reads one newline-delimited JSON-RPC frame or raw line from the
+    /// caller-provided reader. It does not launch a process, open sockets, or
+    /// persist transport state.
     pub fn read_frame(reader: &mut impl BufRead) -> Result<Option<JsonRpcFrame>, AgentError> {
         let Some(line) = Self::read_line(reader)? else {
             return Ok(None);
@@ -30,6 +42,9 @@ impl JsonRpcLineCodec {
         JsonRpcFrame::from_line(&line).map(Some)
     }
 
+    /// Writes one newline-delimited JSON-RPC frame or raw line to the
+    /// caller-provided writer. It does not launch a process, open sockets, or
+    /// persist transport state.
     pub fn write_raw_line(writer: &mut impl Write, line: &str) -> Result<(), AgentError> {
         validate_json_rpc_line(line)?;
         writer.write_all(line.as_bytes()).map_err(stdio_error)?;
@@ -37,6 +52,9 @@ impl JsonRpcLineCodec {
         writer.flush().map_err(stdio_error)
     }
 
+    /// Reads one newline-delimited JSON-RPC frame or raw line from the
+    /// caller-provided reader. It does not launch a process, open sockets, or
+    /// persist transport state.
     pub fn read_line(reader: &mut impl BufRead) -> Result<Option<String>, AgentError> {
         let mut line = String::new();
         let read = reader.read_line(&mut line).map_err(stdio_error)?;
@@ -55,6 +73,8 @@ impl JsonRpcLineCodec {
 }
 
 #[derive(Clone, Debug)]
+/// Protocol json rpc line endpoint value used by toolkit JSON-RPC adapters.
+/// Constructing the value prepares protocol data; endpoint and transport methods own transcript or I/O effects.
 pub struct JsonRpcLineEndpoint {
     name: String,
     incoming: Arc<Mutex<VecDeque<Vec<u8>>>>,
@@ -64,6 +84,9 @@ pub struct JsonRpcLineEndpoint {
 }
 
 impl JsonRpcLineEndpoint {
+    /// Builds the pair value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn pair(left_name: impl Into<String>, right_name: impl Into<String>) -> (Self, Self) {
         let left_to_right = Arc::new(Mutex::new(VecDeque::new()));
         let right_to_left = Arc::new(Mutex::new(VecDeque::new()));
@@ -84,10 +107,14 @@ impl JsonRpcLineEndpoint {
         (left, right)
     }
 
+    /// Returns the name currently held by this value.
+    /// This reads endpoint metadata or a queued response from the in-memory transport.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Queues a JSON-RPC frame on the paired in-memory endpoint and records
+    /// transcript state for tests; it performs no OS-level I/O.
     pub fn send_frame(&self, frame: JsonRpcFrame) -> Result<String, AgentError> {
         let line = frame.to_line()?;
         let mut bytes = Vec::new();
@@ -96,6 +123,8 @@ impl JsonRpcLineEndpoint {
         Ok(line)
     }
 
+    /// Queues a JSON-RPC frame on the paired in-memory endpoint and records
+    /// transcript state for tests; it performs no OS-level I/O.
     pub fn send_raw_line(&self, line: impl Into<String>) -> Result<(), AgentError> {
         let line = line.into();
         let mut bytes = Vec::new();
@@ -103,6 +132,8 @@ impl JsonRpcLineEndpoint {
         self.queue_line(line, bytes)
     }
 
+    /// Reads a JSON-RPC line or frame from the in-memory endpoint queue. It
+    /// does not perform OS-level I/O.
     pub fn try_receive_raw_line(&self) -> Result<Option<String>, AgentError> {
         let Some(bytes) = self
             .incoming
@@ -123,18 +154,24 @@ impl JsonRpcLineEndpoint {
         Ok(line)
     }
 
+    /// Reads a JSON-RPC line or frame from the in-memory endpoint queue. It
+    /// does not perform OS-level I/O.
     pub fn try_receive_frame(&self) -> Result<Option<JsonRpcFrame>, AgentError> {
         self.try_receive_raw_line()?
             .map(|line| JsonRpcFrame::from_line(&line))
             .transpose()
     }
 
+    /// Reads a JSON-RPC line or frame from the in-memory endpoint queue. It
+    /// does not perform OS-level I/O.
     pub fn receive_frame(&self) -> Result<JsonRpcFrame, AgentError> {
         self.try_receive_frame()?.ok_or_else(|| {
             protocol_violation(format!("{} has no queued json-rpc frame", self.name))
         })
     }
 
+    /// Queues a JSON-RPC frame on the paired in-memory endpoint and records
+    /// transcript state for tests; it performs no OS-level I/O.
     pub fn send_request(
         &self,
         id: impl Into<JsonRpcId>,
@@ -146,6 +183,8 @@ impl JsonRpcLineEndpoint {
         )))
     }
 
+    /// Queues a JSON-RPC frame on the paired in-memory endpoint and records
+    /// transcript state for tests; it performs no OS-level I/O.
     pub fn send_notification(
         &self,
         method: impl Into<String>,
@@ -156,6 +195,8 @@ impl JsonRpcLineEndpoint {
         )))
     }
 
+    /// Queues a JSON-RPC frame on the paired in-memory endpoint and records
+    /// transcript state for tests; it performs no OS-level I/O.
     pub fn send_result(
         &self,
         id: JsonRpcId,
@@ -164,6 +205,8 @@ impl JsonRpcLineEndpoint {
         self.send_frame(JsonRpcFrame::Response(JsonRpcResponse::result(id, result)))
     }
 
+    /// Queues a JSON-RPC frame on the paired in-memory endpoint and records
+    /// transcript state for tests; it performs no OS-level I/O.
     pub fn send_error(
         &self,
         id: Option<JsonRpcId>,
@@ -175,14 +218,21 @@ impl JsonRpcLineEndpoint {
         )))
     }
 
+    /// Returns the response currently held by this value.
+    /// This reads endpoint metadata or a queued response from the in-memory transport.
     pub fn response(&self) -> Result<JsonRpcResponse, AgentError> {
         expect_response(self.receive_frame()?)
     }
 
+    /// Returns notification for this protocol::line_transport value without
+    /// performing external I/O.
     pub fn notification(&self) -> Result<JsonRpcNotification, AgentError> {
         expect_notification(self.receive_frame()?)
     }
 
+    /// Returns sent lines for this protocol::line_transport value without
+    /// performing external I/O. Panics only if the in-memory test transcript
+    /// lock is poisoned.
     pub fn sent_lines(&self) -> Vec<String> {
         self.sent_lines
             .lock()
@@ -190,6 +240,9 @@ impl JsonRpcLineEndpoint {
             .clone()
     }
 
+    /// Returns received lines for this protocol::line_transport value without
+    /// performing external I/O. Panics only if the in-memory test transcript
+    /// lock is poisoned.
     pub fn received_lines(&self) -> Vec<String> {
         self.received_lines
             .lock()

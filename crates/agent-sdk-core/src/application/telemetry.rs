@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the telemetry portion of that contract.
+//!
 use std::{
     collections::{BTreeMap, VecDeque},
     num::NonZeroUsize,
@@ -25,14 +31,25 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds telemetry fanout config application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryFanoutConfig {
+    /// Queue capacity used by this record or request.
     pub queue_capacity: NonZeroUsize,
+    /// Queue slots reserved for terminal frames.
+    /// This keeps important terminal events available even when non-terminal frames overflow.
     pub terminal_reserve: NonZeroUsize,
+    /// Overflow policy applied when a subscriber queue reaches capacity.
+    /// It decides whether to drop, summarize, backpressure, or fail the subscriber.
     pub overflow: TelemetryOverflowPolicy,
+    /// Sink isolation used by this record or request.
     pub sink_isolation: TelemetrySinkIsolationPolicy,
 }
 
 impl TelemetryFanoutConfig {
+    /// Returns an updated value with safe defaults configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn safe_defaults() -> Self {
         Self {
             queue_capacity: NonZeroUsize::new(64).expect("nonzero queue capacity"),
@@ -42,6 +59,9 @@ impl TelemetryFanoutConfig {
         }
     }
 
+    /// Builds the tiny for tests value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn tiny_for_tests() -> Self {
         Self {
             queue_capacity: NonZeroUsize::new(2).expect("nonzero queue capacity"),
@@ -60,25 +80,38 @@ impl Default for TelemetryFanoutConfig {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite telemetry overflow policy cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum TelemetryOverflowPolicy {
+    /// Use this variant when the contract needs to represent drop non terminal progress; selecting it has no side effect by itself.
     DropNonTerminalProgress,
+    /// Use this variant when the contract needs to represent coalesce progress by run; selecting it has no side effect by itself.
     CoalesceProgressByRun,
+    /// Use this variant when the contract needs to represent fail sink not run; selecting it has no side effect by itself.
     FailSinkNotRun,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite telemetry sink isolation policy cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum TelemetrySinkIsolationPolicy {
+    /// Use this variant when the contract needs to represent isolate each sink; selecting it has no side effect by itself.
     IsolateEachSink,
 }
 
 #[derive(Default)]
+/// Holds telemetry fanout application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryFanout {
     config: TelemetryFanoutConfig,
     sinks: BTreeMap<TelemetrySinkId, TelemetrySinkState>,
 }
 
 impl TelemetryFanout {
+    /// Creates a new application::telemetry value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(config: TelemetryFanoutConfig) -> Self {
         Self {
             config,
@@ -86,10 +119,16 @@ impl TelemetryFanout {
         }
     }
 
+    /// Returns an updated value with safe defaults configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn safe_defaults() -> Self {
         Self::new(TelemetryFanoutConfig::safe_defaults())
     }
 
+    /// Register sink.
+    /// This adds the sink to telemetry fanout state and initializes its bounded in-memory
+    /// queue.
     pub fn register_sink(&mut self, sink: Arc<dyn TelemetrySink>) -> Result<(), AgentError> {
         let spec = sink.spec().clone();
         if spec.sink_id.as_str().is_empty() {
@@ -100,10 +139,16 @@ impl TelemetryFanout {
         Ok(())
     }
 
+    /// Returns sink queue len for callers that need to inspect the contract state.
+    /// This reads the in-memory queue length for one sink and does not drain or export
+    /// telemetry.
     pub fn sink_queue_len(&self, sink_id: &TelemetrySinkId) -> Option<usize> {
         self.sinks.get(sink_id).map(|state| state.queue.len())
     }
 
+    /// Returns queued for sink for callers that need to inspect the contract state.
+    /// This clones queued in-memory telemetry projections for inspection and does not drain or
+    /// export them.
     pub fn queued_for_sink(&self, sink_id: &TelemetrySinkId) -> Vec<TelemetryProjection> {
         self.sinks
             .get(sink_id)
@@ -111,6 +156,9 @@ impl TelemetryFanout {
             .unwrap_or_default()
     }
 
+    /// Sets try record on the value and returns it.
+    /// This enqueues a telemetry projection for eligible sinks and reports overflow or drop
+    /// outcomes.
     pub fn try_record(&mut self, projection: TelemetryProjection) -> TelemetryFanoutReport {
         let mut report = TelemetryFanoutReport::default();
         for state in self.sinks.values_mut() {
@@ -120,6 +168,8 @@ impl TelemetryFanout {
         report
     }
 
+    /// Drain sink.
+    /// This drains queued projections for one sink so tests or adapters can export them.
     pub fn drain_sink(
         &mut self,
         sink_id: &TelemetrySinkId,
@@ -379,31 +429,54 @@ impl TelemetrySinkState {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds telemetry fanout report application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryFanoutReport {
+    /// Enqueued used by this record or request.
     pub enqueued: u64,
+    /// Dropped used by this record or request.
     pub dropped: u64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Bounded records included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub records: Vec<TelemetryRecord>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds telemetry drain report application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryDrainReport {
+    /// Exported used by this record or request.
     pub exported: u64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Bounded records included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub records: Vec<TelemetryRecord>,
 }
 
+/// Holds telemetry usage extraction input application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryUsageExtractionInput {
+    /// Event used by this record or request.
     pub event: AgentEvent,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub event_cursor: Option<EventCursor>,
+    /// Stable provider id used for typed lineage, lookup, or dedupe.
     pub provider_id: Option<String>,
+    /// Stable model id used for typed lineage, lookup, or dedupe.
     pub model_id: Option<String>,
+    /// Usage used by this record or request.
     pub usage: UsageUnits,
 }
 
+/// Holds telemetry usage extractor application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryUsageExtractor;
 
 impl TelemetryUsageExtractor {
+    /// Returns extract from event derived from the supplied state.
+    /// This uses only local coordinator state and performs no hidden host work.
     pub fn extract_from_event(
         input: TelemetryUsageExtractionInput,
     ) -> Result<TelemetryProjection, AgentError> {
@@ -469,6 +542,9 @@ impl TelemetryUsageExtractor {
         })
     }
 
+    /// Builds the usage record record for this contract.
+    /// This builds a telemetry usage record from already redacted accounting data without
+    /// exporting it.
     pub fn usage_record(
         projection: &TelemetryProjection,
         usage_record_id: impl Into<String>,
@@ -485,27 +561,55 @@ impl TelemetryUsageExtractor {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds telemetry content capture request application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryContentCaptureRequest {
+    /// Policy used by this record or request.
     pub policy: ContentCapturePolicy,
+    /// Sink used by this record or request.
     pub sink: TelemetrySinkSpec,
+    /// Requested mode used by this record or request.
     pub requested_mode: TelemetryContentCaptureMode,
+    /// Whether source permits content is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub source_permits_content: bool,
+    /// Retention class for referenced content or records.
+    /// Stores and telemetry sinks use it to decide how long evidence may be kept.
     pub retention_active: bool,
+    /// Whether deterministic telemetry sampling included this projection after policy gates.
+    /// False means the projection should be dropped for sampled sinks even if retention is
+    /// active.
     pub deterministic_sample_included: bool,
+    /// requested bytes used for bounds checks, summaries, or truncation
+    /// evidence.
     pub requested_bytes: u64,
+    /// Stable redaction policy id used for typed lineage, lookup, or dedupe.
     pub redaction_policy_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds telemetry content capture decision application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryContentCaptureDecision {
+    /// Allowlist for this policy or contract.
+    /// Validation uses it to reject undeclared or policy-denied values.
     pub allowed: bool,
+    /// Requested mode used by this record or request.
     pub requested_mode: TelemetryContentCaptureMode,
+    /// Effective mode used by this record or request.
     pub effective_mode: TelemetryContentCaptureMode,
+    /// Redacted explanation for a denial, failure, status, or package delta.
     pub reason: String,
+    /// Stable redaction policy id used for typed lineage, lookup, or dedupe.
     pub redaction_policy_id: String,
+    /// Policy references that govern admission, projection, execution, or
+    /// delivery.
     pub policy_refs: Vec<PolicyRef>,
 }
 
+/// Evaluate content capture.
+/// This evaluates policy for telemetry content capture and performs no capture or sink export
+/// by itself.
 pub fn evaluate_content_capture(
     request: &TelemetryContentCaptureRequest,
 ) -> TelemetryContentCaptureDecision {
@@ -555,13 +659,26 @@ pub fn evaluate_content_capture(
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds telemetry authority boundary application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TelemetryAuthorityBoundary {
+    /// Boolean policy/capability flag for whether can decide run state is
+    /// enabled.
     pub can_decide_run_state: bool,
+    /// Boolean policy/capability flag for whether can decide policy outcome
+    /// is enabled.
     pub can_decide_policy_outcome: bool,
+    /// Boolean policy/capability flag for whether can decide output delivery
+    /// is enabled.
     pub can_decide_output_delivery: bool,
+    /// Whether this telemetry surface is allowed to affect side-effect status.
+    /// Observability-only telemetry should leave this false so telemetry cannot drive run
+    /// control.
     pub can_decide_side_effect_status: bool,
 }
 
+/// Constant value for the application::telemetry contract. Use it to
+/// keep SDK records and tests aligned on the same stable value.
 pub const fn telemetry_authority_boundary() -> TelemetryAuthorityBoundary {
     TelemetryAuthorityBoundary {
         can_decide_run_state: false,
@@ -571,6 +688,8 @@ pub const fn telemetry_authority_boundary() -> TelemetryAuthorityBoundary {
     }
 }
 
+/// Returns terminal run projection from event derived from the supplied state.
+/// This derives SDK state locally and does not call host adapters.
 pub fn terminal_run_projection_from_event(event: AgentEvent) -> TelemetryProjection {
     let envelope = event.envelope;
     let terminal_status = match envelope.event_kind {
@@ -643,6 +762,8 @@ fn apply_sink_content_boundary(
     projection.clone().without_raw_content()
 }
 
+/// Returns sink health projection derived from the supplied state.
+/// This derives SDK state locally and does not call host adapters.
 pub fn sink_health_projection(
     base: &TelemetryProjection,
     sink_id: TelemetrySinkId,

@@ -1,3 +1,7 @@
+//! Workspace write helper. Use this toolkit module for policy-bounded file creation
+//! or replacement. Successful execution mutates files and returns content
+//! refs/metadata for the effect result.
+//!
 use std::{fs, sync::Arc};
 
 use agent_sdk_core::{
@@ -18,30 +22,58 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace write request request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceWriteRequest {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// UTF-8 contents that the workspace write executor will place at the target path.
+    /// Use the write mode to decide whether these bytes create, overwrite, or preview the file.
     pub contents: String,
+    /// Mode that selects how this operation or contract should behave.
+    /// Callers use it to choose the explicit execution path instead of relying on hidden
+    /// defaults.
     pub mode: WorkspaceWriteMode,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite workspace write mode cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum WorkspaceWriteMode {
+    /// Use this variant when the contract needs to represent create new; selecting it has no side effect by itself.
     CreateNew,
+    /// Use this variant when the contract needs to represent overwrite; selecting it has no side effect by itself.
     Overwrite,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace write output request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceWriteOutput {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Whether created is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub created: bool,
+    /// Whether overwritten is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub overwritten: bool,
+    /// Deterministic before hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub before_hash: Option<String>,
+    /// Deterministic after hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub after_hash: String,
+    /// Optional non reversible reason value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub non_reversible_reason: Option<String>,
 }
 
 impl BoundedWorkspace {
+    /// Write.
+    /// This writes to the policy-resolved workspace path and may create or overwrite files only
+    /// according to the request mode.
     pub(super) fn write(
         &self,
         request: &WorkspaceWriteRequest,
@@ -98,6 +130,8 @@ impl BoundedWorkspace {
 }
 
 #[derive(Clone)]
+/// Workspace workspace write executor request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceWriteExecutor {
     executor_ref: ExecutorRef,
     workspace: Arc<BoundedWorkspace>,
@@ -106,6 +140,9 @@ pub struct WorkspaceWriteExecutor {
 }
 
 impl WorkspaceWriteExecutor {
+    /// Creates a new workspace::write value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         workspace: Arc<BoundedWorkspace>,
         arguments: InMemoryJsonArgumentStore,
@@ -119,6 +156,9 @@ impl WorkspaceWriteExecutor {
         }
     }
 
+    /// Pack bundle.
+    /// This returns the toolkit pack bundle that registers the operation route; it does not
+    /// execute the operation.
     pub fn pack_bundle(
         source: agent_sdk_core::SourceRef,
         policy_ref: PolicyRef,

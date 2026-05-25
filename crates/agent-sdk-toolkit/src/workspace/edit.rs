@@ -1,3 +1,7 @@
+//! Workspace edit planner and applier. Use this toolkit module when a host-approved
+//! tool call needs anchor-checked text replacement. Successful execution mutates
+//! files and should be journaled through core effect records by the caller.
+//!
 use std::{fs, sync::Arc};
 
 use agent_sdk_core::{
@@ -19,27 +23,55 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace edit request request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceEditRequest {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Anchor used by this record or request.
     pub anchor: HashLineAnchor,
+    /// Replacement used by this record or request.
     pub replacement: String,
+    /// Whether preview only is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub preview_only: bool,
+    /// Deterministic preview hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub preview_hash: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace edit output request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceEditOutput {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Whether preview only is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub preview_only: bool,
+    /// Whether applied is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub applied: bool,
+    /// Deterministic before hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub before_hash: String,
+    /// Deterministic after hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub after_hash: String,
+    /// Deterministic preview hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub preview_hash: String,
+    /// Diff used by this record or request.
     pub diff: String,
+    /// Optional inverse candidate value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub inverse_candidate: Option<String>,
 }
 
 impl BoundedWorkspace {
+    /// Plans or applies an anchor-checked workspace edit. Preview mode is
+    /// read-only; apply mode mutates the target file only after bounds and
+    /// stale-anchor checks pass.
     pub(super) fn edit(
         &self,
         request: &WorkspaceEditRequest,
@@ -103,6 +135,8 @@ impl BoundedWorkspace {
 }
 
 #[derive(Clone)]
+/// Workspace workspace edit executor request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceEditExecutor {
     executor_ref: ExecutorRef,
     workspace: Arc<BoundedWorkspace>,
@@ -111,6 +145,9 @@ pub struct WorkspaceEditExecutor {
 }
 
 impl WorkspaceEditExecutor {
+    /// Creates a new workspace::edit value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         workspace: Arc<BoundedWorkspace>,
         arguments: InMemoryJsonArgumentStore,
@@ -124,6 +161,9 @@ impl WorkspaceEditExecutor {
         }
     }
 
+    /// Pack bundle.
+    /// This returns the toolkit pack bundle that registers the operation route; it does not
+    /// execute the operation.
     pub fn pack_bundle(
         source: agent_sdk_core::SourceRef,
         policy_ref: PolicyRef,

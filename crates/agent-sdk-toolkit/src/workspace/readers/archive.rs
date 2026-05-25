@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the archive portion of that contract.
+//!
 use std::{
     io::{Cursor, Read},
     path::Path,
@@ -15,6 +21,9 @@ use crate::workspace::{
 const MAX_ARCHIVE_ENTRIES: usize = 200;
 const MAX_ARCHIVE_DECOMPRESSED_BYTES: u64 = 4 * 1024 * 1024;
 
+/// Render archive.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_archive(
     path: &Path,
     bytes: &[u8],

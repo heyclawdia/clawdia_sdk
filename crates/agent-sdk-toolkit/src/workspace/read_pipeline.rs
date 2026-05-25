@@ -1,166 +1,335 @@
+//! Format-aware workspace read pipeline and metadata records. Use this module to
+//! detect file kind, choose bounded extraction behavior, and describe truncation or
+//! parser fallbacks. Pipeline functions read local files but must not leak raw binary
+//! content by default.
+//!
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace read detection request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceReadDetection {
+    /// Kind/category for this record, capability, event, or detected
+    /// resource.
     pub kind: WorkspaceFileKind,
+    /// Detected or declared MIME type used for reader selection and
+    /// provider-safe summaries.
     pub mime_type: String,
+    /// Lowercase file extension used as one detection signal; it is not
+    /// trusted as sole authority.
     pub extension: Option<String>,
+    /// Whether the input is treated as binary so raw bytes are not exposed by
+    /// default.
     pub binary: bool,
+    /// Confidence level for file-kind detection.
     pub confidence: WorkspaceFileTypeConfidence,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace media metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceMediaMetadata {
+    /// Detected media, document, archive, or parser format.
     pub format: String,
+    /// Detected image or media width in pixels when available.
     pub width: Option<u32>,
+    /// Detected image or media height in pixels when available.
     pub height: Option<u32>,
+    /// Decoded image color type when the parser can determine it.
     pub color_type: Option<String>,
+    /// Whether the parser decoded the media/document enough to produce
+    /// structured metadata.
     pub decoded: bool,
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Descriptions of embedded previews discovered in RAW or container
+    /// media.
     pub embedded_previews: Vec<WorkspaceEmbeddedPreviewMetadata>,
+    /// RAW sensor metadata discovered without demosaicing full image data.
     pub raw_sensor: Option<WorkspaceRawSensorMetadata>,
+    /// Apple Photos adjustment sidecar metadata, when a sidecar is present.
     pub apple_photos: Option<WorkspaceApplePhotosMetadata>,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace document metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceDocumentMetadata {
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Count of page items observed or included in this record.
     pub page_count: Option<usize>,
+    /// Number of text characters extracted before truncation or parser
+    /// limits.
     pub extracted_chars: usize,
+    /// OCR requirement or sidecar metadata for scanned PDFs/images.
     pub ocr: Option<WorkspaceOcrMetadata>,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace ocr metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceOcrMetadata {
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Path to a sidecar file used for OCR, Apple Photos adjustments, or
+    /// legacy extraction.
     pub sidecar_path: Option<String>,
+    /// Observed byte length for the source, sidecar, or extracted record.
     pub byte_len: u64,
+    /// Number of text characters extracted before truncation or parser
+    /// limits.
     pub extracted_chars: usize,
+    /// Whether output was shortened by byte, item, page, archive, or parser
+    /// limits.
     pub truncated: bool,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace embedded preview metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceEmbeddedPreviewMetadata {
+    /// Detected or declared MIME type used for reader selection and
+    /// provider-safe summaries.
     pub mime_type: String,
+    /// Observed byte length for the source, sidecar, or extracted record.
     pub byte_len: u64,
+    /// Byte offset where this excerpt, prefix, or sample begins.
     pub offset: Option<u64>,
+    /// Stable hash for the bytes or canonical payload used for stale checks
+    /// and fingerprints.
     pub content_hash: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace raw sensor metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceRawSensorMetadata {
+    /// Optional bits per sample value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub bits_per_sample: Option<u16>,
+    /// Optional compression value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub compression: Option<u16>,
+    /// Optional photometric interpretation value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub photometric_interpretation: Option<u16>,
+    /// Count of strip items observed or included in this record.
     pub strip_count: usize,
+    /// strip byte len used for bounds checks, summaries, or truncation
+    /// evidence.
     pub strip_byte_len: u64,
+    /// Whether decoded pixels is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub decoded_pixels: bool,
+    /// Deterministic sample hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub sample_hash: Option<String>,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace apple photos metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceApplePhotosMetadata {
+    /// Path to a sidecar file used for OCR, Apple Photos adjustments, or
+    /// legacy extraction.
     pub sidecar_path: String,
+    /// Observed byte length for the source, sidecar, or extracted record.
     pub byte_len: u64,
+    /// Count of adjustment items observed or included in this record.
     pub adjustment_count: usize,
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace archive entry request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceArchiveEntry {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Observed byte length for the source, sidecar, or extracted record.
     pub byte_len: u64,
+    /// Whether directory is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub directory: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace archive metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceArchiveMetadata {
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Count of entry items observed or included in this record.
     pub entry_count: usize,
+    /// Bounded entries included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub entries: Vec<WorkspaceArchiveEntry>,
+    /// Whether output was shortened by byte, item, page, archive, or parser
+    /// limits.
     pub truncated: bool,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace sqlite table metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceSqliteTableMetadata {
+    /// Human-readable or protocol-visible name for this SDK item.
     pub name: String,
+    /// Kind/category for this record, capability, event, or detected
+    /// resource.
     pub kind: String,
+    /// Bounded columns included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub columns: Vec<String>,
+    /// Bounded sample rows included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub sample_rows: Vec<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace sqlite metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceSqliteMetadata {
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Count of table items observed or included in this record.
     pub table_count: usize,
+    /// Bounded tables included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub tables: Vec<WorkspaceSqliteTableMetadata>,
+    /// Whether output was shortened by byte, item, page, archive, or parser
+    /// limits.
     pub truncated: bool,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace resource metadata request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceResourceMetadata {
+    /// URI scheme resolved by the resource reader.
     pub scheme: String,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: String,
+    /// Observed byte length for the source, sidecar, or extracted record.
     pub byte_len: u64,
+    /// Parser or fallback path that produced this metadata.
     pub parser: String,
+    /// Non-fatal warnings from bounded readers, parsers, or policy
+    /// downgrades.
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite workspace file kind cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum WorkspaceFileKind {
+    /// Use this variant when the contract needs to represent text; selecting it has no side effect by itself.
     Text,
+    /// Use this variant when the contract needs to represent markdown; selecting it has no side effect by itself.
     Markdown,
+    /// Use this variant when the contract needs to represent json; selecting it has no side effect by itself.
     Json,
+    /// Use this variant when the contract needs to represent pdf; selecting it has no side effect by itself.
     Pdf,
+    /// Use this variant when the contract needs to represent image; selecting it has no side effect by itself.
     Image,
+    /// Use this variant when the contract needs to represent raw image; selecting it has no side effect by itself.
     RawImage,
+    /// Use this variant when the contract needs to represent office document; selecting it has no side effect by itself.
     OfficeDocument,
+    /// Use this variant when the contract needs to represent archive; selecting it has no side effect by itself.
     Archive,
+    /// Use this variant when the contract needs to represent sqlite database; selecting it has no side effect by itself.
     SqliteDatabase,
+    /// Use this variant when the contract needs to represent url resource; selecting it has no side effect by itself.
     UrlResource,
+    /// Use this variant when the contract needs to represent binary; selecting it has no side effect by itself.
     Binary,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite workspace file type confidence cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum WorkspaceFileTypeConfidence {
+    /// Use this variant when the contract needs to represent magic; selecting it has no side effect by itself.
     Magic,
+    /// Use this variant when the contract needs to represent extension; selecting it has no side effect by itself.
     Extension,
+    /// Use this variant when the contract needs to represent utf8; selecting it has no side effect by itself.
     Utf8,
+    /// Use this variant when the contract needs to represent fallback; selecting it has no side effect by itself.
     Fallback,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite workspace reader step cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum WorkspaceReaderStep {
+    /// Use this variant when the contract needs to represent detect file type; selecting it has no side effect by itself.
     DetectFileType,
+    /// Use this variant when the contract needs to represent decode utf8 text; selecting it has no side effect by itself.
     DecodeUtf8Text,
+    /// Use this variant when the contract needs to represent extract pdf text; selecting it has no side effect by itself.
     ExtractPdfText,
+    /// Use this variant when the contract needs to represent inspect image metadata; selecting it has no side effect by itself.
     InspectImageMetadata,
+    /// Use this variant when the contract needs to represent inspect raw image metadata; selecting it has no side effect by itself.
     InspectRawImageMetadata,
+    /// Use this variant when the contract needs to represent inspect raw preview; selecting it has no side effect by itself.
     InspectRawPreview,
+    /// Use this variant when the contract needs to represent inspect apple photos adjustments; selecting it has no side effect by itself.
     InspectApplePhotosAdjustments,
+    /// Use this variant when the contract needs to represent apply ocr fallback; selecting it has no side effect by itself.
     ApplyOcrFallback,
+    /// Use this variant when the contract needs to represent extract office text; selecting it has no side effect by itself.
     ExtractOfficeText,
+    /// Use this variant when the contract needs to represent extract legacy office text; selecting it has no side effect by itself.
     ExtractLegacyOfficeText,
+    /// Use this variant when the contract needs to represent list archive entries; selecting it has no side effect by itself.
     ListArchiveEntries,
+    /// Use this variant when the contract needs to represent inspect sqlite database; selecting it has no side effect by itself.
     InspectSqliteDatabase,
+    /// Use this variant when the contract needs to represent read data url; selecting it has no side effect by itself.
     ReadDataUrl,
+    /// Use this variant when the contract needs to represent fail closed external resource; selecting it has no side effect by itself.
     FailClosedExternalResource,
+    /// Use this variant when the contract needs to represent read bounded prefix; selecting it has no side effect by itself.
     ReadBoundedPrefix,
+    /// Use this variant when the contract needs to represent summarize binary; selecting it has no side effect by itself.
     SummarizeBinary,
 }
 
+/// Detect workspace file.
+/// This inspects the path and byte prefix to choose a reader route and performs no I/O.
 pub fn detect_workspace_file(path: &Path, bytes: &[u8]) -> WorkspaceReadDetection {
     let extension = path
         .extension()

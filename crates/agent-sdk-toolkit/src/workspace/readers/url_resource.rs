@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the url resource portion of that contract.
+//!
 use agent_sdk_core::{AgentError, AgentErrorKind, RetryClassification};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 
@@ -10,6 +16,9 @@ use crate::workspace::{
     util::{hash_bytes, truncate_bytes},
 };
 
+/// Render uri.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_uri(
     uri: &str,
     max_input_bytes: u64,

@@ -1,3 +1,9 @@
+//! Deterministic test-kit helpers for SDK consumers. Use these fakes and harnesses to
+//! exercise public contracts without live providers, real stores, product UI, network
+//! telemetry, or wall-clock-dependent infrastructure. They mutate only their
+//! in-memory state unless noted. This file contains the realtime portion of that
+//! contract.
+//!
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex},
@@ -16,6 +22,8 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
+/// In-memory scripted realtime adapter fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct ScriptedRealtimeAdapter {
     adapter_ref: String,
     calls: Arc<Mutex<Vec<RealtimeAdapterCall>>>,
@@ -25,6 +33,15 @@ pub struct ScriptedRealtimeAdapter {
 }
 
 impl ScriptedRealtimeAdapter {
+    /// Creates a new testing::realtime value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
+    ///
+    /// # Panics
+    ///
+    /// Panics if constructor invariants fail, such as invalid identifier
+    /// text or constructor-specific bounds. Use a fallible constructor such as
+    /// `try_new` when one is available for untrusted input.
     pub fn new(adapter_ref: impl Into<String>) -> Self {
         Self {
             adapter_ref: adapter_ref.into(),
@@ -35,6 +52,9 @@ impl ScriptedRealtimeAdapter {
         }
     }
 
+    /// Push output.
+    /// This reads or mutates deterministic in-memory test state unless the method explicitly
+    /// names a fixture file.
     pub fn push_output(&self, frame: RealtimeOutputFrame) {
         self.output_frames
             .lock()
@@ -42,6 +62,9 @@ impl ScriptedRealtimeAdapter {
             .push_back(frame);
     }
 
+    /// Fail next restart.
+    /// This reads or mutates deterministic in-memory test state unless the method explicitly
+    /// names a fixture file.
     pub fn fail_next_restart(&self, message: impl Into<String>) {
         *self
             .fail_restart
@@ -49,10 +72,15 @@ impl ScriptedRealtimeAdapter {
             .expect("realtime fail restart lock") = Some(message.into());
     }
 
+    /// Operates on in-memory or journal-derived testing::realtime state for
+    /// diagnostics and repair evidence. It does not create a second run loop
+    /// or product workflow owner.
     pub fn calls(&self) -> Vec<RealtimeAdapterCall> {
         self.calls.lock().expect("realtime calls lock").clone()
     }
 
+    /// Returns the call names currently held by this value.
+    /// This configures deterministic in-memory test state only.
     pub fn call_names(&self) -> Vec<&'static str> {
         self.calls().iter().map(RealtimeAdapterCall::name).collect()
     }

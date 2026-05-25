@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the media portion of that contract.
+//!
 use std::{
     fs,
     io::{Cursor, Read},
@@ -16,6 +22,9 @@ use crate::workspace::{
     util::{hash_bytes, tool_failure, truncate_bytes},
 };
 
+/// Renders or detects bounded workspace content for
+/// workspace::readers::media. It may read already-approved local file data
+/// but does not mutate the workspace.
 pub(super) fn render_image(
     path: &Path,
     bytes: &[u8],
@@ -111,6 +120,9 @@ pub(super) fn render_image(
     ))
 }
 
+/// Render raw image.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_raw_image(
     path: &Path,
     bytes: &[u8],

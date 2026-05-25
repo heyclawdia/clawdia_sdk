@@ -1,13 +1,33 @@
+//! Domain primitives for stable SDK vocabulary. Use these items for IDs, refs,
+//! policy, privacy, trust, and errors that cross crate or host boundaries. They are
+//! data-only and must not perform provider, filesystem, network, or UI side effects.
+//! This file contains the ids portion of that contract.
+//!
 use core::fmt;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as DeError};
 
+/// Constant value for the domain::ids contract. Use it to keep SDK
+/// records and tests aligned on the same stable value.
 pub const MAX_ID_LEN: usize = 512;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Enumerates the finite id validation error cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum IdValidationError {
+    /// Use this variant when the contract needs to represent empty; selecting it has no side effect by itself.
     Empty,
-    TooLong { max: usize, actual: usize },
-    ControlCharacter { index: usize },
+    /// Use this variant when the contract needs to represent too long; selecting it has no side effect by itself.
+    TooLong {
+        /// Max used by this record or request.
+        max: usize,
+        /// Actual used by this record or request.
+        actual: usize,
+    },
+    /// Use this variant when the contract needs to represent control character; selecting it has no side effect by itself.
+    ControlCharacter {
+        /// Index used by this record or request.
+        index: usize,
+    },
 }
 
 impl fmt::Display for IdValidationError {
@@ -29,6 +49,9 @@ impl fmt::Display for IdValidationError {
 
 impl std::error::Error for IdValidationError {}
 
+/// Validates the domain::ids invariants and returns a typed error on
+/// failure. Validation is pure and does not perform I/O, dispatch,
+/// journal appends, or adapter calls.
 pub(crate) fn validate_identifier(value: &str) -> Result<(), IdValidationError> {
     if value.is_empty() {
         return Err(IdValidationError::Empty);
@@ -50,21 +73,41 @@ pub(crate) fn validate_identifier(value: &str) -> Result<(), IdValidationError> 
 
 macro_rules! id_newtype {
     ($name:ident) => {
+        #[doc = concat!(
+                            "Typed SDK identifier for `",
+                            stringify!($name),
+                            "`. Use this newtype at public boundaries instead of a raw string; ",
+                            "constructing or cloning it is data-only and performs no side effects."
+                        )]
         #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
         #[serde(transparent)]
         pub struct $name(String);
 
         impl $name {
+            /// Creates a new domain::ids value with explicit
+            /// caller-provided inputs. This constructor is data-only
+            /// and performs no I/O or external side effects.
+            ///
+            /// # Panics
+            ///
+            /// Panics if constructor invariants fail, such as invalid identifier
+            /// text or constructor-specific bounds. Use a fallible constructor such as
+            /// `try_new` when one is available for untrusted input.
             pub fn new(value: impl Into<String>) -> Self {
                 Self::try_new(value).expect(concat!(stringify!($name), " must be valid"))
             }
 
+            /// Creates a new domain::ids value after validation.
+            /// Returns an SDK error instead of panicking when the
+            /// identifier or input does not satisfy the contract.
             pub fn try_new(value: impl Into<String>) -> Result<Self, IdValidationError> {
                 let value = value.into();
                 validate_identifier(&value)?;
                 Ok(Self(value))
             }
 
+            /// Returns this value as str. The accessor is side-effect
+            /// free and keeps ownership with the caller.
             pub fn as_str(&self) -> &str {
                 &self.0
             }
@@ -137,19 +180,35 @@ id_newtype!(ArchiveCursorId);
 
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
+/// Defines the journal cursor SDK value.
+/// Construction records local state only; documented runtimes, executors, or ports own side effects.
 pub struct JournalCursor(String);
 
 impl JournalCursor {
+    /// Creates a new domain::ids value with explicit caller-provided
+    /// inputs. This constructor is data-only and performs no I/O or
+    /// external side effects.
+    ///
+    /// # Panics
+    ///
+    /// Panics if constructor invariants fail, such as invalid identifier
+    /// text or constructor-specific bounds. Use a fallible constructor such as
+    /// `try_new` when one is available for untrusted input.
     pub fn new(value: impl Into<String>) -> Self {
         Self::try_new(value).expect("JournalCursor must be valid")
     }
 
+    /// Creates a new domain::ids value after validation. Returns an SDK
+    /// error instead of panicking when the identifier or input does not
+    /// satisfy the contract.
     pub fn try_new(value: impl Into<String>) -> Result<Self, IdValidationError> {
         let value = value.into();
         validate_identifier(&value)?;
         Ok(Self(value))
     }
 
+    /// Returns this value as str. The accessor is side-effect free and
+    /// keeps ownership with the caller.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -178,7 +237,11 @@ impl fmt::Display for JournalCursor {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Defines the correlation entry SDK value.
+/// Construction records local state only; documented runtimes, executors, or ports own side effects.
 pub struct CorrelationEntry {
+    /// Key used by this record or request.
     pub key: CorrelationKey,
+    /// Value used by this record or request.
     pub value: CorrelationValue,
 }

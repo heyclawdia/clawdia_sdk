@@ -1,3 +1,8 @@
+//! Resource-reader helpers layered over explicit URI resolvers and core content refs.
+//! Use these modules when a host wants toolkit tools to read approved resources.
+//! Resolver implementations own any backing-store or network side effects. This file
+//! contains the resolver portion of that contract.
+//!
 use std::sync::Arc;
 
 use agent_sdk_core::{
@@ -6,6 +11,8 @@ use agent_sdk_core::{
 };
 
 #[derive(Clone)]
+/// Resource in memory resource resolver request or result value.
+/// Creating the value does not fetch content; resource executors document resolver and content-store effects.
 pub struct InMemoryResourceResolver {
     scheme: ResourceScheme,
     content_ref: ContentRef,
@@ -14,6 +21,9 @@ pub struct InMemoryResourceResolver {
 }
 
 impl InMemoryResourceResolver {
+    /// Creates a new resources::resolver value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         scheme: &str,
         content_ref: ContentRef,

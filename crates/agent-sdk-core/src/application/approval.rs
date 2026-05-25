@@ -1,3 +1,7 @@
+//! Approval broker coordination. Use this module to turn policy decisions into
+//! host-dispatched approval requests. Broker methods may call a dispatcher and record
+//! cancellation or denial outcomes, but UI transport remains host-owned.
+//!
 use std::sync::{
     Mutex,
     atomic::{AtomicU64, Ordering},
@@ -16,6 +20,8 @@ use crate::{
 };
 
 #[derive(Debug)]
+/// Holds approval broker application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ApprovalBroker {
     next_journal_seq: AtomicU64,
     cancelled_before_dispatch: Mutex<Vec<(ApprovalRequestId, String)>>,
@@ -31,6 +37,10 @@ impl Default for ApprovalBroker {
 }
 
 impl ApprovalBroker {
+    /// Coordinates cancel before dispatch for the application::approval
+    /// contract. This may call configured ports and update
+    /// runtime/journal/event state according to the surrounding module,
+    /// without introducing a parallel behavior path.
     pub fn cancel_before_dispatch(
         &self,
         approval_request_id: ApprovalRequestId,
@@ -42,6 +52,10 @@ impl ApprovalBroker {
             .push((approval_request_id, reason.into()));
     }
 
+    /// Coordinates request approval for the application::approval contract.
+    /// This may call configured ports and update runtime/journal/event state
+    /// according to the surrounding module, without introducing a parallel
+    /// behavior path.
     pub fn request_approval(
         &self,
         request: ApprovalRequest,

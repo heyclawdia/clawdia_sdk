@@ -1,3 +1,8 @@
+//! Durable and observable SDK records. Use these DTOs for events, journals, effects,
+//! context, output, and feature evidence. Constructing records is data-only;
+//! persistence, publication, and external actions happen through ports or application
+//! coordinators. This file contains the hooks portion of that contract.
+//!
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,17 +18,29 @@ use crate::{
     package_hooks::{HookId, HookPoint, HookResponseClass, HookSpec},
 };
 
+/// Constant value for the records::hooks contract. Use it to keep SDK
+/// records and tests aligned on the same stable value.
 pub const HOOK_RECORD_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Carries the hook record record payload for journal, event, or fixture surfaces.
+/// Creating or cloning it only preserves serialized SDK state; append, publish, replay, or export effects are documented on the runtime and port methods that store it.
 pub struct HookRecord {
+    /// Wire schema version used for compatibility checks.
     pub schema_version: u16,
+    /// Stable hook id used for typed lineage, lookup, or dedupe.
     pub hook_id: HookId,
+    /// Point used by this record or request.
     pub point: HookPoint,
+    /// Payload carried by this record.
+    /// Use the surrounding policy and redaction fields to decide whether it can be exposed.
     pub payload: HookRecordPayload,
 }
 
 impl HookRecord {
+    /// Registered.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn registered(spec: &HookSpec) -> Result<Self, crate::domain::AgentError> {
         Ok(Self {
             schema_version: HOOK_RECORD_SCHEMA_VERSION,
@@ -37,6 +54,9 @@ impl HookRecord {
         })
     }
 
+    /// Builds the invocation started value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn invocation_started(spec: &HookSpec, invocation_id: impl Into<String>) -> Self {
         Self {
             schema_version: HOOK_RECORD_SCHEMA_VERSION,
@@ -48,6 +68,9 @@ impl HookRecord {
         }
     }
 
+    /// Returns an updated value with completed configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn completed(spec: &HookSpec, invocation_id: impl Into<String>, elapsed_ms: u64) -> Self {
         Self {
             schema_version: HOOK_RECORD_SCHEMA_VERSION,
@@ -60,6 +83,9 @@ impl HookRecord {
         }
     }
 
+    /// Builds the timeout record or result value.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn timeout(spec: &HookSpec, invocation_id: impl Into<String>, elapsed_ms: u64) -> Self {
         Self {
             schema_version: HOOK_RECORD_SCHEMA_VERSION,
@@ -73,6 +99,9 @@ impl HookRecord {
         }
     }
 
+    /// Cancelled.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn cancelled(spec: &HookSpec, invocation_id: impl Into<String>) -> Self {
         Self {
             schema_version: HOOK_RECORD_SCHEMA_VERSION,
@@ -84,6 +113,9 @@ impl HookRecord {
         }
     }
 
+    /// Returns an updated value with failed configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn failed(
         spec: &HookSpec,
         invocation_id: impl Into<String>,
@@ -101,6 +133,9 @@ impl HookRecord {
         }
     }
 
+    /// Returns the response decision currently held by this value.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn response_decision(
         spec: &HookSpec,
         invocation_id: impl Into<String>,
@@ -125,60 +160,110 @@ impl HookRecord {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite hook record payload cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum HookRecordPayload {
+    /// Use this variant when the contract needs to represent registered; selecting it has no side effect by itself.
     Registered {
+        /// Deterministic spec hash used for stale checks, package evidence,
+        /// or replay comparisons.
         spec_hash: String,
+        /// Typed executor ref reference. Resolving or executing it is a
+        /// separate policy-gated step.
         executor_ref: String,
+        /// Policy reference that must be resolved by the host or runtime
+        /// before execution.
         policy_ref: PolicyRef,
     },
+    /// Use this variant when the contract needs to represent invocation started; selecting it has no side effect by itself.
     InvocationStarted {
+        /// Stable invocation id used for typed lineage, lookup, or dedupe.
         invocation_id: String,
     },
+    /// Use this variant when the contract needs to represent completed; selecting it has no side effect by itself.
     Completed {
+        /// Stable invocation id used for typed lineage, lookup, or dedupe.
         invocation_id: String,
+        /// elapsed ms duration in milliseconds.
         elapsed_ms: u64,
     },
+    /// Use this variant when the contract needs to represent timed out; selecting it has no side effect by itself.
     TimedOut {
+        /// Stable invocation id used for typed lineage, lookup, or dedupe.
         invocation_id: String,
+        /// elapsed ms duration in milliseconds.
         elapsed_ms: u64,
+        /// Failure policy used by this record or request.
         failure_policy: String,
     },
+    /// Use this variant when the contract needs to represent cancelled; selecting it has no side effect by itself.
     Cancelled {
+        /// Stable invocation id used for typed lineage, lookup, or dedupe.
         invocation_id: String,
     },
+    /// Use this variant when the contract needs to represent failed; selecting it has no side effect by itself.
     Failed {
+        /// Stable invocation id used for typed lineage, lookup, or dedupe.
         invocation_id: String,
+        /// Failure policy used by this record or request.
         failure_policy: String,
+        /// Redacted human-readable summary safe for events, telemetry, and
+        /// logs.
         redacted_summary: String,
     },
+    /// Use this variant when the contract needs to represent response decision; selecting it has no side effect by itself.
     ResponseDecision {
+        /// Stable invocation id used for typed lineage, lookup, or dedupe.
         invocation_id: String,
+        /// Decision used by this record or request.
         decision: HookResponseDecision,
+        /// Classification value for response class.
+        /// Policy and projection paths use it for finite routing decisions.
         response_class: HookResponseClass,
+        /// Decision explaining why a hook response mutation class was accepted or rejected.
+        /// Use it as audit evidence when applying hook responses that can affect run state.
         mutation_right_decision: String,
+        /// Typed target domain refs references. Resolving them is separate
+        /// from constructing this record.
         target_domain_refs: Vec<EntityRef>,
     },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite hook response decision cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum HookResponseDecision {
+    /// Use this variant when the contract needs to represent accepted journaled before apply; selecting it has no side effect by itself.
     AcceptedJournaledBeforeApply,
+    /// Use this variant when the contract needs to represent rejected mutation right; selecting it has no side effect by itself.
     RejectedMutationRight,
+    /// Use this variant when the contract needs to represent rejected point matrix; selecting it has no side effect by itself.
     RejectedPointMatrix,
+    /// Use this variant when the contract needs to represent rejected policy; selecting it has no side effect by itself.
     RejectedPolicy,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Carries the hook mutation journal plan record payload for journal, event, or fixture surfaces.
+/// Creating or cloning it only preserves serialized SDK state; append, publish, replay, or export effects are documented on the runtime and port methods that store it.
 pub struct HookMutationJournalPlan {
+    /// Hook record used by this record or request.
     pub hook_record: HookRecord,
+    /// Effect intent used by this record or request.
     pub effect_intent: EffectIntent,
+    /// Hook journal record used by this record or request.
     pub hook_journal_record: JournalRecord,
+    /// Intent journal record used by this record or request.
     pub intent_journal_record: JournalRecord,
+    /// Result journal record used by this record or request.
     pub result_journal_record: JournalRecord,
 }
 
 impl HookMutationJournalPlan {
+    /// Builds the accepted response value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn accepted_response(
         journal_seq: u64,
         record_id: impl Into<String>,
@@ -270,6 +355,8 @@ impl HookMutationJournalPlan {
     }
 }
 
+/// Builds the hook entity ref value.
+/// This is data construction and performs no I/O, journal append, event publication, or process
 pub fn hook_entity_ref(hook_id: &HookId) -> EntityRef {
     EntityRef::new(EntityKind::Hook, hook_id.as_str())
 }

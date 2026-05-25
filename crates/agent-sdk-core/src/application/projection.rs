@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the projection portion of that contract.
+//!
 use crate::{
     context::{ContextItem, ContextProjection, ProjectionRole},
     domain::{AgentError, AgentErrorKind, RetryClassification},
@@ -7,6 +13,9 @@ use crate::{
     },
 };
 
+/// Project context projection.
+/// This derives a provider projection from admitted context and does not resolve raw content or
+/// call the provider.
 pub fn project_context_projection(
     projection: &ContextProjection,
     policy: &ProviderProjectionPolicy,

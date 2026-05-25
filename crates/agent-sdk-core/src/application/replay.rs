@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the replay portion of that contract.
+//!
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -22,53 +28,94 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite replay mode cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ReplayMode {
+    /// Use this variant when the contract needs to represent audit replay; selecting it has no side effect by itself.
     AuditReplay,
+    /// Use this variant when the contract needs to represent resume replay; selecting it has no side effect by itself.
     ResumeReplay,
+    /// Use this variant when the contract needs to represent repair replay; selecting it has no side effect by itself.
     RepairReplay,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite replay status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ReplayStatus {
+    /// Use this variant when the contract needs to represent complete; selecting it has no side effect by itself.
     Complete,
+    /// Use this variant when the contract needs to represent repair needed; selecting it has no side effect by itself.
     RepairNeeded,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite replay repair kind cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ReplayRepairKind {
+    /// Use this variant when the contract needs to represent missing content ref; selecting it has no side effect by itself.
     MissingContentRef,
+    /// Use this variant when the contract needs to represent unsafe pending side effect; selecting it has no side effect by itself.
     UnsafePendingSideEffect,
+    /// Use this variant when the contract needs to represent non idempotent pending side effect; selecting it has no side effect by itself.
     NonIdempotentPendingSideEffect,
+    /// Use this variant when the contract needs to represent output delivery reconciliation; selecting it has no side effect by itself.
     OutputDeliveryReconciliation,
+    /// Use this variant when the contract needs to represent cursor scope mismatch; selecting it has no side effect by itself.
     CursorScopeMismatch,
+    /// Use this variant when the contract needs to represent checkpoint invalid; selecting it has no side effect by itself.
     CheckpointInvalid,
+    /// Use this variant when the contract needs to represent replay invariant violation; selecting it has no side effect by itself.
     ReplayInvariantViolation,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds replay repair needed application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ReplayRepairNeeded {
+    /// Kind/category for this record, capability, event, or detected
+    /// resource.
     pub kind: ReplayRepairKind,
+    /// Stable record id used for typed lineage, lookup, or dedupe.
     pub record_id: String,
+    /// Journal seq used by this record or request.
     pub journal_seq: u64,
+    /// Redacted explanation for a denial, failure, status, or package delta.
     pub reason: String,
+    /// Retry used by this record or request.
     pub retry: RetryClassification,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds replay pending side effect application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ReplayPendingSideEffect {
+    /// Stable effect id used for typed lineage, lookup, or dedupe.
     pub effect_id: EffectId,
+    /// Stable intent record id used for typed lineage, lookup, or dedupe.
     pub intent_record_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Idempotency setting or key for deduping retries.
+    /// Use it to prevent duplicate side effects during replay or repair.
     pub idempotency_key: Option<crate::domain::IdempotencyKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Dedupe policy or key for a side-effecting operation.
+    /// Replay and repair use it to avoid sending or executing the same effect twice.
     pub dedupe_key: Option<DedupeKey>,
+    /// Reason a pending side effect is unsafe to retry automatically.
+    /// Recovery uses it to require repair or reconciliation before continuing.
     pub unsafe_pending_reason: String,
+    /// Allowlist for this policy or contract.
+    /// Validation uses it to reject undeclared or policy-denied values.
     pub retry_allowed: bool,
 }
 
 impl ReplayPendingSideEffect {
+    /// Constructs this value from pending. Use it when adapting
+    /// canonical SDK records without introducing a second behavior
+    /// path.
     pub fn from_pending(pending: PendingSideEffect) -> Self {
         let retry_allowed = pending.idempotency_key.is_some() || pending.dedupe_key.is_some();
         Self {
@@ -83,42 +130,75 @@ impl ReplayPendingSideEffect {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds replay result application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ReplayResult {
+    /// Mode that selects how this operation or contract should behave.
+    /// Callers use it to choose the explicit execution path instead of relying on hidden
+    /// defaults.
     pub mode: ReplayMode,
+    /// Finite status for this record or lifecycle stage.
     pub status: ReplayStatus,
+    /// Allowlist for this policy or contract.
+    /// Validation uses it to reject undeclared or policy-denied values.
     pub resume_allowed: bool,
+    /// Latest journal seq used by this record or request.
     pub latest_journal_seq: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional terminal status value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub terminal_status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional next loop state value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub next_loop_state: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Side effects found during replay that have intent evidence but no safe terminal result.
+    /// Recovery must reconcile or repair these entries before the run can resume safely.
     pub unsafe_pending_side_effects: Vec<ReplayPendingSideEffect>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Typed missing content refs references. Resolving them is separate from
+    /// constructing this record.
     pub missing_content_refs: Vec<ContentRef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Replay repairs required before the durable state can be resumed safely.
+    /// Each entry names the repair category and evidence that must be reconciled.
     pub repair_needed: Vec<ReplayRepairNeeded>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Output delivery setting or policy.
+    /// Delivery coordinators use it to decide sink mode, dedupe, and required evidence.
     pub output_delivery_repairs: Vec<OutputDeliveryReconciliationRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional latest checkpoint value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub latest_checkpoint: Option<RunCheckpoint>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite cursor compatibility cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum CursorCompatibility {
+    /// Use this variant when the contract needs to represent compatible; selecting it has no side effect by itself.
     Compatible,
+    /// Use this variant when the contract needs to represent scope mismatch; selecting it has no side effect by itself.
     ScopeMismatch,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite durable replay support cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum DurableReplaySupport {
+    /// Use this variant when the contract needs to represent run journal; selecting it has no side effect by itself.
     RunJournal,
+    /// Use this variant when the contract needs to represent host archive required; selecting it has no side effect by itself.
     HostArchiveRequired,
 }
 
 #[derive(Clone, Debug)]
+/// Holds replay reducer application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ReplayReducer {
     mode: ReplayMode,
     last_journal_seq: Option<u64>,
@@ -138,6 +218,9 @@ pub struct ReplayReducer {
 }
 
 impl ReplayReducer {
+    /// Creates a new application::replay value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(mode: ReplayMode) -> Self {
         Self {
             mode,
@@ -158,6 +241,9 @@ impl ReplayReducer {
         }
     }
 
+    /// Returns this value with its available content refs setting
+    /// replaced. The method follows builder-style data construction and
+    /// does not execute external work.
     pub fn with_available_content_refs(
         mut self,
         refs: impl IntoIterator<Item = ContentRef>,
@@ -166,11 +252,17 @@ impl ReplayReducer {
         self
     }
 
+    /// Returns this value with its missing content policy setting
+    /// replaced. The method follows builder-style data construction and
+    /// does not execute external work.
     pub fn with_missing_content_policy(mut self, policy: MissingContentPolicy) -> Self {
         self.missing_content_policy = policy;
         self
     }
 
+    /// Apply.
+    /// This mutates only the replay projection with one journal record and never re-executes
+    /// the recorded side effect.
     pub fn apply(&mut self, record: JournalRecord) -> Result<(), AgentError> {
         if self
             .seen_records
@@ -249,6 +341,9 @@ impl ReplayReducer {
         Ok(())
     }
 
+    /// Finish.
+    /// This finalizes replay bookkeeping into a result and does not re-execute recorded
+    /// effects.
     pub fn finish(mut self) -> Result<ReplayResult, AgentError> {
         self.finish_pending_effects();
         let output_delivery_repairs = self.finish_output_deliveries();
@@ -498,6 +593,9 @@ impl ReplayReducer {
     }
 }
 
+/// Check cursor compatibility.
+/// This is replay bookkeeping over cursors or stream scopes and does not mutate runtime state
+/// or re-execute effects.
 pub fn check_cursor_compatibility(
     requested_scope: &EventStreamScope,
     cursor: Option<&EventCursor>,
@@ -508,6 +606,8 @@ pub fn check_cursor_compatibility(
     }
 }
 
+/// Returns durable replay support derived from the supplied state.
+/// This derives SDK state locally and does not call host adapters.
 pub fn durable_replay_support(scope: &EventStreamScope) -> DurableReplaySupport {
     match scope {
         EventStreamScope::Run(_) => DurableReplaySupport::RunJournal,
@@ -592,6 +692,8 @@ fn idempotent_duplicate_allowed(record: &JournalRecord) -> bool {
         )
 }
 
+/// Returns journal cursor for seq derived from the supplied state.
+/// This derives SDK state locally and does not call host adapters.
 pub fn journal_cursor_for_seq(seq: u64) -> JournalCursor {
     JournalCursor::new(format!("journal.{seq}"))
 }

@@ -1,3 +1,9 @@
+//! Application-layer coordination over core primitives. Use these services to lower
+//! helpers, drive runs, validate output, coordinate tools, approvals, delivery,
+//! isolation, telemetry, and feature layers. Methods in this layer may call
+//! configured ports, mutate in-memory stores, append journals, or publish events as
+//! documented. This file contains the repair portion of that contract.
+//!
 use crate as sdk;
 
 use serde::{Deserialize, Serialize};
@@ -16,9 +22,14 @@ use sdk::{
 };
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+/// Holds repair policy controller application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RepairPolicyController;
 
 impl RepairPolicyController {
+    /// Builds the next attempt value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn next_attempt(
         &self,
         contract: &OutputContract,
@@ -76,11 +87,17 @@ impl RepairPolicyController {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+/// Holds repair accounting application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct RepairAccounting {
+    /// Attempt identifier or attempt history for bounded retry/repair.
+    /// Use it to preserve ordering and avoid retry loops that cannot be audited.
     pub repair_attempts: Vec<RepairAttemptId>,
 }
 
 impl RepairAccounting {
+    /// Sets record attempt on the value and returns it.
+    /// This mutates the in-memory repair tracker by recording the attempt id.
     pub fn record_attempt(&mut self, repair_attempt_id: RepairAttemptId) {
         self.repair_attempts.push(repair_attempt_id);
     }
@@ -88,13 +105,21 @@ impl RepairAccounting {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite repair decision cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum RepairDecision {
+    /// Use this variant when the contract needs to represent attempt; selecting it has no side effect by itself.
     Attempt {
+        /// Prompt used by this record or request.
         prompt: RepairPrompt,
+        /// Record used by this record or request.
         record: RepairRecord,
     },
+    /// Use this variant when the contract needs to represent exhausted; selecting it has no side effect by itself.
     Exhausted {
+        /// Failure used by this record or request.
         failure: TerminalValidationFailure,
+        /// Record used by this record or request.
         record: RepairExhaustionRecord,
     },
 }
@@ -176,6 +201,9 @@ fn repair_record_requested(
     }
 }
 
+/// Builds the repair exhaustion record from failure record for this contract.
+/// This derives recovery or repair data from the supplied failure state and does not perform
+/// the repair by itself.
 pub(crate) fn repair_exhaustion_record_from_failure(
     failure: &TerminalValidationFailure,
     reason: impl Into<String>,
@@ -197,12 +225,17 @@ pub(crate) fn repair_exhaustion_record_from_failure(
 }
 
 #[derive(Clone, Debug)]
+/// Holds local validation repair service application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct LocalValidationRepairService<V = JsonSchemaSubsetValidator> {
     validator: V,
     repair_controller: RepairPolicyController,
 }
 
 impl LocalValidationRepairService<JsonSchemaSubsetValidator> {
+    /// Builds the default json schema subset value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn default_json_schema_subset() -> Self {
         Self::new(JsonSchemaSubsetValidator::default())
     }
@@ -212,6 +245,9 @@ impl<V> LocalValidationRepairService<V>
 where
     V: StructuredOutputValidator,
 {
+    /// Creates a new application::repair value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(validator: V) -> Self {
         Self {
             validator,
@@ -219,6 +255,9 @@ where
         }
     }
 
+    /// Validates the application::repair invariants and returns a typed
+    /// error on failure. Validation is pure and does not perform I/O,
+    /// dispatch, journal appends, or adapter calls.
     pub fn validate_candidates(
         &self,
         contract: &OutputContract,
@@ -301,23 +340,50 @@ where
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Enumerates the finite validation repair outcome cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ValidationRepairOutcome {
+    /// Use this variant when the contract needs to represent validated; selecting it has no side effect by itself.
     Validated {
+        /// Success used by this record or request.
         success: ValidationSuccess,
+        /// Validation policy applied before output is accepted as typed data.
+        /// It controls validator selection, bounds, failure visibility, and local validation
+        /// behavior.
         validation_records: Vec<ValidationRecord>,
+        /// Repair policy used after structured output validation fails.
+        /// It controls whether repair is attempted and which policy gates must approve it.
         repair_records: Vec<RepairRecord>,
+        /// Attempt identifier or attempt history for bounded retry/repair.
+        /// Use it to preserve ordering and avoid retry loops that cannot be audited.
         repair_attempts: Vec<RepairAttemptId>,
     },
+    /// Use this variant when the contract needs to represent repair requested; selecting it has no side effect by itself.
     RepairRequested {
+        /// Latest report used by this record or request.
         latest_report: ValidationErrorReport,
+        /// Prompt used by this record or request.
         prompt: RepairPrompt,
+        /// Validation policy applied before output is accepted as typed data.
+        /// It controls validator selection, bounds, failure visibility, and local validation
+        /// behavior.
         validation_records: Vec<ValidationRecord>,
+        /// Repair policy used after structured output validation fails.
+        /// It controls whether repair is attempted and which policy gates must approve it.
         repair_records: Vec<RepairRecord>,
     },
+    /// Use this variant when the contract needs to represent failed; selecting it has no side effect by itself.
     Failed {
+        /// Failure used by this record or request.
         failure: TerminalValidationFailure,
+        /// Validation policy applied before output is accepted as typed data.
+        /// It controls validator selection, bounds, failure visibility, and local validation
+        /// behavior.
         validation_records: Vec<ValidationRecord>,
+        /// Repair policy used after structured output validation fails.
+        /// It controls whether repair is attempted and which policy gates must approve it.
         repair_records: Vec<RepairRecord>,
+        /// Exhaustion record used by this record or request.
         exhaustion_record: RepairExhaustionRecord,
     },
 }

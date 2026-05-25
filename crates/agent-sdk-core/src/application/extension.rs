@@ -1,3 +1,8 @@
+//! Extension action coordination and protocol recovery. Use this module when
+//! extension-declared capabilities resolve into policy-checked SDK actions. Execution
+//! may call extension ports and approval brokers, but extension hosts remain outside
+//! core.
+//!
 use crate::{
     approval_ports::ApprovalDispatcher,
     approval_records::{ApprovalBrokerOutcome, ApprovalRequest},
@@ -25,6 +30,8 @@ use crate::{
     policy::{ApprovalDecisionKind, DispatcherScope, PolicyOutcome, PolicyStage},
 };
 
+/// Holds extension action coordinator application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ExtensionActionCoordinator {
     snapshot: ExtensionActionRegistrySnapshot,
     executors: ExtensionActionExecutorRegistry,
@@ -32,6 +39,9 @@ pub struct ExtensionActionCoordinator {
 }
 
 impl ExtensionActionCoordinator {
+    /// Creates a new application::extension value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         snapshot: ExtensionActionRegistrySnapshot,
         executors: ExtensionActionExecutorRegistry,
@@ -43,6 +53,9 @@ impl ExtensionActionCoordinator {
         }
     }
 
+    /// Returns this value with its approval broker setting replaced.
+    /// The method follows builder-style data construction and does not
+    /// execute external work.
     pub fn with_approval_broker(
         mut self,
         approval_broker: crate::approval::ApprovalBroker,
@@ -51,6 +64,9 @@ impl ExtensionActionCoordinator {
         self
     }
 
+    /// Executes one extension action with approval and journal gating.
+    /// This appends intent/result records through the supplied journal and then
+    /// calls the configured extension bridge only after policy allows it.
     pub fn execute<J>(
         &self,
         journal: &J,
@@ -434,14 +450,27 @@ impl ExtensionActionCoordinator {
 }
 
 #[derive(Clone, Debug)]
+/// Holds extension action context application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ExtensionActionContext {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Turn identifier for one loop turn within a run.
     pub turn_id: Option<TurnId>,
+    /// Fingerprint of the runtime package snapshot in force when this value was produced.
+    /// Use it for replay, dedupe, and package-lineage checks; the field is evidence and does
+    /// not execute package behavior.
     pub runtime_package_fingerprint: String,
+    /// Next journal seq used by this record or request.
     pub next_journal_seq: u64,
+    /// Timestamp in milliseconds associated with this record.
+    /// Use it for ordering and diagnostics; durable causality still comes from ids and cursors.
     pub timestamp_millis: u64,
+    /// Record id prefix used by this record or request.
     pub record_id_prefix: String,
+    /// Stable redaction policy id used for typed lineage, lookup, or dedupe.
     pub redaction_policy_id: String,
 }
 
@@ -478,13 +507,27 @@ impl ExtensionActionContext {
 }
 
 #[derive(Clone, Debug)]
+/// Holds extension action outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ExtensionActionOutcome {
+    /// Finite status for this record or lifecycle stage.
     pub status: ExtensionActionOutcomeStatus,
+    /// Record used by this record or request.
     pub record: ExtensionActionRecord,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub intent_cursor: Option<JournalCursor>,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub terminal_cursor: Option<JournalCursor>,
+    /// Optional approval outcome value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub approval_outcome: Option<ApprovalBrokerOutcome>,
+    /// Bounded events included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub events: Vec<ExtensionActionEvent>,
+    /// Whether recovery required is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub recovery_required: bool,
 }
 
@@ -516,10 +559,16 @@ impl ExtensionActionOutcome {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Enumerates the finite extension action outcome status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ExtensionActionOutcomeStatus {
+    /// Use this variant when the contract needs to represent completed; selecting it has no side effect by itself.
     Completed,
+    /// Use this variant when the contract needs to represent failed; selecting it has no side effect by itself.
     Failed,
+    /// Use this variant when the contract needs to represent denied; selecting it has no side effect by itself.
     Denied,
+    /// Use this variant when the contract needs to represent recovery required; selecting it has no side effect by itself.
     RecoveryRequired,
 }
 
@@ -535,22 +584,43 @@ impl ExtensionActionOutcomeStatus {
 }
 
 #[derive(Clone, Debug)]
+/// Holds extension protocol recovery context application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ExtensionProtocolRecoveryContext {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Fingerprint of the runtime package snapshot in force when this value was produced.
+    /// Use it for replay, dedupe, and package-lineage checks; the field is evidence and does
+    /// not execute package behavior.
     pub runtime_package_fingerprint: String,
+    /// Next journal seq used by this record or request.
     pub next_journal_seq: u64,
+    /// Timestamp in milliseconds associated with this record.
+    /// Use it for ordering and diagnostics; durable causality still comes from ids and cursors.
     pub timestamp_millis: u64,
+    /// Stable record id used for typed lineage, lookup, or dedupe.
     pub record_id: String,
+    /// Stable redaction policy id used for typed lineage, lookup, or dedupe.
     pub redaction_policy_id: String,
 }
 
 #[derive(Clone, Debug)]
+/// Holds extension protocol recovery outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ExtensionProtocolRecoveryOutcome {
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub cursor: JournalCursor,
 }
 
+/// Recover extension protocol error.
+/// This appends protocol-recovery evidence through the journal so extension transport errors
+/// can be reconciled without executing another action.
 pub fn recover_extension_protocol_error<J>(
     journal: &J,
     error: ExtensionProtocolError,

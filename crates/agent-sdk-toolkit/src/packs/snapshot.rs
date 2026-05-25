@@ -1,3 +1,8 @@
+//! Toolkit pack assembly helpers. Use these modules to turn toolkit operations into
+//! core package capabilities, sidecars, and routes. Pack assembly is data-only and
+//! does not execute tools or mutate a runtime package until explicitly installed.
+//! This file contains the snapshot portion of that contract.
+//!
 use agent_sdk_core::{
     CapabilityId, CapabilityNamespace, ExecutorRef, PolicyRef, PrivacyClass, SourceRef,
     ToolPackToolSnapshot,
@@ -5,6 +10,9 @@ use agent_sdk_core::{
     tool_records::CanonicalToolName,
 };
 
+/// Returns tool snapshot for the current value.
+/// This is a read-only or data-construction helper unless the method body explicitly calls a
+/// port or store.
 pub fn tool_snapshot(
     capability_id: &str,
     tool_name: &str,

@@ -1,3 +1,7 @@
+//! Workspace search helpers. Use this toolkit module for bounded regex or glob-like
+//! discovery before narrowing a read or edit. Searches read the workspace but do not
+//! mutate files.
+//!
 use std::{fs, sync::Arc};
 
 use agent_sdk_core::{
@@ -20,27 +24,53 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace search request request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceSearchRequest {
+    /// Search pattern supplied by the caller.
+    /// The grep executor compiles it under regex and output bounds before reading files.
     pub pattern: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace workspace search output request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceSearchOutput {
+    /// Search pattern supplied by the caller.
+    /// The grep executor compiles it under regex and output bounds before reading files.
     pub pattern: String,
+    /// Collection of matches values.
+    /// Ordering and membership should be treated as part of the serialized contract when
+    /// relevant.
     pub matches: Vec<SearchMatch>,
+    /// Whether output was shortened by byte, item, page, archive, or parser
+    /// limits.
     pub truncated: bool,
+    /// Maximum number of matches to return.
+    /// Use it to keep search output bounded for model context.
     pub max_matches: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Workspace search match request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct SearchMatch {
+    /// Workspace-relative or resource path selected by the request or result.
     pub path: String,
+    /// Line used by this record or request.
     pub line: usize,
+    /// Deterministic line hash used for stale checks, package evidence, or
+    /// replay comparisons.
     pub line_hash: String,
+    /// Human-readable preview for a search, edit, or write result.
+    /// It is bounded display data and should not be treated as durable file contents.
     pub preview: String,
 }
 
 impl BoundedWorkspace {
+    /// Searches bounded workspace files under the configured policy.
+    /// This reads directory metadata and matching file contents, returns
+    /// bounded previews, and never mutates workspace files.
     pub fn search(
         &self,
         request: &WorkspaceSearchRequest,
@@ -106,6 +136,8 @@ impl BoundedWorkspace {
 }
 
 #[derive(Clone)]
+/// Workspace workspace search executor request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct WorkspaceSearchExecutor {
     executor_ref: ExecutorRef,
     workspace: Arc<BoundedWorkspace>,
@@ -114,6 +146,9 @@ pub struct WorkspaceSearchExecutor {
 }
 
 impl WorkspaceSearchExecutor {
+    /// Creates a new workspace::grep value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         workspace: Arc<BoundedWorkspace>,
         arguments: InMemoryJsonArgumentStore,
@@ -127,6 +162,9 @@ impl WorkspaceSearchExecutor {
         }
     }
 
+    /// Pack bundle.
+    /// This returns the toolkit pack bundle that registers the operation route; it does not
+    /// execute the operation.
     pub fn pack_bundle(
         source: agent_sdk_core::SourceRef,
         policy_ref: PolicyRef,

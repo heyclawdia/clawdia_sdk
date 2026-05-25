@@ -1,3 +1,8 @@
+//! Subagent supervision helpers layered over agent pools and child run requests. Use
+//! this module when a parent run starts bounded child work and needs event wrapping
+//! or usage rollup. Child lifecycle is parent-owned; product-specific agent societies
+//! stay outside core.
+//!
 use core::fmt;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -43,19 +48,35 @@ use crate::{
 
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
+/// Holds subagent request id application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct SubagentRequestId(String);
 
 impl SubagentRequestId {
+    /// Creates a new application::subagent value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
+    ///
+    /// # Panics
+    ///
+    /// Panics if constructor invariants fail, such as invalid identifier
+    /// text or constructor-specific bounds. Use a fallible constructor such as
+    /// `try_new` when one is available for untrusted input.
     pub fn new(value: impl Into<String>) -> Self {
         Self::try_new(value).expect("SubagentRequestId must be valid")
     }
 
+    /// Creates a new application::subagent value after validation.
+    /// Returns an SDK error instead of panicking when the identifier or
+    /// input does not satisfy the contract.
     pub fn try_new(value: impl Into<String>) -> Result<Self, IdValidationError> {
         let value = value.into();
         validate_identifier(&value)?;
         Ok(Self(value))
     }
 
+    /// Returns this value as str. The accessor is side-effect free and
+    /// keeps ownership with the caller.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -84,30 +105,58 @@ impl fmt::Display for SubagentRequestId {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds subagent request application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct SubagentRequest {
+    /// Stable request id used for typed lineage, lookup, or dedupe.
     pub request_id: SubagentRequestId,
+    /// Stable parent run id used for typed lineage, lookup, or dedupe.
     pub parent_run_id: RunId,
+    /// Stable parent agent id used for typed lineage, lookup, or dedupe.
     pub parent_agent_id: AgentId,
+    /// Stable parent tool call id used for typed lineage, lookup, or dedupe.
     pub parent_tool_call_id: ToolCallId,
+    /// Stable child run id used for typed lineage, lookup, or dedupe.
     pub child_run_id: RunId,
+    /// Stable child agent id used for typed lineage, lookup, or dedupe.
     pub child_agent_id: AgentId,
+    /// Child source used by this record or request.
     pub child_source: SourceRef,
+    /// Child destination used by this record or request.
     pub child_destination: DestinationRef,
+    /// Route policy used by this record or request.
     pub route_policy: SubagentRoutePolicy,
+    /// Context handoff used by this record or request.
     pub context_handoff: ContextHandoffPolicy,
+    /// Child package policy used by this record or request.
     pub child_package_policy: ChildRuntimePackagePolicy,
+    /// Child tool policy used by this record or request.
     pub child_tool_policy: SubagentToolPolicy,
+    /// Typed message policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub message_policy_ref: PolicyRef,
+    /// Typed wake policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub wake_policy_ref: PolicyRef,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Typed lifecycle policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub lifecycle_policy_ref: Option<PolicyRef>,
+    /// Depth budget used by this record or request.
     pub depth_budget: DepthBudget,
+    /// Idempotency setting or key for deduping retries.
+    /// Use it to prevent duplicate side effects during replay or repair.
     pub idempotency_key: IdempotencyKey,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Typed initial message ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub initial_message_ref: Option<ContentRefId>,
 }
 
 impl SubagentRequest {
+    /// Validates the application::subagent invariants and returns a
+    /// typed error on failure. Validation is pure and does not perform
+    /// I/O, dispatch, journal appends, or adapter calls.
     pub fn validate(&self) -> Result<(), AgentError> {
         self.depth_budget.validate_child_start()?;
         self.context_handoff.validate()?;
@@ -131,6 +180,9 @@ impl SubagentRequest {
         Ok(())
     }
 
+    /// Builds the child run request value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn child_run_request(&self) -> RunRequest {
         RunRequest::text(
             self.child_run_id.clone(),
@@ -142,6 +194,8 @@ impl SubagentRequest {
 }
 
 #[derive(Clone)]
+/// Holds subagent supervisor application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct SubagentSupervisor {
     runtime: AgentRuntime,
     pool: AgentPool,
@@ -150,6 +204,9 @@ pub struct SubagentSupervisor {
 }
 
 impl SubagentSupervisor {
+    /// Creates a new application::subagent value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(runtime: AgentRuntime, pool: AgentPool, parent_package: RuntimePackage) -> Self {
         Self {
             runtime,
@@ -159,6 +216,9 @@ impl SubagentSupervisor {
         }
     }
 
+    /// Start child.
+    /// This delegates to child run control to start/register the child and records parent-owned
+    /// lifecycle state.
     pub fn start_child(&self, request: SubagentRequest) -> Result<ChildRunHandle, AgentError> {
         request.validate()?;
 
@@ -286,10 +346,16 @@ impl SubagentSupervisor {
         Ok(handle)
     }
 
+    /// Send message.
+    /// This sends a run message through the parent coordination channel and records the
+    /// receipt.
     pub fn send_message(&self, message: RunMessage) -> Result<MessageReceipt, AgentError> {
         self.pool.send(message)
     }
 
+    /// Registers a wake condition for a child run through the parent pool.
+    /// This delegates to `AgentPoolCoordinator::suspend_until`, so it can mutate wake state and
+    /// poll event subscriptions while leaving the child run itself paused.
     pub fn suspend_until(
         &self,
         run_id: RunId,
@@ -298,6 +364,9 @@ impl SubagentSupervisor {
         self.pool.suspend_until(run_id, condition)
     }
 
+    /// Wraps a child event into the parent subagent record stream.
+    /// This appends a parent subagent record and stores the wrapped-event record in supervisor
+    /// state; it does not re-publish the child event or execute child work.
     pub fn wrap_child_event(
         &self,
         event: AgentEvent,
@@ -329,6 +398,9 @@ impl SubagentSupervisor {
         Ok(record)
     }
 
+    /// Rolls child usage into parent-visible subagent accounting.
+    /// This dedupes by child usage ref, appends the parent subagent usage record, and stores the
+    /// rollup in supervisor state; it does not call a provider or sink.
     pub fn rollup_usage(
         &self,
         child_run_id: RunId,
@@ -382,6 +454,9 @@ impl SubagentSupervisor {
         Ok(record)
     }
 
+    /// Complete child.
+    /// This records child completion in parent-owned lifecycle state and returns the completion
+    /// summary.
     pub fn complete_child(
         &self,
         child_run_id: RunId,
@@ -430,6 +505,9 @@ impl SubagentSupervisor {
         Ok(record)
     }
 
+    /// Cancel child.
+    /// This records parent-owned cancellation intent and asks child run control to cancel the
+    /// child.
     pub fn cancel_child(
         &self,
         child_run_id: RunId,
@@ -464,6 +542,9 @@ impl SubagentSupervisor {
         Ok(vec![intent, completed])
     }
 
+    /// Detach child.
+    /// This records parent-owned detach intent and transfers lifecycle ownership according to
+    /// policy.
     pub fn detach_child(
         &self,
         child_run_id: RunId,
@@ -503,10 +584,15 @@ impl SubagentSupervisor {
         Ok(vec![intent, detached])
     }
 
+    /// Records.
+    /// This reads the in-memory child lifecycle ledger for assertions or projection.
     pub fn records(&self) -> Result<Vec<SubagentRecord>, AgentError> {
         Ok(self.state()?.records.clone())
     }
 
+    /// Builds the child can be addressed as user chat value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn child_can_be_addressed_as_user_chat(
         &self,
         child_run_id: &RunId,
@@ -515,6 +601,9 @@ impl SubagentSupervisor {
         Ok(false)
     }
 
+    /// Builds the child requires terminal rollup or detach value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn child_requires_terminal_rollup_or_detach(
         &self,
         child_run_id: &RunId,
@@ -678,15 +767,29 @@ impl SubagentSupervisor {
 }
 
 #[derive(Clone, Debug)]
+/// Holds child run handle application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ChildRunHandle {
+    /// Stable child run id used for typed lineage, lookup, or dedupe.
     pub child_run_id: RunId,
+    /// Stable child agent id used for typed lineage, lookup, or dedupe.
     pub child_agent_id: AgentId,
+    /// Stable parent run id used for typed lineage, lookup, or dedupe.
     pub parent_run_id: RunId,
+    /// Deterministic child package fingerprint used for stale checks, package
+    /// evidence, or replay comparisons.
     pub child_package_fingerprint: RuntimePackageFingerprint,
+    /// Typed child journal ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub child_journal_ref: RunJournalRef,
+    /// Wrapped event filter used by this record or request.
     pub wrapped_event_filter: CompiledEventFilter,
+    /// Run handle used by this record or request.
     pub run_handle: RunHandle,
+    /// Child package used by this record or request.
     pub child_package: ChildRuntimePackage,
+    /// Cursor identifying a replay, export, or subscription position.
+    /// Use it to resume without widening the original scope.
     pub start_journal_cursor: Option<JournalCursor>,
 }
 
@@ -796,6 +899,8 @@ fn child_event_filter(child_run_id: RunId) -> Result<CompiledEventFilter, AgentE
     .compile()
 }
 
+/// Builds the subagent runtime event frame value.
+/// This is data construction and performs no I/O, journal append, event publication, or process
 pub fn subagent_runtime_event_frame(
     parent_run_id: RunId,
     child_run_id: RunId,

@@ -1,3 +1,7 @@
+//! Low-level shell command runner. Use this module behind policy-checked shell
+//! execution. It starts host processes and therefore must stay behind sandbox,
+//! timeout, and approval boundaries.
+//!
 use std::{
     process::{Command, Stdio},
     thread,
@@ -8,6 +12,9 @@ use agent_sdk_core::{AgentError, AgentErrorKind, RetryClassification};
 
 use super::types::{ShellRequest, ShellResult};
 
+/// Starts the requested host process after policy-checked callers reach this
+/// layer, waits for completion or timeout, and captures stdout/stderr with
+/// the current unbounded `wait_with_output` buffering behavior.
 pub(super) fn run_command(request: &ShellRequest) -> Result<ShellResult, AgentError> {
     let mut command = Command::new(&request.argv[0]);
     command.args(&request.argv[1..]);

@@ -103,166 +103,454 @@
 #[path = "application/agent.rs"]
 pub mod agent;
 #[path = "application/agent_pool.rs"]
+/// Public agent pool namespace. Use it for the documented agent pool
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod agent_pool;
 #[path = "application/anti_entropy.rs"]
+/// Public anti entropy namespace. Use it for the documented anti
+/// entropy API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod anti_entropy;
 #[path = "application/isolation.rs"]
+/// Public application isolation namespace. Use it for the documented
+/// application isolation API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod application_isolation;
 #[path = "application/approval.rs"]
+/// Public approval namespace. Use it for the documented approval API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod approval;
 #[path = "ports/approval.rs"]
+/// Public approval ports namespace. Use it for the documented approval
+/// ports API surface; prefer crate-root re-exports for common imports.
+/// Module items must preserve the core ownership and side-effect
+/// boundaries described in this file.
 pub mod approval_ports;
 #[path = "records/approval.rs"]
+/// Public approval records namespace. Use it for the documented
+/// approval records API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod approval_records;
 #[path = "testing/approval.rs"]
 mod approval_testing;
 #[path = "package/capability.rs"]
+/// Public capability namespace. Use it for the documented capability
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod capability;
 #[path = "application/checkpoint.rs"]
+/// Public checkpoint namespace. Use it for the documented checkpoint
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod checkpoint;
 #[path = "records/content.rs"]
+/// Public content namespace. Use it for the documented content API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod content;
 #[path = "ports/content.rs"]
+/// Public content ports namespace. Use it for the documented content
+/// ports API surface; prefer crate-root re-exports for common imports.
+/// Module items must preserve the core ownership and side-effect
+/// boundaries described in this file.
 pub mod content_ports;
 #[path = "testing/content.rs"]
 mod content_testing;
 #[path = "records/context.rs"]
+/// Public context namespace. Use it for the documented context API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod context;
+/// Public domain namespace. Use it for the documented domain API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod domain;
 #[path = "records/effect.rs"]
+/// Public effect namespace. Use it for the documented effect API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod effect;
 #[path = "domain/error.rs"]
+/// Public error namespace. Use it for the documented error API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod error;
 #[path = "records/event.rs"]
+/// Public event namespace. Use it for the documented event API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod event;
 #[path = "ports/event_bus.rs"]
+/// Public event bus namespace. Use it for the documented event bus API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod event_bus;
 #[path = "testing/event.rs"]
 mod event_testing;
 #[path = "records/events.rs"]
+/// Public events namespace. Use it for the documented events API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod events;
 #[path = "application/extension.rs"]
+/// Public extension namespace. Use it for the documented extension API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod extension;
 #[path = "ports/extension.rs"]
+/// Public extension ports namespace. Use it for the documented
+/// extension ports API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod extension_ports;
 #[path = "records/extension.rs"]
+/// Public extension records namespace. Use it for the documented
+/// extension records API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod extension_records;
 #[path = "testing/extension.rs"]
 mod extension_testing;
 #[path = "testing/fakes.rs"]
 mod fakes;
 #[path = "ports/hooks.rs"]
+/// Public hook ports namespace. Use it for the documented hook ports
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod hook_ports;
 #[path = "records/hooks.rs"]
+/// Public hook records namespace. Use it for the documented hook
+/// records API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod hook_records;
 #[path = "application/hooks.rs"]
+/// Public hooks namespace. Use it for the documented hooks API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod hooks;
 #[path = "testing/hooks.rs"]
 mod hooks_testing;
 #[path = "domain/ids.rs"]
+/// Public ids namespace. Use it for the documented ids API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod ids;
 #[path = "testing/isolation.rs"]
 mod isolation_testing;
 #[path = "records/journal.rs"]
+/// Public journal namespace. Use it for the documented journal API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod journal;
 #[path = "ports/journal.rs"]
+/// Public journal ports namespace. Use it for the documented journal
+/// ports API surface; prefer crate-root re-exports for common imports.
+/// Module items must preserve the core ownership and side-effect
+/// boundaries described in this file.
 pub mod journal_ports;
 #[path = "application/kernel.rs"]
+/// Public kernel namespace. Use it for the documented kernel API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod kernel;
 #[path = "application/loop_driver.rs"]
+/// Public loop driver namespace. Use it for the documented loop driver
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod loop_driver;
 #[path = "application/loop_state.rs"]
+/// Public loop state namespace. Use it for the documented loop state
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod loop_state;
 #[path = "records/output.rs"]
+/// Public output namespace. Use it for the documented output API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod output;
 #[path = "records/output_delivery.rs"]
+/// Public output delivery namespace. Use it for the documented output
+/// delivery API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod output_delivery;
 #[path = "ports/output_delivery.rs"]
+/// Public output delivery port namespace. Use it for the documented
+/// output delivery port API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod output_delivery_port;
 #[path = "application/output_delivery.rs"]
+/// Public output delivery service namespace. Use it for the documented
+/// output delivery service API surface; prefer crate-root re-exports
+/// for common imports. Module items must preserve the core ownership
+/// and side-effect boundaries described in this file.
 pub mod output_delivery_service;
 #[path = "testing/output_delivery.rs"]
 mod output_delivery_testing;
+/// Public package namespace. Use it for the documented package API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod package;
 #[path = "package/extension.rs"]
+/// Public package extension namespace. Use it for the documented
+/// package extension API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod package_extension;
 #[path = "package/hooks.rs"]
+/// Public package hooks namespace. Use it for the documented package
+/// hooks API surface; prefer crate-root re-exports for common imports.
+/// Module items must preserve the core ownership and side-effect
+/// boundaries described in this file.
 pub mod package_hooks;
 #[path = "package/isolation.rs"]
+/// Public package isolation namespace. Use it for the documented
+/// package isolation API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod package_isolation;
 #[path = "domain/policy.rs"]
+/// Public policy namespace. Use it for the documented policy API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod policy;
+/// Public ports namespace. Use it for the documented ports API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod ports;
 #[path = "ports/isolation.rs"]
+/// Public ports isolation namespace. Use it for the documented ports
+/// isolation API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod ports_isolation;
 #[path = "domain/privacy.rs"]
+/// Public privacy namespace. Use it for the documented privacy API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod privacy;
 #[path = "application/projection.rs"]
+/// Public projection namespace. Use it for the documented projection
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod projection;
 #[path = "ports/provider.rs"]
+/// Public provider namespace. Use it for the documented provider API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod provider;
 #[path = "ports/providers.rs"]
+/// Public providers namespace. Use it for the documented providers API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod providers;
 #[path = "application/realtime.rs"]
+/// Public realtime namespace. Use it for the documented realtime API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod realtime;
 #[path = "records/realtime.rs"]
+/// Public realtime records namespace. Use it for the documented
+/// realtime records API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod realtime_records;
 #[path = "testing/realtime.rs"]
 mod realtime_testing;
 #[path = "records/isolation.rs"]
+/// Public records isolation namespace. Use it for the documented
+/// records isolation API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod records_isolation;
 #[path = "application/recovery.rs"]
+/// Public recovery namespace. Use it for the documented recovery API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod recovery;
 #[path = "domain/refs.rs"]
+/// Public refs namespace. Use it for the documented refs API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod refs;
 #[path = "application/repair.rs"]
+/// Public repair namespace. Use it for the documented repair API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod repair;
 #[path = "application/replay.rs"]
+/// Public replay namespace. Use it for the documented replay API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod replay;
 #[path = "application/run.rs"]
+/// Public run namespace. Use it for the documented run API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the core ownership and side-effect boundaries described in
+/// this file.
 pub mod run;
 #[path = "application/run_handle.rs"]
+/// Public run handle namespace. Use it for the documented run handle
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod run_handle;
 #[path = "application/runtime.rs"]
+/// Public runtime namespace. Use it for the documented runtime API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod runtime;
 #[path = "application/stream.rs"]
+/// Public stream namespace. Use it for the documented stream API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod stream;
 #[path = "records/stream.rs"]
+/// Public stream records namespace. Use it for the documented stream
+/// records API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod stream_records;
 #[path = "records/structured_output.rs"]
+/// Public structured output namespace. Use it for the documented
+/// structured output API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod structured_output;
 #[path = "application/subagent.rs"]
+/// Public subagent namespace. Use it for the documented subagent API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod subagent;
 #[path = "records/subagent.rs"]
+/// Public subagent records namespace. Use it for the documented
+/// subagent records API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod subagent_records;
 #[path = "ports/subscription.rs"]
+/// Public subscription namespace. Use it for the documented
+/// subscription API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod subscription;
 #[path = "application/telemetry.rs"]
+/// Public telemetry namespace. Use it for the documented telemetry API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod telemetry;
 #[path = "ports/telemetry.rs"]
+/// Public telemetry ports namespace. Use it for the documented
+/// telemetry ports API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod telemetry_ports;
 #[path = "records/telemetry.rs"]
+/// Public telemetry records namespace. Use it for the documented
+/// telemetry records API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod telemetry_records;
 #[path = "testing/telemetry.rs"]
 mod telemetry_testing;
+/// Public testing namespace. Use it for the documented testing API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod testing;
 #[path = "application/tool.rs"]
+/// Public tool execution namespace. Use it for the documented tool
+/// execution API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod tool_execution;
 #[path = "ports/tool_pack.rs"]
+/// Public tool pack ports namespace. Use it for the documented tool
+/// pack ports API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod tool_pack_ports;
 #[path = "records/tool_pack.rs"]
+/// Public tool pack records namespace. Use it for the documented tool
+/// pack records API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod tool_pack_records;
 #[path = "ports/tool.rs"]
+/// Public tool ports namespace. Use it for the documented tool ports
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod tool_ports;
 #[path = "records/tool.rs"]
+/// Public tool records namespace. Use it for the documented tool
+/// records API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod tool_records;
 #[path = "testing/tool.rs"]
 mod tool_testing;
 #[path = "ports/typed_output.rs"]
+/// Public typed output ports namespace. Use it for the documented typed
+/// output ports API surface; prefer crate-root re-exports for common
+/// imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod typed_output_ports;
 #[path = "records/validated_output.rs"]
+/// Public validated output namespace. Use it for the documented
+/// validated output API surface; prefer crate-root re-exports for
+/// common imports. Module items must preserve the core ownership and
+/// side-effect boundaries described in this file.
 pub mod validated_output;
 #[path = "application/validation.rs"]
+/// Public validation namespace. Use it for the documented validation
+/// API surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod validation;
 
 pub use agent::{Agent, AgentBuilder};

@@ -1,3 +1,7 @@
+//! Structured-output validation orchestration. Use this module after provider output
+//! is available and before typed results are published. Validation is local and
+//! deterministic unless a caller-provided validator performs additional work.
+//!
 use crate as sdk;
 
 use serde::{Deserialize, Serialize};
@@ -15,14 +19,24 @@ use sdk::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds output candidate application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputCandidate {
+    /// Stable source attempt id used for typed lineage, lookup, or dedupe.
     pub source_attempt_id: AttemptId,
+    /// Content reference for the candidate value being validated.
     pub candidate_content_ref: ContentRef,
+    /// Text used by this record or request.
     pub text: String,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
 }
 
 impl OutputCandidate {
+    /// Creates a new application::validation value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         source_attempt_id: AttemptId,
         candidate_content_ref: ContentRef,
@@ -36,13 +50,23 @@ impl OutputCandidate {
         }
     }
 
+    /// Returns this value with its privacy setting replaced. The method
+    /// follows builder-style data construction and does not execute
+    /// external work.
     pub fn with_privacy(mut self, privacy: PrivacyClass) -> Self {
         self.privacy = privacy;
         self
     }
 }
 
+/// Port or behavior contract for structured output validator.
+/// Implementors should preserve policy, redaction, idempotency, and
+/// replay expectations from the surrounding module. Implementations may
+/// perform side effects only as described by the trait methods.
 pub trait StructuredOutputValidator {
+    /// Validates the application::validation invariants and returns a
+    /// typed error on failure. Validation is pure and does not perform
+    /// I/O, dispatch, journal appends, or adapter calls.
     fn validate_candidate(
         &self,
         contract: &OutputContract,
@@ -52,11 +76,17 @@ pub trait StructuredOutputValidator {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds json schema subset validator application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct JsonSchemaSubsetValidator {
+    /// Schema limits used by this record or request.
     pub schema_limits: HostileSchemaLimits,
 }
 
 impl JsonSchemaSubsetValidator {
+    /// Creates a new application::validation value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(schema_limits: HostileSchemaLimits) -> Self {
         Self { schema_limits }
     }
@@ -214,13 +244,29 @@ impl StructuredOutputValidator for JsonSchemaSubsetValidator {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds hostile schema limits application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct HostileSchemaLimits {
+    /// max schema bytes used for bounds checks, summaries, or truncation
+    /// evidence.
     pub max_schema_bytes: usize,
+    /// Maximum allowed object depth.
+    /// Use it to keep execution, output, or diagnostics bounded.
     pub max_object_depth: usize,
+    /// Maximum allowed properties per object.
+    /// Use it to keep execution, output, or diagnostics bounded.
     pub max_properties_per_object: usize,
+    /// Maximum allowed enum values per field.
+    /// Use it to keep execution, output, or diagnostics bounded.
     pub max_enum_values_per_field: usize,
+    /// max string pattern bytes used for bounds checks, summaries, or
+    /// truncation evidence.
     pub max_string_pattern_bytes: usize,
+    /// Typed allow remote refs references. Resolving them is separate from
+    /// constructing this record.
     pub allow_remote_refs: bool,
+    /// Boolean policy/capability flag for whether allow custom formats is
+    /// enabled.
     pub allow_custom_formats: bool,
 }
 
@@ -239,31 +285,66 @@ impl Default for HostileSchemaLimits {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+/// Holds validation success application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ValidationSuccess {
+    /// Stable schema id used for typed lineage, lookup, or dedupe.
     pub schema_id: OutputSchemaId,
+    /// Wire schema version used for compatibility checks.
     pub schema_version: SchemaVersion,
+    /// Deterministic schema fingerprint used for stale checks, package
+    /// evidence, or replay comparisons.
     pub schema_fingerprint: ContentHash,
+    /// Stable validation attempt id used for typed lineage, lookup, or
+    /// dedupe.
     pub validation_attempt_id: ValidationAttemptId,
+    /// Stable source attempt id used for typed lineage, lookup, or dedupe.
     pub source_attempt_id: AttemptId,
+    /// Content reference for the candidate value being validated.
     pub candidate_content_ref: ContentRef,
+    /// Canonical value used by this record or request.
     pub canonical_value: Value,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
+    /// Record used by this record or request.
     pub record: ValidationRecord,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds validation error report application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct ValidationErrorReport {
+    /// Stable schema id used for typed lineage, lookup, or dedupe.
     pub schema_id: OutputSchemaId,
+    /// Wire schema version used for compatibility checks.
     pub schema_version: SchemaVersion,
+    /// Deterministic schema fingerprint used for stale checks, package
+    /// evidence, or replay comparisons.
     pub schema_fingerprint: ContentHash,
+    /// Stable validation attempt id used for typed lineage, lookup, or
+    /// dedupe.
     pub validation_attempt_id: ValidationAttemptId,
+    /// Stable source attempt id used for typed lineage, lookup, or dedupe.
     pub source_attempt_id: AttemptId,
+    /// Content reference for the candidate value being validated.
     pub candidate_content_ref: ContentRef,
+    /// Bounded errors included in this record. Limits and truncation are
+    /// represented by companion metadata when applicable.
     pub errors: Vec<ValidationErrorSummary>,
+    /// Redacted summary for display, logs, events, or telemetry.
+    /// It should describe the value without exposing raw private content.
     pub redacted_error_summary: String,
+    /// Whether schema rejected is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub schema_rejected: bool,
+    /// Whether retry exhausted is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub retry_exhausted: bool,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
+    /// Record used by this record or request.
     pub record: ValidationRecord,
 }
 
@@ -310,6 +391,8 @@ impl ValidationErrorReport {
         }
     }
 
+    /// Returns this value as agent error. The accessor is side-effect
+    /// free and keeps ownership with the caller.
     pub fn as_agent_error(&self) -> AgentError {
         let mut error = AgentError::new(
             AgentErrorKind::StructuredOutputFailure,
@@ -329,20 +412,42 @@ impl ValidationErrorReport {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Holds terminal validation failure application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct TerminalValidationFailure {
+    /// Stable schema id used for typed lineage, lookup, or dedupe.
     pub schema_id: OutputSchemaId,
+    /// Wire schema version used for compatibility checks.
     pub schema_version: SchemaVersion,
+    /// Validation policy applied before output is accepted as typed data.
+    /// It controls validator selection, bounds, failure visibility, and local validation
+    /// behavior.
     pub validation_attempts: Vec<ValidationAttemptId>,
+    /// Attempt identifier or attempt history for bounded retry/repair.
+    /// Use it to preserve ordering and avoid retry loops that cannot be audited.
     pub repair_attempts: Vec<sdk::RepairAttemptId>,
+    /// Attempt identifier or attempt history for bounded retry/repair.
+    /// Use it to preserve ordering and avoid retry loops that cannot be audited.
     pub source_attempt_ids: Vec<AttemptId>,
+    /// Redacted summary for display, logs, events, or telemetry.
+    /// It should describe the value without exposing raw private content.
     pub redacted_error_summary: String,
+    /// Content reference for the candidate value being validated.
     pub candidate_content_ref: ContentRef,
+    /// Whether retry exhausted is enabled.
+    /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub retry_exhausted: bool,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
+    /// Record used by this record or request.
     pub record: ValidationRecord,
 }
 
 impl TerminalValidationFailure {
+    /// Constructs this value from reports. Use it when adapting
+    /// canonical SDK records without introducing a second behavior
+    /// path.
     pub fn from_reports(
         reports: &[ValidationErrorReport],
         repair_attempts: Vec<sdk::RepairAttemptId>,
@@ -393,6 +498,8 @@ impl TerminalValidationFailure {
         }
     }
 
+    /// Returns this value as agent error. The accessor is side-effect
+    /// free and keeps ownership with the caller.
     pub fn as_agent_error(&self) -> AgentError {
         AgentError::new(
             AgentErrorKind::StructuredOutputFailure,

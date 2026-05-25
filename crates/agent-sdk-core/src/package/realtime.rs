@@ -1,3 +1,9 @@
+//! Runtime-package records and builders. Use these items to describe the immutable
+//! per-run package that freezes provider route, capabilities, policies, sidecars,
+//! catalogs, and fingerprints. Builders are data-only and must not perform discovery
+//! or execution side effects. This file contains the realtime portion of that
+//! contract.
+//!
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -7,26 +13,56 @@ use crate::{
     package::PackageSidecarSnapshot,
 };
 
+/// Constant value for the package::realtime contract. Use it to keep
+/// SDK records and tests aligned on the same stable value.
 pub const REALTIME_SESSION_SIDECAR_KIND: &str = "realtime_session";
+/// Constant value for the package::realtime contract. Use it to keep
+/// SDK records and tests aligned on the same stable value.
 pub const REALTIME_SESSION_SIDECAR_VERSION: &str = "realtime_session.sidecar.v1";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the realtime session sidecar portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct RealtimeSessionSidecar {
+    /// Identifier for the typed package sidecar.
     pub sidecar_id: String,
+    /// Typed provider route ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub provider_route_ref: String,
+    /// Typed realtime capability ref reference. Resolving or executing it is
+    /// a separate policy-gated step.
     pub realtime_capability_ref: String,
+    /// Typed media policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub media_policy_ref: PolicyRef,
+    /// Typed send policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub send_policy_ref: PolicyRef,
+    /// Typed receive policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub receive_policy_ref: PolicyRef,
+    /// Typed restart policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub restart_policy_ref: PolicyRef,
+    /// Typed backpressure policy ref reference. Resolving or executing it is
+    /// a separate policy-gated step.
     pub backpressure_policy_ref: PolicyRef,
+    /// Typed interruption policy ref reference. Resolving or executing it is
+    /// a separate policy-gated step.
     pub interruption_policy_ref: PolicyRef,
+    /// Typed close policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub close_policy_ref: PolicyRef,
+    /// Queue capacity used by this record or request.
     pub queue_capacity: usize,
+    /// Overflow policy used by this record or request.
     pub overflow_policy: String,
 }
 
 impl RealtimeSessionSidecar {
+    /// Returns voice defaults for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn voice_defaults(
         sidecar_id: impl Into<String>,
         provider_route_ref: impl Into<String>,
@@ -52,6 +88,9 @@ impl RealtimeSessionSidecar {
         Ok(sidecar)
     }
 
+    /// Validates the package::realtime invariants and returns a typed
+    /// error on failure. Validation is pure and does not perform I/O,
+    /// dispatch, journal appends, or adapter calls.
     pub fn validate(&self) -> Result<(), AgentError> {
         if self.sidecar_id.is_empty() {
             return Err(AgentError::missing_required_field(
@@ -76,6 +115,9 @@ impl RealtimeSessionSidecar {
         Ok(())
     }
 
+    /// Computes the stable content hash for this package::realtime
+    /// value. The computation is deterministic and side-effect free so
+    /// it can be used in package, journal, or test evidence.
     pub fn content_hash(&self) -> Result<String, AgentError> {
         self.validate()?;
         let bytes = serde_json::to_vec(self)
@@ -83,6 +125,9 @@ impl RealtimeSessionSidecar {
         Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
     }
 
+    /// Returns policy refs for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn policy_refs(&self) -> Vec<PolicyRef> {
         vec![
             self.media_policy_ref.clone(),
@@ -95,6 +140,9 @@ impl RealtimeSessionSidecar {
         ]
     }
 
+    /// Converts this value into package sidecar snapshot data.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn to_package_sidecar_snapshot(&self) -> Result<PackageSidecarSnapshot, AgentError> {
         self.validate()?;
         Ok(PackageSidecarSnapshot {

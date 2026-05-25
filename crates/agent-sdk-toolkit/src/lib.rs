@@ -6,11 +6,35 @@
 //! refs, policy refs, content refs, and effect lineage.
 
 pub mod discovery;
+/// Public packs namespace. Use it for the documented packs API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the toolkit ownership and side-effect boundaries described
+/// in this file.
 pub mod packs;
+/// Public protocol namespace. Use it for the documented protocol API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the toolkit ownership and side-effect boundaries
+/// described in this file.
 pub mod protocol;
+/// Public resources namespace. Use it for the documented resources API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the toolkit ownership and side-effect boundaries
+/// described in this file.
 pub mod resources;
+/// Public shell namespace. Use it for the documented shell API surface;
+/// prefer crate-root re-exports for common imports. Module items must
+/// preserve the toolkit ownership and side-effect boundaries described
+/// in this file.
 pub mod shell;
+/// Public testing namespace. Use it for the documented testing API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the toolkit ownership and side-effect boundaries
+/// described in this file.
 pub mod testing;
+/// Public workspace namespace. Use it for the documented workspace API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the toolkit ownership and side-effect boundaries
+/// described in this file.
 pub mod workspace;
 
 pub use discovery::{ToolDiscoveryExecutor, ToolDiscoveryIndex, ToolDiscoveryRequest};

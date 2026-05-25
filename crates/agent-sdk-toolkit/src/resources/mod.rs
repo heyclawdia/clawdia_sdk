@@ -1,3 +1,7 @@
+//! Resource-reader helpers layered over explicit URI resolvers and core content refs.
+//! Use these modules when a host wants toolkit tools to read approved resources.
+//! Resolver implementations own any backing-store or network side effects.
+//!
 mod executor;
 mod policy;
 mod resolver;

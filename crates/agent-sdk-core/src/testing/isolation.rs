@@ -1,3 +1,9 @@
+//! Deterministic test-kit helpers for SDK consumers. Use these fakes and harnesses to
+//! exercise public contracts without live providers, real stores, product UI, network
+//! telemetry, or wall-clock-dependent infrastructure. They mutate only their
+//! in-memory state unless noted. This file contains the isolation portion of that
+//! contract.
+//!
 use std::sync::{Arc, Mutex};
 
 use crate::{
@@ -19,6 +25,8 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
+/// In-memory fake isolation runtime fixture for SDK conformance tests.
+/// Use it to script deterministic behavior in memory; any transcript or endpoint mutation is documented on the method that performs it.
 pub struct FakeIsolationRuntime {
     report: IsolationCapabilityReport,
     calls: Arc<Mutex<Vec<String>>>,
@@ -26,6 +34,9 @@ pub struct FakeIsolationRuntime {
 }
 
 impl FakeIsolationRuntime {
+    /// Returns this value with its report setting replaced. The method
+    /// follows builder-style data construction and does not execute
+    /// external work.
     pub fn with_report(report: IsolationCapabilityReport) -> Self {
         Self {
             report,
@@ -34,6 +45,9 @@ impl FakeIsolationRuntime {
         }
     }
 
+    /// Builds the unsupported host value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn unsupported_host(
         adapter_ref: impl Into<IsolationRuntimeRef>,
         missing: impl IntoIterator<Item = impl Into<String>>,
@@ -41,23 +55,36 @@ impl FakeIsolationRuntime {
         Self::with_report(IsolationCapabilityReport::unsupported(adapter_ref, missing))
     }
 
+    /// Builds the host process only value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn host_process_only(adapter_ref: impl Into<IsolationRuntimeRef>) -> Self {
         Self::with_report(IsolationCapabilityReport::host_process(adapter_ref))
     }
 
+    /// Returns this value with its cleanup status setting replaced. The
+    /// method follows builder-style data construction and does not
+    /// execute external work.
     pub fn with_cleanup_status(mut self, cleanup_status: CleanupStatus) -> Self {
         self.cleanup_status = cleanup_status;
         self
     }
 
+    /// Operates on in-memory or journal-derived testing::isolation state for
+    /// diagnostics and repair evidence. It does not create a second run loop
+    /// or product workflow owner.
     pub fn calls(&self) -> Vec<String> {
         self.calls.lock().expect("fake isolation calls").clone()
     }
 
+    /// Returns the call count currently held by this value.
+    /// This reads deterministic in-memory test state and performs no external I/O.
     pub fn call_count(&self) -> usize {
         self.calls().len()
     }
 
+    /// Start process call count.
+    /// This reads the fake adapter call counter and does not start or signal a process.
     pub fn start_process_call_count(&self) -> usize {
         self.calls()
             .into_iter()

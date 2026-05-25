@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the bounds portion of that contract.
+//!
 use std::{
     fs,
     path::{Component, Path, PathBuf},
@@ -11,19 +17,31 @@ use super::{
 };
 
 #[derive(Clone, Debug)]
+/// Workspace bounded workspace request or result value.
+/// Creating the value does not touch the filesystem; workspace executors document read, write, edit, or search effects.
 pub struct BoundedWorkspace {
+    /// Value used by this record or request.
     pub(super) policy: WorkspacePolicy,
 }
 
 impl BoundedWorkspace {
+    /// Creates a new workspace::bounds value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(policy: WorkspacePolicy) -> Self {
         Self { policy }
     }
 
+    /// Returns policy for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn policy(&self) -> &WorkspacePolicy {
         &self.policy
     }
 
+    /// Resolve existing file.
+    /// This resolves and validates a workspace path using filesystem metadata; it does not read
+    /// or write file contents.
     pub(super) fn resolve_existing_file(&self, path: &str) -> Result<PathBuf, AgentError> {
         let path = self.resolve_workspace_path(path)?;
         self.validate_existing_path(&path)?;
@@ -37,6 +55,9 @@ impl BoundedWorkspace {
         Ok(path)
     }
 
+    /// Resolve for write.
+    /// This resolves and validates a workspace path using filesystem metadata; it does not read
+    /// or write file contents.
     pub(super) fn resolve_for_write(&self, path: &str) -> Result<PathBuf, AgentError> {
         let path = self.resolve_workspace_path(path)?;
         let parent = path.parent().ok_or_else(|| {
@@ -136,6 +157,9 @@ impl BoundedWorkspace {
         self.policy.root.canonicalize().map_err(tool_failure)
     }
 
+    /// Visits files under the configured workspace policy.
+    /// This reads directory entries and file metadata, skips denied paths, and
+    /// invokes the caller callback for allowed files without mutating them.
     pub(super) fn visit_files(
         &self,
         dir: &Path,
@@ -161,6 +185,9 @@ impl BoundedWorkspace {
         Ok(())
     }
 
+    /// Converts an allowed path into a workspace-relative UTF-8 path.
+    /// This only checks the path prefix and string encoding; it does not read
+    /// file contents or mutate files.
     pub(super) fn relative_path(&self, path: &Path) -> Result<String, AgentError> {
         path.strip_prefix(&self.policy.root)
             .map_err(|_| policy_denial("workspace path escapes root"))?

@@ -1,3 +1,7 @@
+//! Event bus port and in-memory event bus helpers. Use this module for live
+//! observation separate from durable journal truth. Publishing mutates the bus state
+//! and may notify subscribers.
+//!
 use std::{
     collections::VecDeque,
     sync::{
@@ -15,23 +19,42 @@ use crate::{
     },
 };
 
+/// Port or behavior contract for agent event bus. Implementors should
+/// preserve policy, redaction, idempotency, and replay expectations
+/// from the surrounding module. Implementations may perform side
+/// effects only as described by the trait methods.
 pub trait AgentEventBus: Send + Sync {
+    /// Mutates the in-memory event/subscription state and may wake local
+    /// subscribers. It does not persist durable journal truth or call network
+    /// sinks.
     fn publish(&self, frame: EventFrame) -> Result<(), AgentError>;
 
+    /// Creates a live stream for all visible event frames from the cursor.
+    /// Implementations may register subscriber state or read buffered frames,
+    /// but must not publish new events or append journal records.
     fn subscribe_all(&self, cursor: Option<EventCursor>) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a live stream for all visible event frames with queue options.
+    /// Implementations create a live subscription stream from bus state; subscribing must not
+    /// publish new events or append journal records.
     fn subscribe_all_with_options(
         &self,
         cursor: Option<EventCursor>,
         options: SubscriptionOptions,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a live stream scoped to one run from the cursor.
+    /// Implementations may register subscriber state or read buffered frames,
+    /// but must not publish new events or append journal records.
     fn subscribe_run(
         &self,
         run_id: RunId,
         cursor: Option<EventCursor>,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a live stream scoped to one run with queue options.
+    /// Implementations create a live subscription stream from bus state; subscribing must not
+    /// publish new events or append journal records.
     fn subscribe_run_with_options(
         &self,
         run_id: RunId,
@@ -39,12 +62,18 @@ pub trait AgentEventBus: Send + Sync {
         options: SubscriptionOptions,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a live stream scoped to one agent from the cursor.
+    /// Implementations may register subscriber state or read buffered frames,
+    /// but must not publish new events or append journal records.
     fn subscribe_agent(
         &self,
         agent_id: AgentId,
         cursor: Option<EventCursor>,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a live stream scoped to one agent with queue options.
+    /// Implementations create a live subscription stream from bus state; subscribing must not
+    /// publish new events or append journal records.
     fn subscribe_agent_with_options(
         &self,
         agent_id: AgentId,
@@ -52,6 +81,9 @@ pub trait AgentEventBus: Send + Sync {
         options: SubscriptionOptions,
     ) -> Result<AgentEventStream, AgentError>;
 
+    /// Creates a live stream for frames matching a compiled envelope filter.
+    /// Implementations create a live subscription stream from bus state; subscribing must not
+    /// publish new events or append journal records.
     fn subscribe_filtered(
         &self,
         filter: CompiledEventFilter,
@@ -59,7 +91,15 @@ pub trait AgentEventBus: Send + Sync {
     ) -> Result<AgentEventStream, AgentError>;
 }
 
+/// Port or behavior contract for event archive. Implementors should
+/// preserve policy, redaction, idempotency, and replay expectations
+/// from the surrounding module. Implementations may perform side
+/// effects only as described by the trait methods.
 pub trait EventArchive: Send + Sync {
+    /// Replays archived frames matching a compiled envelope filter from the
+    /// archive cursor.
+    /// Implementations read archived event frames from the requested cursor and return a
+    /// stream; replaying must not publish new events or append journal records.
     fn replay_filtered_from_cursor(
         &self,
         filter: CompiledEventFilter,
@@ -68,11 +108,16 @@ pub trait EventArchive: Send + Sync {
 }
 
 #[derive(Clone, Debug)]
+/// Carries agent event stream data across a host-port boundary.
+/// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct AgentEventStream {
     frames: VecDeque<EventFrame>,
 }
 
 impl AgentEventStream {
+    /// Creates a new ports::event_bus value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(frames: impl IntoIterator<Item = EventFrame>) -> Self {
         Self {
             frames: frames.into_iter().collect(),
@@ -89,12 +134,17 @@ impl Iterator for AgentEventStream {
 }
 
 #[derive(Clone, Debug, Default)]
+/// Carries in memory agent event bus data across a host-port boundary.
+/// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct InMemoryAgentEventBus {
     frames: Arc<Mutex<Vec<EventFrame>>>,
     next_event_seq: Arc<AtomicU64>,
 }
 
 impl InMemoryAgentEventBus {
+    /// Mutates the in-memory event/subscription state and may wake local
+    /// subscribers. It does not persist durable journal truth or call network
+    /// sinks.
     pub fn publish(&self, frame: EventFrame) -> Result<(), AgentError> {
         let frame = self.assign_live_sequence(frame);
         self.frames
@@ -104,6 +154,9 @@ impl InMemoryAgentEventBus {
         Ok(())
     }
 
+    /// Mutates the in-memory event/subscription state and may wake local
+    /// subscribers. It does not persist durable journal truth or call network
+    /// sinks.
     pub fn publish_all(
         &self,
         frames: impl IntoIterator<Item = EventFrame>,

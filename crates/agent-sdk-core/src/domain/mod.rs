@@ -1,3 +1,7 @@
+//! Domain primitives for stable SDK vocabulary. Use these items for IDs, refs,
+//! policy, privacy, trust, and errors that cross crate or host boundaries. They are
+//! data-only and must not perform provider, filesystem, network, or UI side effects.
+//!
 pub(crate) mod json;
 
 pub use crate::effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus};

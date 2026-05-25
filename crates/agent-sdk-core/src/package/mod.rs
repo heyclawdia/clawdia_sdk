@@ -1,3 +1,8 @@
+//! Runtime package authority for one run. Use this module to freeze provider routes,
+//! capabilities, sidecars, catalogs, policies, output sinks, and fingerprints before
+//! execution. Package builders are data-only; applying deltas returns a new snapshot
+//! rather than mutating ambient state.
+//!
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -12,9 +17,25 @@ use crate::{
     output::{OutputContract, OutputMode, OutputSchemaDialect, ProviderHintPolicy, SchemaVersion},
 };
 
+/// Public realtime namespace. Use it for the documented realtime API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod realtime;
+/// Public stream namespace. Use it for the documented stream API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod stream;
+/// Public subagent namespace. Use it for the documented subagent API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod subagent;
+/// Public tool pack namespace. Use it for the documented tool pack API
+/// surface; prefer crate-root re-exports for common imports. Module
+/// items must preserve the core ownership and side-effect boundaries
+/// described in this file.
 pub mod tool_pack;
 
 pub use crate::package_isolation::IsolationRequirementSnapshot;
@@ -24,40 +45,70 @@ pub use subagent::{
     SubagentToolPolicy, build_child_runtime_package,
 };
 
+/// Constant value for the package contract. Use it to keep SDK records
+/// and tests aligned on the same stable value.
 pub const RUNTIME_PACKAGE_SCHEMA_VERSION: u16 = 1;
+/// Constant value for the package contract. Use it to keep SDK records
+/// and tests aligned on the same stable value.
 pub const RUNTIME_PACKAGE_FINGERPRINT_ALGORITHM: &str = "sha256:runtime-package-canonical-v1";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the runtime package portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct RuntimePackage {
+    /// Wire schema version used for compatibility checks.
     pub schema_version: u16,
+    /// Runtime package identifier for the immutable per-run package snapshot.
     pub package_id: RuntimePackageId,
+    /// Agent snapshot frozen into this package or record.
     pub agent: AgentSnapshot,
+    /// Provider route snapshot selected for this runtime package.
     pub provider_route: ProviderRouteSnapshot,
+    /// Provider capability hints frozen into this package snapshot.
     pub provider_capabilities: ProviderCapabilitySnapshot,
     #[serde(default)]
+    /// Output contracts frozen into this package or request.
     pub output_contracts: Vec<OutputContractSnapshot>,
     #[serde(default)]
+    /// Output sink snapshots available to this run.
     pub output_sinks: Vec<OutputSinkSnapshot>,
     #[serde(default)]
+    /// Capabilities frozen into the package or returned by an adapter health
+    /// check.
     pub capabilities: Vec<CapabilitySpec>,
     #[serde(default)]
+    /// Typed sidecar snapshots included in a package or delta.
     pub sidecars: Vec<PackageSidecarSnapshot>,
     #[serde(default)]
+    /// Isolation requirements frozen into the package snapshot.
     pub isolation_requirements: Vec<IsolationRequirementSnapshot>,
     #[serde(default)]
+    /// Catalog snapshots contributed to or returned with a runtime package
+    /// delta.
     pub catalogs: Vec<CapabilityCatalogSnapshot>,
+    /// Child-run lifecycle policy frozen into the package snapshot.
     pub child_lifecycle: ChildLifecyclePolicySnapshot,
+    /// Policies used by this record or request.
     pub policies: PolicySnapshot,
+    /// Manifest describing which fields entered or were excluded from
+    /// fingerprinting.
     pub fingerprint_manifest: FingerprintInputManifest,
     #[serde(default, skip_serializing_if = "VolatileRuntimeFields::is_empty")]
+    /// Volatile used by this record or request.
     pub volatile: VolatileRuntimeFields,
 }
 
 impl RuntimePackage {
+    /// Starts a builder for this package value. Building is data-only;
+    /// runtime side effects occur only when a later coordinator or host
+    /// port executes the built configuration.
     pub fn builder(package_id: RuntimePackageId) -> RuntimePackageBuilder {
         RuntimePackageBuilder::new(package_id)
     }
 
+    /// Returns for agent for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn for_agent(agent_id: AgentId, agent_name: impl Into<String>) -> RuntimePackageBuilder {
         RuntimePackageBuilder::new(RuntimePackageId::new(format!(
             "package.{}",
@@ -70,6 +121,9 @@ impl RuntimePackage {
         })
     }
 
+    /// Computes the stable canonical snapshot for this package value.
+    /// The computation is deterministic and side-effect free so it can
+    /// be used in package, journal, or test evidence.
     pub fn canonical_snapshot(&self) -> Result<RuntimePackageCanonicalV1, AgentError> {
         self.validate()?;
         Ok(RuntimePackageCanonicalV1 {
@@ -115,6 +169,9 @@ impl RuntimePackage {
         })
     }
 
+    /// Computes the stable fingerprint for this package value. The
+    /// computation is deterministic and side-effect free so it can be
+    /// used in package, journal, or test evidence.
     pub fn fingerprint(&self) -> Result<RuntimePackageFingerprint, AgentError> {
         let canonical = self.canonical_snapshot()?;
         let preimage = serde_json::json!({
@@ -135,6 +192,9 @@ impl RuntimePackage {
         )))
     }
 
+    /// Validates the package invariants and returns a typed error on
+    /// failure. Validation is pure and does not perform I/O, dispatch,
+    /// journal appends, or adapter calls.
     pub fn validate(&self) -> Result<(), AgentError> {
         if self.schema_version != RUNTIME_PACKAGE_SCHEMA_VERSION {
             return Err(AgentError::contract_violation(format!(
@@ -185,6 +245,9 @@ impl RuntimePackage {
         Ok(())
     }
 
+    /// Returns provider tool specs for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn provider_tool_specs(&self) -> Result<Vec<ProviderCapabilityProjection>, AgentError> {
         self.capabilities
             .iter()
@@ -192,6 +255,9 @@ impl RuntimePackage {
             .collect()
     }
 
+    /// Returns executable routes for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn executable_routes(&self) -> Result<Vec<ExecutableCapabilityRoute>, AgentError> {
         self.capabilities
             .iter()
@@ -199,12 +265,18 @@ impl RuntimePackage {
             .collect()
     }
 
+    /// Returns sidecar for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn sidecar(&self, sidecar_id: &str) -> Option<&PackageSidecarSnapshot> {
         self.sidecars
             .iter()
             .find(|sidecar| sidecar.sidecar_id == sidecar_id)
     }
 
+    /// Returns this value with its output contract setting replaced.
+    /// The method follows builder-style data construction and does not
+    /// execute external work.
     pub fn with_output_contract(
         mut self,
         output_contract: &OutputContract,
@@ -219,12 +291,19 @@ impl RuntimePackage {
         Ok(self)
     }
 
+    /// Returns catalog for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn catalog(&self, catalog_id: &str) -> Option<&CapabilityCatalogSnapshot> {
         self.catalogs
             .iter()
             .find(|catalog| catalog.catalog_id == catalog_id)
     }
 
+    /// Validates a package delta against this snapshot and returns a new
+    /// runtime package. The method is pure with respect to the existing
+    /// package and does not mutate ambient registries or execute activated
+    /// capabilities.
     pub fn apply_delta(&self, delta: PackageDelta) -> Result<Self, AgentError> {
         if delta.previous_fingerprint != self.fingerprint()? {
             return Err(AgentError::contract_violation(
@@ -245,6 +324,9 @@ impl RuntimePackage {
         Ok(next)
     }
 
+    /// Returns conformance report for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn conformance_report(&self) -> Result<RuntimePackageConformanceReport, AgentError> {
         let fingerprint = self.fingerprint()?;
         Ok(RuntimePackageConformanceReport {
@@ -304,11 +386,16 @@ impl RuntimePackage {
 }
 
 #[derive(Clone, Debug)]
+/// Describes the runtime package builder portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct RuntimePackageBuilder {
     package: RuntimePackage,
 }
 
 impl RuntimePackageBuilder {
+    /// Creates a new package value with explicit caller-provided
+    /// inputs. This constructor is data-only and performs no I/O or
+    /// external side effects.
     pub fn new(package_id: RuntimePackageId) -> Self {
         let package = RuntimePackage {
             schema_version: RUNTIME_PACKAGE_SCHEMA_VERSION,
@@ -337,51 +424,81 @@ impl RuntimePackageBuilder {
         Self { package }
     }
 
+    /// Returns agent for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn agent(mut self, agent: AgentSnapshot) -> Self {
         self.package.agent = agent;
         self
     }
 
+    /// Returns provider route for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn provider_route(mut self, provider_route: ProviderRouteSnapshot) -> Self {
         self.package.provider_route = provider_route;
         self
     }
 
+    /// Returns output contract for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn output_contract(mut self, output_contract: OutputContractSnapshot) -> Self {
         self.package.output_contracts.push(output_contract);
         self
     }
 
+    /// Returns output sink for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn output_sink(mut self, output_sink: OutputSinkSnapshot) -> Self {
         self.package.output_sinks.push(output_sink);
         self
     }
 
+    /// Returns capability for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn capability(mut self, capability: CapabilitySpec) -> Self {
         self.package.capabilities.push(capability);
         self
     }
 
+    /// Returns sidecar for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn sidecar(mut self, sidecar: PackageSidecarSnapshot) -> Self {
         self.package.sidecars.push(sidecar);
         self
     }
 
+    /// Returns catalog for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn catalog(mut self, catalog: CapabilityCatalogSnapshot) -> Self {
         self.package.catalogs.push(catalog);
         self
     }
 
+    /// Returns isolation requirement for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn isolation_requirement(mut self, snapshot: IsolationRequirementSnapshot) -> Self {
         self.package.isolation_requirements.push(snapshot);
         self
     }
 
+    /// Returns policy for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn policy(mut self, policy_ref: PolicyRef) -> Self {
         self.package.policies.policy_refs.push(policy_ref);
         self
     }
 
+    /// Finishes builder validation and returns the configured value.
+    /// This is data-only unless the surrounding builder explicitly
+    /// documents adapter or store access.
     pub fn build(mut self) -> Result<RuntimePackage, AgentError> {
         self.package.fingerprint_manifest = self.package.computed_fingerprint_manifest();
         self.package.validate()?;
@@ -390,49 +507,86 @@ impl RuntimePackageBuilder {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the runtime package canonical v1 portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct RuntimePackageCanonicalV1 {
+    /// Wire schema version used for compatibility checks.
     pub schema_version: u16,
+    /// Runtime package identifier for the immutable per-run package snapshot.
     pub package_id: RuntimePackageId,
+    /// Agent snapshot frozen into this package or record.
     pub agent: AgentSnapshot,
+    /// Provider route snapshot selected for this runtime package.
     pub provider_route: ProviderRouteSnapshot,
+    /// Provider capability hints frozen into this package snapshot.
     pub provider_capabilities: ProviderCapabilitySnapshot,
+    /// Output contracts frozen into this package or request.
     pub output_contracts: Vec<OutputContractSnapshot>,
+    /// Output sink snapshots available to this run.
     pub output_sinks: Vec<OutputSinkSnapshot>,
+    /// Capabilities frozen into the package or returned by an adapter health
+    /// check.
     pub capabilities: Vec<CapabilitySpec>,
+    /// Typed sidecar snapshots included in a package or delta.
     pub sidecars: Vec<PackageSidecarSnapshot>,
+    /// Isolation requirements frozen into the package snapshot.
     pub isolation_requirements: Vec<IsolationRequirementSnapshot>,
+    /// Catalog snapshots contributed to or returned with a runtime package
+    /// delta.
     pub catalogs: Vec<CapabilityCatalogSnapshot>,
+    /// Child-run lifecycle policy frozen into the package snapshot.
     pub child_lifecycle: ChildLifecyclePolicySnapshot,
+    /// Policies used by this record or request.
     pub policies: PolicySnapshot,
+    /// Manifest describing which fields entered or were excluded from
+    /// fingerprinting.
     pub fingerprint_manifest: FingerprintInputManifest,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the runtime package fingerprint portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct RuntimePackageFingerprint(pub String);
 
 impl RuntimePackageFingerprint {
+    /// Returns this value as str. The accessor is side-effect free and
+    /// keeps ownership with the caller.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the agent snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct AgentSnapshot {
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Human-readable or protocol-visible name for this SDK item.
     pub name: String,
     #[serde(default)]
+    /// Typed default behavior refs references. Resolving them is separate
+    /// from constructing this record.
     pub default_behavior_refs: Vec<PolicyRef>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the provider route snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ProviderRouteSnapshot {
+    /// Stable route id used for typed lineage, lookup, or dedupe.
     pub route_id: String,
+    /// Stable model id used for typed lineage, lookup, or dedupe.
     pub model_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Policy reference governing provider projection or calls.
     pub provider_policy_ref: Option<PolicyRef>,
 }
 
 impl ProviderRouteSnapshot {
+    /// Creates a new package value with explicit caller-provided
+    /// inputs. This constructor is data-only and performs no I/O or
+    /// external side effects.
     pub fn new(route_id: impl Into<String>, model_id: impl Into<String>) -> Self {
         Self {
             route_id: route_id.into(),
@@ -443,31 +597,70 @@ impl ProviderRouteSnapshot {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the provider capability snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ProviderCapabilitySnapshot {
+    /// Capability version advertised by the provider or package.
+    /// Use it to match compatible feature contracts during package resolution.
     pub capability_version: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional realtime capability version advertised by the package.
+    /// Package resolution can use it to match compatible realtime sidecars and adapters.
     pub realtime_capability_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the output contract snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct OutputContractSnapshot {
+    /// Stable schema id used for typed lineage, lookup, or dedupe.
     pub schema_id: OutputSchemaId,
+    /// Wire schema version used for compatibility checks.
     pub schema_version: SchemaVersion,
+    /// Deterministic schema fingerprint used for stale checks, package
+    /// evidence, or replay comparisons.
     pub schema_fingerprint: String,
+    /// Schema dialect used to interpret the output schema.
+    /// Validators use it to select the supported JSON-schema subset and compatibility rules.
     pub dialect: OutputSchemaDialect,
+    /// Mode that selects how this operation or contract should behave.
+    /// Callers use it to choose the explicit execution path instead of relying on hidden
+    /// defaults.
     pub mode: OutputMode,
+    /// Typed validation policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub validation_policy_ref: PolicyRef,
+    /// Typed repair policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub repair_policy_ref: PolicyRef,
+    /// Version of the local validator contract used for this output policy.
+    /// Use it to keep validation and replay behavior stable across releases.
     pub local_validator_version: String,
+    /// Policy for provider-side structured-output hints.
+    /// Hints may guide prompting but cannot replace SDK-owned validation.
     pub provider_hint_policy: ProviderHintPolicy,
+    /// Validation policy applied before output is accepted as typed data.
+    /// It controls validator selection, bounds, failure visibility, and local validation
+    /// behavior.
     pub validation: crate::output::ValidationPolicy,
+    /// Repair policy used after structured output validation fails.
+    /// It controls whether repair is attempted and which policy gates must approve it.
     pub repair: crate::output::RepairPolicy,
+    /// Retry budget for validation, repair, or adapter attempts.
+    /// Runtimes use it to stop bounded loops deterministically.
     pub retry_budget: crate::output::RetryBudget,
+    /// Content-capture policy that governs raw content, summaries, redaction, and retention.
+    /// Projection, telemetry, and delivery paths must honor it before exposing content.
     pub content_policy: crate::policy::ContentCapturePolicy,
+    /// Provider-facing projection hint for structured output requests.
+    /// It can guide model prompting but does not replace local validation policy.
     pub projection_hint: crate::output::OutputProjectionHint,
 }
 
 impl OutputContractSnapshot {
+    /// Validates the package invariants and returns a typed error on
+    /// failure. Validation is pure and does not perform I/O, dispatch,
+    /// journal appends, or adapter calls.
     pub fn validate(&self) -> Result<(), AgentError> {
         if !self.schema_fingerprint.starts_with("sha256:") {
             return Err(AgentError::contract_violation(
@@ -500,32 +693,68 @@ impl From<&OutputContract> for OutputContractSnapshot {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the output sink snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct OutputSinkSnapshot {
+    /// Stable sink id used for typed lineage, lookup, or dedupe.
     pub sink_id: String,
+    /// Typed delivery policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub delivery_policy_ref: PolicyRef,
+    /// Dedupe policy or key for a side-effecting operation.
+    /// Replay and repair use it to avoid sending or executing the same effect twice.
     pub dedupe_policy: String,
+    /// Capability version advertised by an output sink.
+    /// Delivery policy uses it to confirm that the sink can receive the requested payload
+    /// shape.
     pub sink_capability_version: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the package sidecar snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct PackageSidecarSnapshot {
+    /// Identifier for the typed package sidecar.
     pub sidecar_id: String,
+    /// Kind/category for this record, capability, event, or detected
+    /// resource.
     pub kind: String,
+    /// Version string for this capability, package, or protocol surface.
+    /// Use it for compatibility checks during package or adapter resolution.
     pub version: String,
+    /// References associated with refs.
+    /// Resolve them through the appropriate registry or content store before using referenced
+    /// data.
     pub refs: Vec<PackageSidecarRef>,
+    /// Policy references that govern admission, projection, execution, or
+    /// delivery.
     pub policy_refs: Vec<PolicyRef>,
+    /// Stable hash for the bytes or canonical payload used for stale checks
+    /// and fingerprints.
     pub content_hash: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the child lifecycle policy snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ChildLifecyclePolicySnapshot {
+    /// Policy reference that must be resolved by the host or runtime before
+    /// execution.
     pub policy_ref: PolicyRef,
+    /// Manual cancellation policy for child or run lifecycle.
+    /// Use it to decide whether cancellation cascades, detaches, or requires explicit cleanup.
     pub manual_cancel: String,
+    /// Typed detach policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub detach_policy_ref: PolicyRef,
+    /// cleanup timeout ms duration in milliseconds.
     pub cleanup_timeout_ms: u64,
 }
 
 impl ChildLifecyclePolicySnapshot {
+    /// Returns an updated value with safe defaults configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn safe_defaults() -> Self {
         Self {
             policy_ref: PolicyRef::with_kind(
@@ -543,8 +772,12 @@ impl ChildLifecyclePolicySnapshot {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the policy snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct PolicySnapshot {
     #[serde(default)]
+    /// Policy references that govern admission, projection, execution, or
+    /// delivery.
     pub policy_refs: Vec<PolicyRef>,
 }
 
@@ -557,56 +790,108 @@ impl PolicySnapshot {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the capability catalog snapshot portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct CapabilityCatalogSnapshot {
+    /// Stable catalog id used for typed lineage, lookup, or dedupe.
     pub catalog_id: String,
+    /// Kind discriminator for source kind.
+    /// Use it to route finite match arms without parsing display text.
     pub source_kind: crate::capability::CapabilitySourceKind,
+    /// Typed source reference that records where this item originated.
     pub source_ref: SourceRef,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Version string for this capability, package, or protocol surface.
+    /// Use it for compatibility checks during package or adapter resolution.
     pub version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Stable hash for the bytes or canonical payload used for stale checks
+    /// and fingerprints.
     pub content_hash: Option<String>,
+    /// Trust state used by this record or request.
     pub trust_state: TrustClass,
+    /// Typed activation policy ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub activation_policy_ref: PolicyRef,
     #[serde(default)]
+    /// Candidate capabilities, tools, resources, or package entries exposed
+    /// for host-approved selection.
     pub candidates: Vec<CapabilityId>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the package delta portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct PackageDelta {
+    /// Fingerprint of the package snapshot that a delta was computed against.
     pub previous_fingerprint: RuntimePackageFingerprint,
+    /// Source that requested this package delta, activation, or side effect.
     pub requested_by: SourceRef,
+    /// Redacted explanation for a denial, failure, status, or package delta.
     pub reason: String,
     #[serde(default)]
+    /// Capabilities that a package delta proposes to add to the next
+    /// snapshot.
     pub activated_capabilities: Vec<CapabilitySpec>,
     #[serde(default)]
+    /// Capability identifiers that a package delta proposes to remove from
+    /// the next snapshot.
     pub deactivated_capability_ids: Vec<CapabilityId>,
     #[serde(default)]
+    /// Catalog snapshots contributed to or returned with a runtime package
+    /// delta.
     pub catalogs: Vec<CapabilityCatalogSnapshot>,
     #[serde(default)]
+    /// Typed sidecar snapshots included in a package or delta.
     pub sidecars: Vec<PackageSidecarSnapshot>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the runtime package conformance report portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct RuntimePackageConformanceReport {
+    /// Deterministic fingerprint for package, event, telemetry, or validation
+    /// evidence.
     pub fingerprint: RuntimePackageFingerprint,
+    /// Count of provider projection items observed or included in this
+    /// record.
     pub provider_projection_count: usize,
+    /// Count of executable route items observed or included in this record.
     pub executable_route_count: usize,
+    /// Count of reserved inactive items observed or included in this record.
     pub reserved_inactive_count: usize,
+    /// Count of catalog items observed or included in this record.
     pub catalog_count: usize,
+    /// Count of sidecar items observed or included in this record.
     pub sidecar_count: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the fingerprint input manifest portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct FingerprintInputManifest {
+    /// Algorithm name used for hashing or fingerprint generation.
     pub algorithm: String,
+    /// Version of the canonical schema format used for fingerprinting.
+    /// Use it to detect incompatible fingerprint inputs.
     pub canonical_schema_version: u16,
+    /// Readiness state for a capability or package feature.
+    /// Launch and package validation use it to distinguish active, reserved, and blocked
+    /// surfaces.
     pub readiness_profile: ReadinessProfile,
+    /// Fingerprint input groups included for this readiness profile.
     pub included_groups: Vec<FingerprintInputGroup>,
+    /// Fingerprint input groups deliberately excluded for this readiness
+    /// profile.
     pub excluded_groups: Vec<FingerprintExclusionGroup>,
+    /// Readiness status for reserved feature capabilities.
     pub reserved_feature_status: Vec<ReservedFeatureFingerprintStatus>,
 }
 
 impl FingerprintInputManifest {
+    /// Returns p0 text for the current value.
+    /// This is a read-only or data-construction helper unless the method body explicitly calls
+    /// a port or store.
     pub fn p0_text() -> Self {
         Self {
             algorithm: RUNTIME_PACKAGE_FINGERPRINT_ALGORITHM.to_string(),
@@ -621,58 +906,103 @@ impl FingerprintInputManifest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite readiness profile cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum ReadinessProfile {
+    /// Use this variant when the contract needs to represent p0 text; selecting it has no side effect by itself.
     P0Text,
+    /// Use this variant when the contract needs to represent p1 typed output; selecting it has no side effect by itself.
     P1TypedOutput,
+    /// Use this variant when the contract needs to represent p2 side effects; selecting it has no side effect by itself.
     P2SideEffects,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite fingerprint input group cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum FingerprintInputGroup {
+    /// Use this variant when the contract needs to represent agent; selecting it has no side effect by itself.
     Agent,
+    /// Use this variant when the contract needs to represent provider route; selecting it has no side effect by itself.
     ProviderRoute,
+    /// Use this variant when the contract needs to represent output contracts; selecting it has no side effect by itself.
     OutputContracts,
+    /// Use this variant when the contract needs to represent output sinks; selecting it has no side effect by itself.
     OutputSinks,
+    /// Use this variant when the contract needs to represent capabilities; selecting it has no side effect by itself.
     Capabilities,
+    /// Use this variant when the contract needs to represent sidecars; selecting it has no side effect by itself.
     Sidecars,
+    /// Use this variant when the contract needs to represent isolation requirements; selecting it has no side effect by itself.
     IsolationRequirements,
+    /// Use this variant when the contract needs to represent catalogs; selecting it has no side effect by itself.
     Catalogs,
+    /// Use this variant when the contract needs to represent child lifecycle; selecting it has no side effect by itself.
     ChildLifecycle,
+    /// Use this variant when the contract needs to represent policies; selecting it has no side effect by itself.
     Policies,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+/// Enumerates the finite fingerprint exclusion group cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
 pub enum FingerprintExclusionGroup {
+    /// Use this variant when the contract needs to represent run ids; selecting it has no side effect by itself.
     RunIds,
+    /// Use this variant when the contract needs to represent event ids; selecting it has no side effect by itself.
     EventIds,
+    /// Use this variant when the contract needs to represent timestamps; selecting it has no side effect by itself.
     Timestamps,
+    /// Use this variant when the contract needs to represent adapter health; selecting it has no side effect by itself.
     AdapterHealth,
+    /// Use this variant when the contract needs to represent temporary paths; selecting it has no side effect by itself.
     TemporaryPaths,
+    /// Use this variant when the contract needs to represent telemetry sink health; selecting it has no side effect by itself.
     TelemetrySinkHealth,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the reserved feature fingerprint status portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct ReservedFeatureFingerprintStatus {
+    /// Stable capability identifier used for package projection and
+    /// executable routing.
     pub capability_id: CapabilityId,
+    /// Kind/category for this record, capability, event, or detected
+    /// resource.
     pub kind: CapabilityKind,
+    /// Implementation owner responsible for this capability surface.
+    /// Use it to route follow-up work and validation ownership.
     pub owner_role: String,
+    /// Finite status for this record or lifecycle stage.
     pub status: String,
+    /// Redacted explanation for a denial, failure, status, or package delta.
     pub reason: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Describes the volatile runtime fields portion of a runtime package snapshot.
+/// Use it when package authors or tests need explicit package configuration; validation and activation happen in package/runtime coordinators.
 pub struct VolatileRuntimeFields {
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Event identifier used to correlate live events with journal or replay
+    /// evidence.
     pub event_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// timestamp ms duration in milliseconds.
     pub timestamp_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Adapter health snapshot used to decide whether host support is
+    /// available.
     pub adapter_health: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Temporary host path used only for diagnostics or adapter handoff; it
+    /// should not become durable SDK authority.
     pub temporary_path: Option<String>,
 }
 

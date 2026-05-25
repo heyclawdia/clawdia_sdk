@@ -1,3 +1,7 @@
+//! Output delivery coordination over destination refs and sinks. Use this module to
+//! send final or streaming output through host-provided sinks with dedupe and journal
+//! evidence. Dispatch may call sinks and append delivery intent/result records.
+//!
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicU64, Ordering},
@@ -24,6 +28,8 @@ use crate::{
 };
 
 #[derive(Clone)]
+/// Holds output delivery service application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputDeliveryService {
     journal: Arc<dyn RunJournal>,
     sinks: OutputSinkRegistry,
@@ -32,6 +38,9 @@ pub struct OutputDeliveryService {
 }
 
 impl OutputDeliveryService {
+    /// Creates a new application::output_delivery value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(journal: Arc<dyn RunJournal>, sinks: OutputSinkRegistry) -> Self {
         Self {
             journal,
@@ -41,11 +50,18 @@ impl OutputDeliveryService {
         }
     }
 
+    /// Returns this value with its dedupe index setting replaced. The
+    /// method follows builder-style data construction and does not
+    /// execute external work.
     pub fn with_dedupe_index(mut self, dedupe_index: OutputDeliveryDedupeIndex) -> Self {
         self.dedupe_index = dedupe_index;
         self
     }
 
+    /// Coordinates dispatch for the application::output_delivery contract.
+    /// This may call configured ports and update runtime/journal/event state
+    /// according to the surrounding module, without introducing a parallel
+    /// behavior path.
     pub fn dispatch(
         &self,
         context: OutputDeliveryContext,
@@ -332,6 +348,9 @@ impl OutputDeliveryService {
         }
     }
 
+    /// Operates on in-memory or journal-derived application::output_delivery
+    /// state for diagnostics and repair evidence. It does not create a second
+    /// run loop or product workflow owner.
     pub fn repair_replay(
         &self,
         intent: &OutputDeliveryIntentRecord,
@@ -546,16 +565,31 @@ impl OutputDeliveryService {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds output delivery context application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputDeliveryContext {
+    /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Turn identifier for one loop turn within a run.
     pub turn_id: Option<TurnId>,
+    /// Attempt identifier for retry, repair, provider, or tool execution
+    /// evidence.
     pub attempt_id: Option<AttemptId>,
+    /// Source label or ref for this item; it is metadata and does not fetch
+    /// content by itself.
     pub source: SourceRef,
+    /// Fingerprint of the runtime package snapshot in force when this value was produced.
+    /// Use it for replay, dedupe, and package-lineage checks; the field is evidence and does
+    /// not execute package behavior.
     pub runtime_package_fingerprint: RuntimePackageFingerprint,
 }
 
 impl OutputDeliveryContext {
+    /// Creates a new application::output_delivery value with explicit
+    /// caller-provided inputs. This constructor is data-only and
+    /// performs no I/O or external side effects.
     pub fn new(
         run_id: RunId,
         agent_id: AgentId,
@@ -573,22 +607,47 @@ impl OutputDeliveryContext {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds output delivery candidate application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputDeliveryCandidate {
+    /// Destination label or ref for this item; it is metadata and does not
+    /// deliver content by itself.
     pub destination: DestinationRef,
+    /// Typed preferred sink ref reference. Resolving or executing it is a
+    /// separate policy-gated step.
     pub preferred_sink_ref: Option<OutputSinkRef>,
+    /// Output delivery setting or policy.
+    /// Delivery coordinators use it to decide sink mode, dedupe, and required evidence.
     pub delivery_kind: OutputDeliveryKind,
+    /// Stable source message id used for typed lineage, lookup, or dedupe.
     pub source_message_id: Option<MessageId>,
+    /// Stable validated output id used for typed lineage, lookup, or dedupe.
     pub validated_output_id: Option<ValidatedOutputId>,
+    /// Content references associated with this record; resolving them is a
+    /// separate policy-gated step.
     pub content_refs: Vec<ContentRef>,
+    /// Redacted human-readable summary safe for events, telemetry, and logs.
     pub redacted_summary: String,
+    /// Raw content or raw-content control for this value.
+    /// Use it only when policy explicitly allows raw content capture or delivery.
     pub raw_content: Option<String>,
+    /// Optional requested content mode value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub requested_content_mode: Option<OutputContentMode>,
+    /// Privacy class used for projection, telemetry, and raw-content access
+    /// decisions.
     pub privacy: PrivacyClass,
+    /// Retention class used by hosts and sinks when storing or exporting this
+    /// item.
     pub retention: RetentionClass,
+    /// Policy used by this record or request.
     pub policy: OutputDeliveryPolicy,
 }
 
 impl OutputDeliveryCandidate {
+    /// Builds the final message value.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
     pub fn final_message(
         destination: DestinationRef,
         sink_ref: OutputSinkRef,
@@ -613,14 +672,30 @@ impl OutputDeliveryCandidate {
 }
 
 #[derive(Clone, Debug)]
+/// Holds output delivery outcome application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputDeliveryOutcome {
+    /// Finite status for this record or lifecycle stage.
     pub status: OutputDispatchStatus,
+    /// Request DTO or resolved call that triggered this operation.
     pub request: Option<OutputDeliveryRequest>,
+    /// Optional intent record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub intent_record: Option<OutputDeliveryIntentRecord>,
+    /// Optional result record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub result_record: Option<OutputDeliveryResultRecord>,
+    /// Dedupe policy or key for a side-effecting operation.
+    /// Replay and repair use it to avoid sending or executing the same effect twice.
     pub dedupe_record: Option<OutputDeliveryDedupeRecord>,
+    /// Optional reconciliation record value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub reconciliation_record: Option<OutputDeliveryReconciliationRecord>,
+    /// Optional receipt value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub receipt: Option<OutputDeliveryReceipt>,
+    /// Optional terminal error value.
+    /// When absent, callers should use the documented default or skip that optional behavior.
     pub terminal_error: Option<AgentError>,
 }
 
@@ -641,11 +716,16 @@ impl OutputDeliveryOutcome {
 }
 
 #[derive(Clone, Debug, Default)]
+/// Holds output delivery dedupe index application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputDeliveryDedupeIndex {
     completed: Arc<Mutex<std::collections::BTreeMap<crate::domain::DedupeKey, OutputDedupeProof>>>,
 }
 
 impl OutputDeliveryDedupeIndex {
+    /// Records a completed output-delivery dedupe proof in the in-memory index.
+    /// This mutates only the local dedupe map and does not send output, append journals, or
+    /// publish events.
     pub fn insert_completed(&self, proof: OutputDedupeProof) -> Result<(), AgentError> {
         self.completed
             .lock()
@@ -654,6 +734,9 @@ impl OutputDeliveryDedupeIndex {
         Ok(())
     }
 
+    /// Returns an updated value with completed configured.
+    /// This is data-only and does not perform I/O, call host ports, append journals, publish
+    /// events, or start processes.
     pub fn completed(
         &self,
         dedupe_key: &crate::domain::DedupeKey,
@@ -668,10 +751,18 @@ impl OutputDeliveryDedupeIndex {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Holds output dedupe proof application-layer state or configuration.
+/// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct OutputDedupeProof {
+    /// Dedupe policy or key for a side-effecting operation.
+    /// Replay and repair use it to avoid sending or executing the same effect twice.
     pub dedupe_key: crate::domain::DedupeKey,
+    /// Stable delivery id used for typed lineage, lookup, or dedupe.
     pub delivery_id: OutputDeliveryId,
+    /// Stable external operation id used for typed lineage, lookup, or
+    /// dedupe.
     pub external_operation_id: Option<String>,
+    /// Finite status for this record or lifecycle stage.
     pub status: OutputDispatchStatus,
 }
 

@@ -1,3 +1,9 @@
+//! Concrete workspace tool helpers layered over core tool/effect contracts. Use these
+//! modules for bounded read, search, edit, write, and format-aware extraction
+//! behavior under a host-selected workspace policy. Reads search local files;
+//! edit/write helpers may mutate files only through explicit executor calls. This
+//! file contains the office portion of that contract.
+//!
 use std::{
     io::{Cursor, Read},
     path::Path,
@@ -11,6 +17,9 @@ use crate::workspace::read_pipeline::{WorkspaceDocumentMetadata, WorkspaceReader
 
 const MAX_XML_ENTRY_BYTES: u64 = 1024 * 1024;
 
+/// Render office.
+/// This parses caller-provided bytes into a bounded rendered read response and does not write
+/// workspace files.
 pub(super) fn render_office(
     path: &Path,
     bytes: &[u8],
