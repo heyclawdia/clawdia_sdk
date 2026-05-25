@@ -10,7 +10,6 @@ The core crate is already the primitive kernel: `Agent`, `AgentRuntime`, `RunReq
 | --- | --- |
 | [adapter-and-runtime-plan.md](adapter-and-runtime-plan.md) | Phased plan, crate map, high-level APIs, security posture, and validation gates for live providers, OpenAI-compatible providers, ACP, MCP gateways, containerized agents, web access, local MLX/llama.cpp acceleration, and artifact resolution. |
 | [workspace-toolkit-plan.md](workspace-toolkit-plan.md) | Workspace read/search/edit/write design, format-aware reader pipeline, implemented PDF/image/RAW/Office/archive behavior, and validation matrix for essential agent file tools. |
-| [reference-tui-orchestrator-example-plan.md](reference-tui-orchestrator-example-plan.md) | Follow-on plan for a product-neutral CLI/TUI reference host example once core SDK and toolkit adapter gates are implemented. |
 
 ## Non-Negotiable Boundaries
 

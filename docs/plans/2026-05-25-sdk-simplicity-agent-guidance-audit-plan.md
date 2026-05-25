@@ -35,7 +35,6 @@ Plan/review evidence:
 Explicitly not writable for this task:
 
 - `docs/agent-sdk-toolkit/README.md`
-- `docs/agent-sdk-toolkit/reference-tui-orchestrator-example-plan.md`
 - runtime behavior modules outside `crates/agent-sdk-core/src/lib.rs`
 - package manifests, release workflows, tags, commits, or publish scripts
 
