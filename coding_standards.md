@@ -14,6 +14,7 @@ The authoritative standards live at [docs/architecture/coding-standards.md](docs
 - Maintain the Rust SDK package with clear architectural ownership. Source and tests should be organized by SDK responsibility (`domain`, `package`, `records`, `ports`, `application`/`runtime`, and `testing`) while preserving a stable, discoverable public facade.
 - Keep `mod.rs` and crate facades small and navigable. Real behavior belongs in meaningfully named files or responsibility folders, and future agents should be able to find read/search/edit/write/protocol behavior by filename.
 - Follow the mature-SDK layout lesson captured in the architecture standards: stable package facades, separated generated/spec-derived code, explicit ports/adapters, durable records apart from runtime orchestration, and visible reusable fake/test-kit support.
+- Run the Rust API Guidelines review gate for public Rust API changes: naming, conversions, common traits, rustdoc examples and failure docs, type-safe parameters, predictable methods, future-proof public types, crate metadata, dependency, and license posture.
 - Expose SDK-consumer test helpers through the documented `agent_sdk_core::testing` namespace. New `Fake*`, `Scripted*`, and conformance harnesses belong in `src/testing/` unless explicitly justified as production reference implementations.
 - Validate behavior with fake adapters, golden fixtures, property tests, smoke tests, and contract audits before using live providers or concrete host runtimes.
 - Treat mockability as a core SDK contract. Every port, adapter boundary, side-effect path, and scenario surface must be testable with deterministic fakes or a public test-support harness that SDK users can reuse for their own implementations.
@@ -28,6 +29,7 @@ The authoritative standards live at [docs/architecture/coding-standards.md](docs
 6. [docs/workstreams/validation-gates.md](docs/workstreams/validation-gates.md)
 7. [docs/reference/sdk-review-checklist.md](docs/reference/sdk-review-checklist.md)
 8. [docs/reference/simplicity-audit.md](docs/reference/simplicity-audit.md)
+9. [Rust API Guidelines checklist](https://rust-lang.github.io/api-guidelines/checklist.html)
 
 ## Completion Rule
 

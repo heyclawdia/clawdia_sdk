@@ -59,6 +59,7 @@ Reference points:
 
 - [Cargo package layout](https://doc.rust-lang.org/cargo/guide/project-layout.html) keeps package roots, integration tests, examples, benches, and multi-file test modules predictable.
 - [Cargo integration tests](https://doc.rust-lang.org/stable/cargo/guide/tests.html) are discovered from `tests/`; stable root test targets may delegate to submodules for larger suites.
+- [Rust API Guidelines checklist](https://rust-lang.github.io/api-guidelines/checklist.html) is the crate-review baseline for naming, interoperability, documentation, predictability, type safety, dependability, debuggability, future proofing, and crate necessities.
 - [Rust API Guidelines documentation](https://rust-lang.github.io/api-guidelines/documentation.html) expects crate-level docs and examples to make public APIs discoverable.
 
 Patterns from mature SDKs:
@@ -160,6 +161,21 @@ wc -l crates/agent-sdk-*/src/lib.rs
 The first command must be empty. The second command must show only stable Cargo shims, normally two lines that delegate into the responsibility folders. The `lib.rs` module audit must explain any newly public deep module. The fake/scripted audit must either point to `src/testing` or identify a production reference implementation. The records audit must be empty except for durable-record-only traits justified in the report. Optional crate `src/lib.rs` files should stay as small facades; implementation creep there is blocking.
 
 ## Rust API Standards
+
+Every public Rust API change must pass a Rust API Guidelines review gate before approval. Treat the upstream checklist as an idiomatic Rust crate review baseline, while keeping this SDK's primitive-lowering, privacy, durability, mockability, and product-neutrality gates stricter where they apply.
+
+Reviewers must check:
+
+- Naming and discoverability: public items follow Rust casing and word-order conventions, ad hoc conversions use `as_`, `to_`, or `into_` consistently, getters avoid redundant `get_`, iterator methods use `iter`, `iter_mut`, and `into_iter`, iterator type names match producing methods, and feature names avoid placeholder words.
+- Interoperability: public types eagerly derive or implement common traits when semantically correct (`Copy`, `Clone`, `Eq`, `PartialEq`, `Ord`, `PartialOrd`, `Hash`, `Debug`, `Display`, `Default`), conversions use standard traits such as `From`, `TryFrom`, `AsRef`, and `AsMut`, collection-like types support `FromIterator` and `Extend`, durable DTOs support `Serialize` and `Deserialize`, types are `Send` and `Sync` where possible, and errors are meaningful typed values.
+- Documentation: crate-level and module-level docs explain the public surface, public items include rustdoc examples where useful, examples use `?` instead of `unwrap`, fallible functions document error cases, panic conditions, and safety obligations, docs link to relevant types, crate metadata is complete, release notes cover significant public changes, and rustdoc hides unhelpful implementation details.
+- Predictability and flexibility: constructors are inherent static methods, functions with a clear receiver are methods, APIs avoid out-parameters, `Deref` and operator overloads are unsurprising, caller-owned allocation/copy decisions remain visible, generic inputs are used where they reduce needless constraints, and port traits are object-safe when downstream users need dynamic dispatch.
+- Type safety: public boundaries use newtypes and domain enums/structs instead of raw strings, booleans, or ambiguous `Option` flags; flag sets use a flag type; and complex values use builders that validate before construction.
+- Dependability and debuggability: public functions validate arguments at SDK boundaries, destructors do not fail, potentially blocking cleanup has an explicit non-`Drop` alternative, every public type has a useful non-empty `Debug` representation, and failure state carries enough typed context for tests and users to diagnose it.
+- Future proofing and SemVer: public structs prefer private fields with constructors/builders, traits are sealed when downstream implementations would freeze internal invariants, newtypes hide representation details, public data structures avoid unnecessary trait bounds on the type definition, public enums/DTOs have an explicit extension strategy such as `#[non_exhaustive]` or reserved variants, and phase exit reports record new public modules, deep imports, or facade exports.
+- Crate necessities: public dependencies used in stable APIs are stable enough for the promised SemVer posture, dependency licenses are permissive and compatible, and package metadata supports crates.io/docs.rs discovery before release.
+
+Intentional deviations from this gate must be recorded in the review packet or phase exit report with an SDK-specific reason. "The code compiles" is not enough for public API approval.
 
 - Use `Result<T, AgentError>` for fallible SDK operations. Error variants should preserve typed context and causal IDs.
 - Prefer enums for finite state: stop reasons, approval decisions, permission outcomes, stream item kinds, recovery actions, and policy decisions.
