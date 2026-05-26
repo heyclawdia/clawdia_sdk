@@ -13,10 +13,10 @@ use agent_sdk_core::{
     EventKind, InMemoryAgentEventBus, JournalRecord, JournalRecordPayload, OutputContract,
     OutputSchemaId, OutputSchemaRef, PolicyDecision, PolicyKind, PolicyOutcome, PolicyRef,
     PolicyStage, PrivacyClass, ProviderAdapter, ProviderHintPolicy, ProviderRouteSnapshot,
-    RetentionClass, RunId, RunJournal, RunRequest, RunResult, RunStatus, RuntimePackage,
-    RuntimePackageBuilder, RuntimePackageId, RuntimePolicyPort, SchemaVersion, SourceKind,
-    SourceRef, StructuredOutputRecord, TelemetryContentCaptureMode, TelemetryTerminalStatus,
-    TypedOutputModel, ValidatedOutput,
+    ProviderToolCall, RetentionClass, RunId, RunJournal, RunRequest, RunResult, RunStatus,
+    RuntimePackage, RuntimePackageBuilder, RuntimePackageId, RuntimePolicyPort, SchemaVersion,
+    SourceKind, SourceRef, StructuredOutputRecord, TelemetryContentCaptureMode,
+    TelemetryTerminalStatus, TypedOutputModel, ValidatedOutput,
     event::ContentCaptureMode as EventContentCaptureMode,
     policy::ContentCaptureMode as PolicyContentCaptureMode,
     terminal_run_projection_from_event,
@@ -98,6 +98,7 @@ fn api_exports_match_phase_12b_contract() {
         type_name::<ValidatedOutput>(),
         type_name::<PolicyDecision>(),
         type_name::<dyn ProviderAdapter>(),
+        type_name::<ProviderToolCall>(),
         type_name::<dyn RunJournal>(),
         type_name::<dyn AgentEventBus>(),
         type_name::<dyn ContentResolver>(),
@@ -577,6 +578,7 @@ fn assert_provider_request_is_structured(request: &agent_sdk_core::ProviderReque
         hint.provider_hint_policy,
         ProviderHintPolicy::SchemaRequired
     );
+    assert!(hint.redacted_schema.is_some());
 }
 
 fn assert_ordered(records: &[JournalRecord], before: &str, after: &str) {

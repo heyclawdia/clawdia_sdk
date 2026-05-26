@@ -7,6 +7,8 @@
 SDK consumers should import through the crate root:
 
 - `ToolkitPackBundle` and `tool_snapshot`
+- `Tool`, `AsyncTool`, and `ToolPackBuilder` for data-only ergonomic tool
+  declarations that lower into core package capabilities and routes
 - `BoundedWorkspace`, `WorkspaceReadExecutor`, `WorkspaceSearchExecutor`, `WorkspaceEditExecutor`, `WorkspaceWriteExecutor`
 - `WorkspaceReadDetection`, `WorkspaceFileKind`, `WorkspaceReaderStep`, `WorkspaceMediaMetadata`, `WorkspaceDocumentMetadata`, and `WorkspaceArchiveMetadata` for format-aware read output
 - `ShellExecutor`, `ResourceReaderExecutor`, and `ToolDiscoveryExecutor`
@@ -15,6 +17,18 @@ SDK consumers should import through the crate root:
 - `JsonRpcLineCodec` and `JsonRpcLineEndpoint` for JSON-RPC stdio-style line framing
 - `testing::InMemoryJsonArgumentStore` and `testing::InMemoryToolkitContentStore` for deterministic tests
 - `testing::{ScriptedAcpClient, ScriptedAcpAgent, McpHostProxy, ScriptedMcpServer, IsolatedJsonRpcProcess}` for transport-level ACP/MCP conformance tests
+
+## Onboarding
+
+Start with the core quickstarts, then add toolkit helpers only when a concrete
+tool pack or store is needed:
+
+- [Live provider quickstart](https://github.com/heyclawdia/clawdia_sdk/blob/main/docs/examples/live-provider-quickstart.md)
+- [Typed-output quickstart](https://github.com/heyclawdia/clawdia_sdk/blob/main/docs/examples/typed-output-quickstart.md)
+- [Tool-approval quickstart](https://github.com/heyclawdia/clawdia_sdk/blob/main/docs/examples/tool-approval-quickstart.md)
+
+Toolkit helpers still lower into core capability snapshots, policy checks,
+content refs, journal records, events, and effect intent/result records.
 
 ## Workspace Readers
 
@@ -26,7 +40,7 @@ Unsupported or partial cases return typed warnings rather than raw bytes: live O
 
 ## Package Boundary
 
-The toolkit crate may provide concrete helper implementations and deterministic protocol fakes, but it must not become a hidden runtime, package registry, approval path, event stream, journal, or host product adapter. Every tool helper still lowers into core capability snapshots, policy checks, content refs, and effect intent/result records. `SqliteAgentPoolStore` is a concrete `AgentPoolStore` adapter, not a daemon or broker: it stores pool-scoped coordination records that core replays into snapshots and watches. ACP and MCP mocks exchange encoded UTF-8 JSON-RPC frames over newline-style line transports, reject embedded newlines, include strict JSON-RPC response IDs, and model required lifecycle notifications so conformance tests can prove protocol behavior without live editors, live MCP servers, or product hosts. Scripted fakes live under the `testing` namespace; production-facing wire primitives live under `protocol`.
+The toolkit crate may provide concrete helper implementations, ergonomic tool declarations, and deterministic protocol fakes, but it must not become a hidden runtime, package registry, approval path, event stream, journal, or host product adapter. `Tool`, `AsyncTool`, and `ToolPackBuilder::listen*` are data-only wrappers: they assemble `ToolPackSnapshot`, capabilities, sidecars, and `ToolRoute` values, while execution still requires core `ToolExecutorRegistry`, `ToolExecutionCoordinator`, policy, journal records, events, and effect intent/result records. Every tool helper still lowers into core capability snapshots, policy checks, content refs, and effect intent/result records. `SqliteAgentPoolStore` is a concrete `AgentPoolStore` adapter, not a daemon or broker: it stores pool-scoped coordination records that core replays into snapshots and watches. ACP and MCP mocks exchange encoded UTF-8 JSON-RPC frames over newline-style line transports, reject embedded newlines, include strict JSON-RPC response IDs, and model required lifecycle notifications so conformance tests can prove protocol behavior without live editors, live MCP servers, or product hosts. Scripted fakes live under the `testing` namespace; production-facing wire primitives live under `protocol`.
 
 ## Unsupported In This Handoff
 

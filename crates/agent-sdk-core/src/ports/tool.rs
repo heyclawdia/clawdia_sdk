@@ -19,6 +19,7 @@ use crate::{
     effect::{EffectIntent, EffectResult, EffectTerminalStatus},
     package::RuntimePackage,
     policy::{EffectClass, PolicyOutcome, PolicyStage, RiskClass},
+    provider::ProviderToolCall,
     tool_records::CanonicalToolName,
 };
 
@@ -234,6 +235,25 @@ pub struct ToolCallRequest {
     /// Dedupe policy or key for a side-effecting operation.
     /// Replay and repair use it to avoid sending or executing the same effect twice.
     pub dedupe_key: Option<DedupeKey>,
+}
+
+impl ToolCallRequest {
+    /// Lowers a provider-emitted tool call into the canonical SDK tool
+    /// request shape. This is data construction only: callers must still
+    /// resolve the request through `ToolRouter`, evaluate policy, append
+    /// journal intent/result records, publish events where applicable, and
+    /// call a configured `ToolExecutor`.
+    pub fn from_provider_tool_call(call: ProviderToolCall, source: SourceRef) -> Self {
+        Self {
+            tool_call_id: call.tool_call_id,
+            canonical_tool_name: call.canonical_tool_name,
+            source,
+            requested_args_refs: call.requested_args_refs,
+            redacted_args_summary: call.redacted_args_summary,
+            idempotency_key: None,
+            dedupe_key: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

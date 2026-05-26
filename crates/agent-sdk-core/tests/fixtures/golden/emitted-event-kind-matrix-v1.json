@@ -39,6 +39,31 @@
       "family": "agent_pool",
       "kind": "wake_condition_failed",
       "redacted_summary": "wake condition status event redacted"
+    },
+    {
+      "family": "tool",
+      "kind": "tool_started",
+      "redacted_summary": "tool execution started"
+    },
+    {
+      "family": "tool",
+      "kind": "tool_completed",
+      "redacted_summary": "tool execution terminal"
+    },
+    {
+      "family": "tool",
+      "kind": "tool_failed",
+      "redacted_summary": "tool execution terminal"
+    },
+    {
+      "family": "tool",
+      "kind": "tool_denied",
+      "redacted_summary": "tool execution terminal"
+    },
+    {
+      "family": "tool",
+      "kind": "tool_recovery_required",
+      "redacted_summary": "tool execution terminal"
     }
   ]
 }

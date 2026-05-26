@@ -12,7 +12,11 @@ Plan the optional Agent SDK toolkit layer for:
 - local Apple-silicon acceleration using MLX where it belongs;
 - reusable test kits and conformance gates for SDK consumers.
 
-This is a documentation-only plan. It creates no Rust source, executable tests, package manifests, fixtures, branches, publish actions, or tags.
+This started as a documentation-only plan. A later implementation slice added
+the first optional `agent-sdk-provider` crate with live OpenAI Responses,
+Anthropic Messages, and Gemini generateContent adapters over `ProviderAdapter`,
+plus transport-injected deterministic harnesses. Model catalogs, MCP/web
+adapters, OTel, isolation, and workflow crates remain future work.
 
 ## Relevant Existing Context
 
@@ -929,7 +933,7 @@ Exit gate:
 
 | Adapter family | Required fake/conformance tests | Optional live smoke |
 | --- | --- | --- |
-| Cross-family setup and registration | missing adapter, missing credential, denied endpoint, unsupported capability, failed capability report, artifact validation failure, ambiguous generation route, setup cancellation, and journal append failure before setup side effects | none; setup correctness is fake-first |
+| Cross-family setup and registration | missing adapter, missing credential, denied endpoint, unsupported capability, failed capability report, artifact validation failure, ambiguous generation route, setup cancellation, and journal append failure before setup side effects | none; setup correctness is deterministic and does not require live services |
 | Provider adapters | projection, streaming chunks, cancellation, retry/error classification, usage, structured output, redaction, auth absence, malformed responses, OpenAI-compatible strict/degraded dialects, provider model catalog schema/golden/accessor tests, unsupported-feature errors | credential-gated provider call with safe prompt |
 | ACP | transport-level fake client/server over JSON-RPC stdio; `initialize`, `session/new`, `session/prompt`, `session/update`, `session/cancel` notification, reconnect, `fs/read_text_file` denial, `terminal/create` denial, `session/request_permission`, malformed protocol frames, non-ACP stdout noise, dropped connection, duplicate events | editor smoke only when client is installed; future HTTP/custom transport smoke only after stdio matrix passes |
 | MCP | transport-level fake stdio and HTTP servers; `initialize`, `notifications/initialized`, lifecycle rejection before initialization, `tools/list`, selected `tools/call`, denied unselected `tools/call`, `resources/list/read`, roots denied, prompt denied, malformed protocol frames, non-MCP stdout noise, dropped connection, duplicate responses, cancellation, approval denial, in-isolation server with denied mount/network | live MCP server smoke only with explicit server refs and credentials; no live server required for conformance |
@@ -966,7 +970,7 @@ These defaults answer the current open decisions for the first toolkit implement
 
 | Decision | First default | Deferred variants | Release gate |
 | --- | --- | --- | --- |
-| First live and compatible provider adapters | `agent-sdk-provider::openai` over the Responses API after the provider conformance harness exists, followed by `agent-sdk-provider::openai_compatible` with explicit compatibility profiles. | Additional live providers, local host services, and direct provider SDK integrations. | Fake HTTP conformance first; all supported model names/capabilities come from the single provider model catalog; compatible endpoints require strict/degraded dialect harnesses and typed unsupported-feature errors; live smoke opt-in only; no provider credentials, endpoint secrets, request IDs, account IDs, or raw prompts in package fingerprints, journals, events, or fixtures. |
+| First live and compatible provider adapters | Done for first text/structured-output request mapping: `agent-sdk-provider` includes OpenAI Responses, Anthropic Messages, Gemini generateContent, and OpenAI-compatible adapters. | Streaming, model catalogs, local host services, direct provider SDK integrations, and provider-native function-result replay. | Deterministic HTTP conformance first; all supported model names/capabilities should move into a single provider model catalog; compatible endpoints require strict/degraded dialect harnesses and typed unsupported-feature errors; live smoke opt-in only; no provider credentials, endpoint secrets, request IDs, account IDs, or raw prompts in package fingerprints, journals, events, or fixtures. |
 | First Linux isolation runtime | `agent-sdk-isolation::gvisor` for the first Linux OCI/browser/CLI-compatible runtime because it is easier to fit into common container workflows while still improving host-kernel exposure over plain runc. | `agent-sdk-isolation::firecracker` for stronger server/multi-tenant VM isolation; `wasmtime` for small WASI tools. | Same `IsolationRuntime` capability report and downgrade-denial suite across runtimes; Firecracker follows when kernel/rootfs/network/jailer lifecycle can be tested cleanly. |
 | ACP implementation language and ergonomics | Rust ACP bridge first for SDK-native hosts, exposed through both explicit `AcpExternalAgentAdapter` wiring and a provider-like `AcpAgentProvider` facade. The official TypeScript SDK remains a protocol reference, comparison fixture source, or optional host-side helper where useful. | TypeScript-first bridge with Rust bindings if a host integration proves that path is materially faster or safer. | Stdio JSON-RPC fake client/agent harness passes before any editor smoke; no product-specific command examples in generic docs; `AcpAgentProvider` lowers to external-agent primitives rather than a raw model provider path. |
 | MCP gateway shape | Host-proxy MCP first for host credentials, local apps, remote service accounts, and exact tool/resource/prompt allowlisting. | In-isolation MCP server for untrusted/project-local servers after isolation runtime conformance exists. | Selected capability only: unselected sibling tools/resources/prompts denied; all calls through `ToolRouter`, approval, effects, journal, events, and transport fakes. |

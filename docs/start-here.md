@@ -7,7 +7,7 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 ## Current Packet
 
 - The authoritative Agent SDK packet lives in `<repo-root>`.
-- The current checkout includes Rust crates under `crates/agent-sdk-core` and `crates/agent-sdk-toolkit`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
+- The current checkout includes Rust crates under `crates/agent-sdk-core`, `crates/agent-sdk-toolkit`, and the optional `crates/agent-sdk-provider`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
@@ -42,6 +42,7 @@ the old contract packet:
 | [implementation-workstreams/README.md](implementation-workstreams/README.md) | Rust coding launch map: phase dependencies, parallel-safe launch targets, implementation exit gates, and phase reports. |
 | [workstreams/validation-gates.md](workstreams/validation-gates.md) | Shared validation levels, required evidence, and target commands for every workstream. |
 | [reference/feature-to-primitive-matrix.md](reference/feature-to-primitive-matrix.md) | Feature-to-primitive mapping and primitive decision ladder used by Phase 00, Phase 01, and Phase 02. |
+| [reference/persistence-ownership-map.md](reference/persistence-ownership-map.md) | Concrete store boundary map for journals, checkpoints, content, event cursors, agent pools, tool execution, and provider arguments. |
 | [reference/sdk-review-checklist.md](reference/sdk-review-checklist.md) | SDK review rubric for simplicity, product-neutrality, observability, durability, privacy, and API quality. |
 | [reference/simplicity-audit.md](reference/simplicity-audit.md) | Simplicity audit identifying what to default, merge, keep advanced-only, or preserve as essential complexity. |
 | [reference/open-questions-and-ambiguities.md](reference/open-questions-and-ambiguities.md) | Decision register for first Rust-slice resolved decisions, deferred details, and non-questions. |

@@ -1,0 +1,15 @@
+[package]
+name = "agent-sdk-provider"
+version = "0.1.0-alpha.3"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Optional provider adapter helpers layered over agent-sdk-core ProviderAdapter contracts."
+documentation = "https://docs.rs/agent-sdk-provider"
+readme = "README.md"
+
+[dependencies]
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3" }
+serde.workspace = true
+serde_json.workspace = true

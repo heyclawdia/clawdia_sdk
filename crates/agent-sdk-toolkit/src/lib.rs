@@ -42,7 +42,10 @@ pub mod workspace;
 
 pub use agent_pool::SqliteAgentPoolStore;
 pub use discovery::{ToolDiscoveryExecutor, ToolDiscoveryIndex, ToolDiscoveryRequest};
-pub use packs::{ToolkitPackBundle, tool_snapshot};
+pub use packs::{
+    AsyncTool, Tool, ToolBuilder, ToolPackBuilder, ToolkitPackBundle, ToolkitToolExecutionMode,
+    tool_snapshot,
+};
 pub use protocol::{
     JsonRpcErrorObject, JsonRpcFrame, JsonRpcId, JsonRpcLineCodec, JsonRpcLineEndpoint,
     JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,

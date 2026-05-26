@@ -4,6 +4,11 @@ This folder plans the optional toolkit and adapter crates that should make the c
 
 The core crate is already the primitive kernel: `Agent`, `AgentRuntime`, `RunRequest`, `RuntimePackage`, provider ports, tool ports, isolation ports, journals, events, policy, and the public `agent_sdk_core::testing` namespace. The next layer should be adapter crates that implement those ports with real providers, OpenAI-compatible providers, ACP interoperability, MCP gateways, containerized execution, browser/web access, local accelerators such as MLX and llama.cpp, artifact resolvers, and reusable conformance tests.
 
+Current implementation update: `crates/agent-sdk-provider` now exists as the
+first aggregate provider crate. It includes live OpenAI Responses, Anthropic
+Messages, and Gemini generateContent adapters, plus transport-injected
+deterministic harnesses for SDK-consumer tests.
+
 ## Documents
 
 | Document | Purpose |

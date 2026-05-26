@@ -10,8 +10,9 @@ This matrix is the release-readiness evidence for package separation. It is not 
 | `agent-sdk-core` | `--no-default-features` | Same as default because default features are empty. Proves optional crates are not required by the primitive kernel. | `cargo test -p agent-sdk-core --no-default-features` |
 | `agent-sdk-core` | `--all-features` | Currently adds only the reserved `test-support` feature. Deterministic fakes remain under `agent_sdk_core::testing` and do not add live providers or host infrastructure. | `cargo test -p agent-sdk-core --all-features` |
 | `agent-sdk-toolkit` | default | Optional crate that depends on core and concrete helper dependencies such as `regex`. Core has no reverse dependency. | `cargo test -p agent-sdk-toolkit` |
-| workspace | default | Runs all current crates without publishing, tagging, live providers, concrete containers, or product adapters. | `cargo test --workspace` |
+| `agent-sdk-provider` | default | Optional aggregate provider crate that depends on core and implements live OpenAI, Anthropic, and Gemini adapters through `ProviderAdapter`. It owns adapter-local HTTP request mapping and redacted API-key wrappers, but not journals, events, approval, tool execution, provider-selection UI, or product routing. | `cargo test -p agent-sdk-provider` |
+| workspace | default | Runs all current crates without publishing, tagging, concrete containers, or product adapters. | `cargo test --workspace` |
 
 ## Unsupported Optional Crates
 
-The implementation handoff does not include `agent-sdk-isolation`, `agent-sdk-otel`, `agent-sdk-extension`, or `agent-sdk-workflow` packages. Their contracts and reserved ports are represented in core where needed, but concrete adapters/exporters/workflow engines remain unsupported until a later phase adds separate crates, manifests, tests, and release notes.
+The implementation handoff does not include `agent-sdk-isolation`, `agent-sdk-otel`, `agent-sdk-extension`, or `agent-sdk-workflow` packages. It also does not include Bedrock, local-model, MCP, browser, or web adapter packages. Their contracts and reserved ports are represented in core where needed, but concrete adapters/exporters/workflow engines remain unsupported until a later phase adds crates, manifests, tests, and release notes.

@@ -32,6 +32,11 @@ use crate::{
     run::{RunRequest, RunResult, RunStatus},
     run_handle::{InMemoryRunControlStore, RunControlStore, RunHandle},
     subscription::RunSubscriptionSource,
+    tool_execution::ToolExecutionCoordinator,
+    tool_ports::{
+        ToolExecutor, ToolExecutorRegistry, ToolPolicyPort, ToolRegistrySnapshot, ToolRoute,
+        ToolRouter,
+    },
 };
 
 #[derive(Clone)]
@@ -311,6 +316,36 @@ impl AgentRuntime {
         &self.inner.output_sinks
     }
 
+    /// Builds the tool execution coordinator for the effective package.
+    /// This validates configured tool routes against the runtime package and
+    /// returns a coordinator over the shared tool router, policy, journal,
+    /// and effect spine. It does not execute a tool.
+    pub(crate) fn tool_execution_coordinator(
+        &self,
+        package: &RuntimePackage,
+        run_id: &RunId,
+    ) -> Result<ToolExecutionCoordinator, AgentError> {
+        if self.inner.tool_routes.is_empty() {
+            return Err(missing_port_error("tool routes", run_id));
+        }
+        let snapshot =
+            ToolRegistrySnapshot::from_runtime_package(package, self.inner.tool_routes.clone())
+                .map_err(|error| {
+                    error.with_causal_ids(CausalIds {
+                        run_id: Some(run_id.clone()),
+                        ..CausalIds::default()
+                    })
+                })?;
+        let coordinator = ToolExecutionCoordinator::new(
+            ToolRouter::new(snapshot),
+            self.inner.tool_executors.clone(),
+        );
+        Ok(match self.inner.tool_policy.clone() {
+            Some(policy) => coordinator.with_policy(policy),
+            None => coordinator,
+        })
+    }
+
     /// Returns hook executor registry for application coordinators.
     /// This retrieves the configured port without invoking hook executors.
     pub(crate) fn hook_registry_port(&self) -> Arc<dyn HookExecutorRegistry> {
@@ -536,6 +571,9 @@ pub struct AgentRuntimeBuilder {
     policy: Option<Arc<dyn RuntimePolicyPort>>,
     output_sinks: OutputSinkRegistry,
     hook_registry: Option<Arc<dyn HookExecutorRegistry>>,
+    tool_routes: Vec<ToolRoute>,
+    tool_executors: ToolExecutorRegistry,
+    tool_policy: Option<Arc<dyn ToolPolicyPort>>,
 }
 
 impl AgentRuntimeBuilder {
@@ -647,6 +685,46 @@ impl AgentRuntimeBuilder {
         Ok(self)
     }
 
+    /// Adds one tool route to the runtime's app-facing tool execution
+    /// configuration. The route is validated against the effective runtime
+    /// package only when a model-requested tool call is lowered.
+    pub fn tool_route(mut self, route: ToolRoute) -> Self {
+        self.tool_routes.push(route);
+        self
+    }
+
+    /// Replaces the runtime's configured tool routes. This is builder
+    /// configuration only and does not execute or resolve tools.
+    pub fn tool_routes(mut self, routes: impl IntoIterator<Item = ToolRoute>) -> Self {
+        self.tool_routes = routes.into_iter().collect();
+        self
+    }
+
+    /// Replaces the runtime's configured tool executor registry. This is
+    /// builder configuration only and does not execute tools.
+    pub fn tool_executors(mut self, executors: ToolExecutorRegistry) -> Self {
+        self.tool_executors = executors;
+        self
+    }
+
+    /// Adds one tool executor to the runtime's configured executor
+    /// registry. This stores the executor behind the public port and does
+    /// not execute it.
+    pub fn tool_executor(mut self, executor: Arc<dyn ToolExecutor>) -> Result<Self, AgentError> {
+        self.tool_executors.register(executor)?;
+        Ok(self)
+    }
+
+    /// Configures the runtime's tool policy port. This is builder
+    /// configuration only and does not evaluate policy.
+    pub fn tool_policy<P>(mut self, policy: P) -> Self
+    where
+        P: ToolPolicyPort + 'static,
+    {
+        self.tool_policy = Some(Arc::new(policy));
+        self
+    }
+
     /// Returns hook executor registry for the current value.
     /// This stores the registry for future run starts and hook invocation; it does not invoke
     /// hook executors.
@@ -683,6 +761,9 @@ impl AgentRuntimeBuilder {
                 hook_registry: self
                     .hook_registry
                     .unwrap_or_else(|| Arc::new(InMemoryHookExecutorRegistry::default())),
+                tool_routes: self.tool_routes,
+                tool_executors: self.tool_executors,
+                tool_policy: self.tool_policy,
                 run_control: InMemoryRunControlStore::default(),
                 next_journal_seq: AtomicU64::new(0),
                 journal_sequence_lock: Mutex::new(()),
@@ -702,6 +783,9 @@ struct RuntimeInner {
     policy: Option<Arc<dyn RuntimePolicyPort>>,
     output_sinks: OutputSinkRegistry,
     hook_registry: Arc<dyn HookExecutorRegistry>,
+    tool_routes: Vec<ToolRoute>,
+    tool_executors: ToolExecutorRegistry,
+    tool_policy: Option<Arc<dyn ToolPolicyPort>>,
     run_control: InMemoryRunControlStore,
     next_journal_seq: AtomicU64,
     journal_sequence_lock: Mutex<()>,

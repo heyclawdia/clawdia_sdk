@@ -1,6 +1,9 @@
 # Agent SDK Examples
 
-These examples show how the contract docs handle complex host workflows without making any product host part of SDK core. They are conceptual and documentation-only.
+These examples show how the SDK handles both onboarding paths and complex host
+workflows without making any product host part of SDK core. The quickstarts are
+the first reading path for adoption. The scenario examples are conceptual and
+documentation-only coverage maps.
 
 Each example names:
 
@@ -14,6 +17,17 @@ Each example names:
 - acceptance tests.
 
 ## Examples
+
+### Quickstarts
+
+| Example | Purpose |
+| --- | --- |
+| [live-provider-quickstart.md](live-provider-quickstart.md) | Starts with a real provider adapter and shows the canonical runtime path through package, runtime, events, and journal. |
+| [typed-output-quickstart.md](typed-output-quickstart.md) | Shows typed output helper ergonomics, live provider setup, and the `RunRequest` plus `OutputContract` lowering underneath. |
+| [tool-approval-quickstart.md](tool-approval-quickstart.md) | Shows a tool route, policy, journal intent/result, effect evidence, and provider-tool continuation without direct callback execution. |
+| [memory-compaction-quickstart.md](memory-compaction-quickstart.md) | Shows a tiny host-owned memory port returning context candidates and a protected compaction summary before provider projection. |
+
+### Scenario Coverage
 
 | Example | Purpose |
 | --- | --- |

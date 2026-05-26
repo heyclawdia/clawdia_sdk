@@ -400,6 +400,7 @@ impl ProviderAdapter for FakeProvider {
             schema_version: ProviderResponse::SCHEMA_VERSION,
             output_text,
             stop_reason: ProviderStopReason::EndTurn,
+            tool_calls: Vec::new(),
             usage: Some(ProviderUsage {
                 input_tokens: Some(input_tokens),
                 output_tokens: Some(output_tokens),

@@ -2,11 +2,16 @@ use agent_sdk_core::{
     ContextBudgetSummary, ContextContribution, ContextContributionId, ContextContributionKind,
     ContextProjection, DestinationKind, DestinationRef, EntityKind, EntityRef, PolicyKind,
     PolicyRef, PrivacyClass, ProjectionRole, ProviderAdapter, ProviderCapabilities,
-    ProviderConformanceCase, ProviderProjectionPolicy, ProviderRequest, ProviderResponse,
-    ProviderStopReason, ProviderUsage, RetentionClass, SourceKind, SourceRef, TrustClass,
-    ids::{ContextItemId, ContextProjectionId},
+    ProviderConformanceCase, ProviderMessage, ProviderMessageRole, ProviderProjectionPolicy,
+    ProviderRequest, ProviderResponse, ProviderStopReason, ProviderStreamChunk,
+    ProviderStreamDelta, ProviderToolCall, ProviderUsage, RetentionClass, SchemaVersion,
+    SourceKind, SourceRef, ToolCallId, TrustClass,
+    ids::{ContentRef as ContentRefId, ContextItemId, ContextProjectionId},
+    output::OutputContract,
     testing::{FakeProvider, normalize_json_value},
+    tool_records::CanonicalToolName,
 };
+use serde_json::json;
 
 fn admitted_projection() -> ContextProjection {
     let mut source = SourceRef::with_kind(SourceKind::User, "source.secret.ui");
@@ -129,6 +134,126 @@ fn sdk_consumer_mock_can_run_shared_provider_conformance_helper() {
     assert_eq!(usage.total_tokens, Some(2));
 }
 
+#[test]
+fn provider_tool_use_response_carries_canonical_tool_call_material() {
+    let tool_call = ProviderToolCall::new(
+        ToolCallId::new("tool.call.provider.1"),
+        CanonicalToolName::new("workspace_read"),
+        "read docs/start-here.md",
+    )
+    .with_args_ref(ContentRefId::new("content.args.provider.1"));
+
+    let response = ProviderResponse::tool_use([tool_call.clone()]);
+    let serialized = normalize_json_value(serde_json::to_value(&response).expect("json"));
+
+    assert_eq!(response.output_text, "");
+    assert_eq!(response.stop_reason, ProviderStopReason::ToolUse);
+    assert_eq!(response.tool_calls, vec![tool_call]);
+    assert_eq!(
+        serialized,
+        serde_json::json!({
+            "schema_version": 1,
+            "output_text": "",
+            "stop_reason": "tool_use",
+            "tool_calls": [
+                {
+                    "tool_call_id": "tool.call.provider.1",
+                    "canonical_tool_name": "workspace_read",
+                    "requested_args_refs": ["content.args.provider.1"],
+                    "redacted_args_summary": "read docs/start-here.md"
+                }
+            ]
+        })
+    );
+}
+
+#[test]
+fn provider_debug_output_redacts_prompt_output_schema_and_tool_material() {
+    let contract = OutputContract::inline_json_schema(
+        agent_sdk_core::OutputSchemaId::new("schema.provider.debug"),
+        SchemaVersion::new(1, 0, 0),
+        json!({
+            "type": "object",
+            "properties": {
+                "debug_secret_schema": { "const": "schema-debug-secret" }
+            }
+        }),
+    );
+    let request = ProviderRequest {
+        schema_version: ProviderRequest::SCHEMA_VERSION,
+        projection_policy_ref: "policy.provider.debug".to_string(),
+        messages: vec![ProviderMessage {
+            role: ProviderMessageRole::User,
+            content: "provider-prompt-debug-secret".to_string(),
+            privacy: PrivacyClass::ContentRefsOnly,
+            projected_metadata: None,
+        }],
+        projection_item_count: 1,
+        structured_output_hint: None,
+    }
+    .with_structured_output_hint(&contract);
+    let response = ProviderResponse::text("provider-output-debug-secret");
+    let tool_call = ProviderToolCall::new(
+        ToolCallId::new("tool.call.debug"),
+        CanonicalToolName::new("workspace_read"),
+        "provider-tool-args-debug-secret",
+    )
+    .with_args_ref(ContentRefId::new("content.args.debug"));
+    let text_chunk = ProviderStreamChunk::text(0, "provider-stream-debug-secret");
+    let tool_chunk = ProviderStreamChunk::final_tool_calls(
+        1,
+        [tool_call.clone()],
+        ProviderStopReason::ToolUse,
+        None,
+    );
+
+    let debug = format!("{request:?}\n{response:?}\n{tool_call:?}\n{text_chunk:?}\n{tool_chunk:?}");
+
+    for secret in [
+        "schema-debug-secret",
+        "debug_secret_schema",
+        "provider-prompt-debug-secret",
+        "provider-output-debug-secret",
+        "provider-tool-args-debug-secret",
+        "provider-stream-debug-secret",
+    ] {
+        assert!(
+            !debug.contains(secret),
+            "provider Debug output leaked {secret}: {debug}"
+        );
+    }
+}
+
+#[test]
+fn default_provider_stream_preserves_tool_use_as_terminal_delta() {
+    let provider = ToolUseProvider;
+    let request = agent_sdk_core::project_context_projection(
+        &admitted_projection(),
+        &ProviderProjectionPolicy::redacted("policy.provider.redacted"),
+    )
+    .expect("projection");
+
+    let chunks = ProviderAdapter::stream(&provider, &request).expect("stream chunks");
+
+    assert_eq!(chunks.len(), 1);
+    assert!(chunks[0].is_terminal);
+    assert_eq!(chunks[0].usage.as_ref().unwrap().total_tokens, Some(9));
+    assert_eq!(
+        chunks[0].delta,
+        ProviderStreamDelta::ToolCalls {
+            tool_calls: vec![
+                ProviderToolCall::new(
+                    ToolCallId::new("tool.call.provider.2"),
+                    CanonicalToolName::new("workspace_read"),
+                    "read README.md",
+                )
+                .with_args_ref(ContentRefId::new("content.args.provider.2"))
+            ],
+            stop_reason: Some(ProviderStopReason::ToolUse),
+        }
+    );
+}
+
 struct SdkConsumerMockProvider;
 
 impl ProviderAdapter for SdkConsumerMockProvider {
@@ -146,11 +271,37 @@ impl ProviderAdapter for SdkConsumerMockProvider {
             schema_version: ProviderResponse::SCHEMA_VERSION,
             output_text: "consumer ok".to_string(),
             stop_reason: ProviderStopReason::EndTurn,
+            tool_calls: Vec::new(),
             usage: Some(ProviderUsage {
                 input_tokens: Some(1),
                 output_tokens: Some(1),
                 total_tokens: Some(2),
             }),
         })
+    }
+}
+
+struct ToolUseProvider;
+
+impl ProviderAdapter for ToolUseProvider {
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities::text_only("provider.consumer.tool_use")
+    }
+
+    fn complete(
+        &self,
+        _request: &ProviderRequest,
+    ) -> Result<ProviderResponse, agent_sdk_core::AgentError> {
+        Ok(ProviderResponse::tool_use([ProviderToolCall::new(
+            ToolCallId::new("tool.call.provider.2"),
+            CanonicalToolName::new("workspace_read"),
+            "read README.md",
+        )
+        .with_args_ref(ContentRefId::new("content.args.provider.2"))])
+        .with_usage(ProviderUsage {
+            input_tokens: Some(4),
+            output_tokens: Some(5),
+            total_tokens: Some(9),
+        }))
     }
 }

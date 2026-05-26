@@ -378,6 +378,51 @@
         ]
       },
       {
+        "kind": "tool_started",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "tool_completed",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "tool_failed",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "tool_denied",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
+        "kind": "tool_recovery_required",
+        "fixtures": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
+        ]
+      },
+      {
         "kind": "agent_pool_run_left",
         "fixtures": [
           "tests/fixtures/golden/emitted-event-kind-matrix-v1.json"
@@ -451,11 +496,6 @@
       "message_committed",
       "model_attempt_failed",
       "tool_requested",
-      "tool_started",
-      "tool_completed",
-      "tool_failed",
-      "tool_denied",
-      "tool_recovery_required",
       "approval_requested",
       "approval_dispatched",
       "approval_dispatch_unavailable",

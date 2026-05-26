@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added live-provider, typed-output, tool-approval, and memory-compaction quickstarts that show the canonical runtime, output-contract, package, policy, journal, event, effect, context, and projection paths with real provider onboarding first.
+- Added provider tool-call DTOs and terminal stream deltas so model-requested tools can be represented by `ProviderAdapter` output without adapter-specific callback shapes.
+- Added the first app-facing model-tool continuation path: `run_text` can lower provider `tool_use` responses through `ToolRoute`, policy, journal intent/result, executor output, and a provider tool-result continuation.
+- Added toolkit-owned `Tool`, `AsyncTool`, and `ToolPackBuilder::listen*` wrappers that declare tools ergonomically while lowering into core tool-pack snapshots, capabilities, sidecars, and routes without executing outside the canonical coordinator.
+- Added live OpenAI Responses, Anthropic Messages, and Gemini generateContent adapters in the unreleased optional `agent-sdk-provider` crate, plus transport-injected deterministic tests. The adapters map canonical `ProviderRequest`/`ProviderResponse`, usage, text output, structured-output hints, and function-call tool requests without owning runtime policy, journals, events, approval, or tool execution.
+- Added a persistence ownership map that separates journal, checkpoint, content, event cursor, agent-pool, provider-argument, and tool-execution storage responsibilities before any durable store crate is added.
+
+### Changed
+
+- Prepared the current checkout as a `0.1.0-alpha.3` release candidate because `ProviderStructuredOutputHint` now carries optional provider-projected redacted inline schema material for live structured-output hints.
+- Synced current public docs to distinguish the published `0.1.0-alpha.2` crates from the local `0.1.0-alpha.3` release-candidate API, and clarified that optional provider, MCP, browser, OTel, isolation, and workflow work belongs in adapter crates layered over `agent-sdk-core`.
+
 ## 0.1.0-alpha.2
 
 Status: second public alpha crates.io release.

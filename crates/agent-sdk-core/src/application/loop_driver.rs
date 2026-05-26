@@ -52,6 +52,8 @@ use crate::{
     run_handle::RunHandle,
     runtime::AgentRuntime,
     structured_output::StructuredOutputLifecycleRecord,
+    tool_ports::ToolCallRequest,
+    tool_records::ToolCallRecordStatus,
     validated_output::{
         OutputLineage, TypedResultPublicationRecord, ValidatedOutput, ValidatedOutputParams,
         ValidatedOutputPublicationStep, ValidationReportRecord,
@@ -321,6 +323,38 @@ pub fn run_p0_text(
         ids.provider_effect_id.clone(),
         response,
     )?;
+    let response = match drive_p2_tool_continuations(
+        runtime,
+        &request,
+        &ids,
+        &mut event_ids,
+        &fingerprint,
+        &source,
+        provider.as_ref(),
+        &mut provider_request,
+        &snapshot.provider_route_id,
+        &snapshot.provider_model_id,
+        &effective.package,
+        response,
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            let summary = error.context().message;
+            append_message_and_terminal(
+                runtime,
+                &handle,
+                &request,
+                &ids,
+                &mut event_ids,
+                &fingerprint,
+                &source,
+                RunStatus::Failed,
+                summary,
+                None,
+            )?;
+            return Err(error);
+        }
+    };
 
     if let Some(output_contract) = request.output_contract.as_ref() {
         match drive_p1_structured_output(
@@ -508,6 +542,7 @@ fn complete_p0_text_with_hooks(
 const P0_HOOK_RETRY_BUDGET: u8 = 1;
 const P0_HOOK_MAX_CONTEXT_INJECTIONS: usize = 4;
 const P0_HOOK_MAX_REDACTED_SUMMARY_CHARS: usize = 2048;
+const P2_TOOL_CONTINUATION_BUDGET: u8 = 4;
 
 #[derive(Clone, Debug)]
 struct HookContextInjection {
@@ -816,6 +851,196 @@ fn repair_needed_error(request: &RunRequest, message: impl Into<String>) -> Agen
     })
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "P2 tool continuation currently mirrors the explicit P0/P1 loop evidence until a loop-session struct owns shared fields"
+)]
+fn drive_p2_tool_continuations(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    event_ids: &mut EventIdSequence,
+    fingerprint: &str,
+    source: &SourceRef,
+    provider: &dyn ProviderAdapter,
+    provider_request: &mut ProviderRequest,
+    provider_route_id: &str,
+    provider_model_id: &str,
+    package: &crate::package::RuntimePackage,
+    mut response: ProviderResponse,
+) -> Result<ProviderResponse, AgentError> {
+    let mut continuation_count = 0_u8;
+    while response.stop_reason == ProviderStopReason::ToolUse {
+        continuation_count += 1;
+        if continuation_count > P2_TOOL_CONTINUATION_BUDGET {
+            return Err(repair_needed_error(
+                request,
+                "provider tool-use continuation budget exhausted",
+            ));
+        }
+        if response.tool_calls.is_empty() {
+            return Err(repair_needed_error(
+                request,
+                "provider returned tool_use without tool calls",
+            ));
+        }
+
+        let coordinator = runtime.tool_execution_coordinator(package, &request.run_id)?;
+        let journal = runtime.journal_port(&request.run_id)?;
+        let mut result_summaries = Vec::new();
+
+        for provider_tool_call in response.tool_calls.clone() {
+            let tool_source = SourceRef::with_kind(
+                SourceKind::Sdk,
+                format!("source.provider_tool_call.{}", ids.fragment),
+            );
+            let tool_request =
+                ToolCallRequest::from_provider_tool_call(provider_tool_call, tool_source.clone());
+            let mut tool_context = crate::tool_execution::ToolExecutionContext::new(
+                request.run_id.clone(),
+                request.agent_id.clone(),
+                tool_source,
+                fingerprint,
+            );
+            tool_context.session_id = request.session_id.clone();
+            tool_context.turn_id = Some(ids.turn_id.clone());
+            tool_context.next_journal_seq = runtime.next_journal_seq_hint();
+            tool_context.timestamp_millis = u64::from(continuation_count) * 1_000;
+            tool_context.record_id_prefix = format!(
+                "journal.p0.{}.tool.{}",
+                ids.fragment, tool_context.next_journal_seq
+            );
+
+            let outcome = coordinator.execute(journal.as_ref(), tool_request, tool_context)?;
+            let appended_count = tool_outcome_journal_record_count(&outcome);
+            if appended_count > 0 {
+                runtime.reserve_journal_seq_block(appended_count);
+            }
+            let events = runtime.event_bus_port(&request.run_id)?;
+            if let Some(intent_cursor) = outcome.intent_cursor.clone() {
+                events.publish(event_frame(
+                    request,
+                    Some(ids.turn_id.clone()),
+                    None,
+                    event_ids.next(),
+                    EventFamily::Tool,
+                    EventKind::ToolStarted,
+                    "tool execution started",
+                    Some(intent_cursor),
+                    fingerprint.to_string(),
+                    ids,
+                ))?;
+            }
+            if let Some(terminal_cursor) = outcome.terminal_cursor.clone() {
+                events.publish(event_frame(
+                    request,
+                    Some(ids.turn_id.clone()),
+                    None,
+                    event_ids.next(),
+                    EventFamily::Tool,
+                    tool_terminal_event_kind(&outcome.record.status),
+                    "tool execution terminal",
+                    Some(terminal_cursor),
+                    fingerprint.to_string(),
+                    ids,
+                ))?;
+            }
+            if outcome.recovery_required {
+                return Err(repair_needed_error(
+                    request,
+                    "tool execution requires recovery before provider continuation",
+                ));
+            }
+            match outcome.record.status {
+                ToolCallRecordStatus::Completed | ToolCallRecordStatus::ResultRewritten => {
+                    let result_summary = outcome
+                        .record
+                        .redacted_result_summary
+                        .clone()
+                        .unwrap_or_else(|| "tool completed without visible result".to_string());
+                    result_summaries.push(format!(
+                        "{}: {}",
+                        outcome.record.canonical_tool_name.as_str(),
+                        result_summary
+                    ));
+                }
+                _ => {
+                    return Err(AgentError::new(
+                        AgentErrorKind::PolicyDenial,
+                        RetryClassification::UserActionNeeded,
+                        format!(
+                            "tool call {} did not complete before provider continuation",
+                            outcome.record.tool_call_id.as_str()
+                        ),
+                    )
+                    .with_causal_ids(CausalIds {
+                        run_id: Some(request.run_id.clone()),
+                        ..CausalIds::default()
+                    }));
+                }
+            }
+        }
+
+        provider_request.messages.push(ProviderMessage {
+            role: ProviderMessageRole::Tool,
+            content: result_summaries.join("\n"),
+            privacy: PrivacyClass::ContentRefsOnly,
+            projected_metadata: None,
+        });
+        provider_request.projection_item_count = provider_request.messages.len();
+
+        let attempt_id = crate::ids::AttemptId::new(format!(
+            "attempt.p2.{}.tool_continuation.{}",
+            ids.fragment, continuation_count
+        ));
+        let effect_id = append_provider_tool_continuation_attempt_started(
+            runtime,
+            request,
+            ids,
+            event_ids,
+            fingerprint,
+            source,
+            attempt_id.clone(),
+            provider_route_id,
+            provider_model_id,
+            provider_request.messages.len() as u32,
+            continuation_count,
+        )?;
+        let next_response = provider.complete(provider_request)?;
+        response = append_model_attempt_completion(
+            runtime,
+            request,
+            ids,
+            event_ids,
+            fingerprint,
+            source,
+            attempt_id,
+            provider_route_id,
+            provider_model_id,
+            provider_request.messages.len() as u32,
+            effect_id,
+            next_response,
+        )?;
+    }
+
+    Ok(response)
+}
+
+fn tool_outcome_journal_record_count(outcome: &crate::tool_execution::ToolExecutionOutcome) -> u64 {
+    u64::from(outcome.intent_cursor.is_some()) + u64::from(outcome.terminal_cursor.is_some())
+}
+
+fn tool_terminal_event_kind(status: &ToolCallRecordStatus) -> EventKind {
+    match status {
+        ToolCallRecordStatus::Completed | ToolCallRecordStatus::ResultRewritten => {
+            EventKind::ToolCompleted
+        }
+        ToolCallRecordStatus::DeniedBeforeExecution => EventKind::ToolDenied,
+        ToolCallRecordStatus::RecoveryRequired => EventKind::ToolRecoveryRequired,
+        _ => EventKind::ToolFailed,
+    }
+}
+
 fn validate_context_injection_bounds(
     request: &RunRequest,
     injections: &[ContextInjectionRequest],
@@ -884,11 +1109,14 @@ fn append_model_attempt_completion(
 ) -> Result<ProviderResponse, AgentError> {
     let journal = runtime.journal_port(&request.run_id)?;
     let events = runtime.event_bus_port(&request.run_id)?;
-    let terminal_status = terminal_status(&response.stop_reason);
-    let effect_status = match &terminal_status {
-        RunStatus::Completed => EffectTerminalStatus::Completed,
-        RunStatus::Cancelled => EffectTerminalStatus::Cancelled,
-        _ => EffectTerminalStatus::Failed,
+    let effect_status = match &response.stop_reason {
+        ProviderStopReason::EndTurn | ProviderStopReason::ToolUse => {
+            EffectTerminalStatus::Completed
+        }
+        ProviderStopReason::Cancelled => EffectTerminalStatus::Cancelled,
+        ProviderStopReason::MaxTokens
+        | ProviderStopReason::ProviderError
+        | ProviderStopReason::Unknown => EffectTerminalStatus::Failed,
     };
 
     let provider_result = journal_record(
@@ -1693,6 +1921,117 @@ fn append_provider_hook_retry_attempt_started(
     Ok(effect_id)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "tool-continuation attempt journaling mirrors provider repair/retry helpers until grouped run-loop command structs exist"
+)]
+fn append_provider_tool_continuation_attempt_started(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    event_ids: &mut EventIdSequence,
+    fingerprint: &str,
+    source: &SourceRef,
+    attempt_id: crate::ids::AttemptId,
+    provider_route_id: &str,
+    provider_model_id: &str,
+    request_message_count: u32,
+    continuation_count: u8,
+) -> Result<EffectId, AgentError> {
+    let journal = runtime.journal_port(&request.run_id)?;
+    let events = runtime.event_bus_port(&request.run_id)?;
+    let effect_id = EffectId::new(format!(
+        "effect.p2.{}.provider_tool_continuation.{}",
+        ids.fragment,
+        attempt_id.as_str()
+    ));
+    let provider_effect_intent = journal_record(
+        request,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id.clone()),
+        runtime.next_journal_seq(),
+        ids.record(&format!(
+            "provider.tool_continuation.effect.intent.{}",
+            attempt_id.as_str()
+        )),
+        JournalRecordKind::EffectIntent,
+        "effect",
+        "provider_tool_continuation_intent",
+        source.clone(),
+        fingerprint.to_string(),
+        JournalRecordPayload::EffectIntent(EffectIntent {
+            effect_id: effect_id.clone(),
+            kind: EffectKind::ProviderRequest,
+            subject_ref: EntityRef::run(request.run_id.clone()),
+            source: source.clone(),
+            destination: Some(DestinationRef::with_kind(
+                DestinationKind::Provider,
+                "destination.provider.p2_tool_continuation",
+            )),
+            policy_refs: vec![PolicyRef::with_kind(
+                PolicyKind::RuntimePackage,
+                "policy.p2.provider_tool_continuation_request",
+            )],
+            idempotency_key: Some(IdempotencyKey::new(format!(
+                "idempotency.p2.{}.tool_continuation.{}",
+                ids.fragment, continuation_count
+            ))),
+            dedupe_key: None,
+            content_refs: Vec::new(),
+            redacted_summary: "provider tool-result continuation request intent".to_string(),
+        }),
+    );
+    let provider_effect_cursor = journal.append(provider_effect_intent)?;
+    let model_intent = journal_record(
+        request,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id.clone()),
+        runtime.next_journal_seq(),
+        ids.record(&format!(
+            "model.tool_continuation.intent.{}",
+            attempt_id.as_str()
+        )),
+        JournalRecordKind::ModelAttempt,
+        "model",
+        "tool_result_request_projected",
+        source.clone(),
+        fingerprint.to_string(),
+        JournalRecordPayload::ModelAttempt(ModelAttemptRecord {
+            provider_route_id: provider_route_id.to_string(),
+            provider_model_id: provider_model_id.to_string(),
+            request_message_count,
+            stop_reason: None,
+            usage: None,
+        }),
+    );
+    let model_intent_cursor = journal.append(model_intent)?;
+    events.publish(event_frame(
+        request,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id.clone()),
+        event_ids.next(),
+        EventFamily::Turn,
+        EventKind::ProviderRequestProjected,
+        "provider tool-result continuation request projected",
+        Some(provider_effect_cursor),
+        fingerprint.to_string(),
+        ids,
+    ))?;
+    events.publish(event_frame(
+        request,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id),
+        event_ids.next(),
+        EventFamily::Model,
+        EventKind::ModelAttemptStarted,
+        "model tool-result continuation attempt started",
+        Some(model_intent_cursor),
+        fingerprint.to_string(),
+        ids,
+    ))?;
+    Ok(effect_id)
+}
+
 fn repair_provider_request(
     base_provider_request: &ProviderRequest,
     prompt_summary: &str,
@@ -2064,16 +2403,6 @@ fn event_frame(
         event,
         archive_cursor: None,
         overflow: None,
-    }
-}
-
-fn terminal_status(stop_reason: &ProviderStopReason) -> RunStatus {
-    match stop_reason {
-        ProviderStopReason::EndTurn => RunStatus::Completed,
-        ProviderStopReason::Cancelled => RunStatus::Cancelled,
-        ProviderStopReason::MaxTokens
-        | ProviderStopReason::ProviderError
-        | ProviderStopReason::Unknown => RunStatus::Failed,
     }
 }
 

@@ -8,21 +8,78 @@ use std::{
 use agent_sdk_core::{
     AgentId, AllowToolPolicy, PolicyKind, PolicyRef, ProviderRouteSnapshot, RunId, RuntimePackage,
     RuntimePackageBuilder, RuntimePackageId, SourceKind, SourceRef, ToolCallId,
-    ToolExecutionContext, ToolExecutionCoordinator,
+    ToolExecutionContext, ToolExecutionCoordinator, ToolPackId, ToolPackKind,
     domain::ContentRef,
     effect::EffectTerminalStatus,
     tool_ports::{ToolCallRequest, ToolExecutorRegistry, ToolRegistrySnapshot, ToolRouter},
     tool_records::CanonicalToolName,
 };
 use agent_sdk_toolkit::{
-    BoundedWorkspace, InMemoryJsonArgumentStore, InMemoryResourceResolver,
+    AsyncTool, BoundedWorkspace, InMemoryJsonArgumentStore, InMemoryResourceResolver,
     InMemoryToolkitContentStore, ResourceReaderExecutor, ResourceReaderRequest,
-    ShellExecutionPolicy, ShellExecutor, ShellRequest, ToolDiscoveryExecutor, ToolDiscoveryIndex,
-    ToolkitPackBundle, WorkspaceEditExecutor, WorkspaceEditOutput, WorkspaceEditRequest,
-    WorkspaceFileKind, WorkspacePolicy, WorkspaceReadExecutor, WorkspaceReadOutput,
-    WorkspaceReadRequest, WorkspaceSearchExecutor, WorkspaceSearchRequest, WorkspaceWriteExecutor,
-    WorkspaceWriteMode, WorkspaceWriteOutput, WorkspaceWriteRequest,
+    ShellExecutionPolicy, ShellExecutor, ShellRequest, Tool, ToolDiscoveryExecutor,
+    ToolDiscoveryIndex, ToolPackBuilder, ToolkitPackBundle, ToolkitToolExecutionMode,
+    WorkspaceEditExecutor, WorkspaceEditOutput, WorkspaceEditRequest, WorkspaceFileKind,
+    WorkspacePolicy, WorkspaceReadExecutor, WorkspaceReadOutput, WorkspaceReadRequest,
+    WorkspaceSearchExecutor, WorkspaceSearchRequest, WorkspaceWriteExecutor, WorkspaceWriteMode,
+    WorkspaceWriteOutput, WorkspaceWriteRequest,
 };
+
+#[test]
+fn ergonomic_tool_wrappers_lower_to_package_routes_without_execution() {
+    let read_tool = Tool::builder(
+        "workspace_read",
+        "executor.workspace_read.v1",
+        "schema.workspace_read",
+        permission_policy("policy.fs.read"),
+    )
+    .read_only()
+    .build()
+    .expect("read tool declaration builds");
+    let async_write = AsyncTool::builder(
+        "workspace_write",
+        "executor.workspace_write.v1",
+        "schema.workspace_write",
+        permission_policy("policy.fs.write"),
+    )
+    .write_effect()
+    .build_async()
+    .expect("async write declaration builds");
+
+    assert_eq!(read_tool.mode(), &ToolkitToolExecutionMode::Sync);
+    assert_eq!(async_write.mode(), &ToolkitToolExecutionMode::Async);
+    assert_eq!(async_write.snapshot().timeout_ms, 60_000);
+    assert_eq!(async_write.snapshot().cancellation, "cooperative");
+
+    let bundle = ToolPackBuilder::new(
+        ToolPackId::new("toolpack.ergonomic"),
+        ToolPackKind::External,
+        "v1",
+        source(),
+    )
+    .listen(read_tool)
+    .listen_async(async_write)
+    .build()
+    .expect("ergonomic pack builds");
+    let package = package_for_bundle(&bundle);
+    let snapshot =
+        ToolRegistrySnapshot::from_runtime_package(&package, bundle.routes.clone()).unwrap();
+
+    assert_eq!(bundle.capabilities.len(), 2);
+    assert_eq!(snapshot.routes.len(), 2);
+    assert!(
+        snapshot
+            .routes
+            .iter()
+            .any(|route| route.canonical_tool_name.as_str() == "workspace_read")
+    );
+    assert!(
+        snapshot
+            .routes
+            .iter()
+            .any(|route| route.canonical_tool_name.as_str() == "workspace_write")
+    );
+}
 
 #[test]
 fn workspace_read_routes_through_tool_executor_and_returns_anchor_hashes() {

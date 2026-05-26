@@ -19,6 +19,18 @@ helper behavior or bypass the canonical run, package, policy, event, journal,
 telemetry, lineage, or redaction paths. Deep implementation modules are review
 surfaces until a release explicitly blesses them.
 
+## Quickstarts
+
+For onboarding, start with the repository quickstarts:
+
+- [Live provider quickstart](https://github.com/heyclawdia/clawdia_sdk/blob/main/docs/examples/live-provider-quickstart.md)
+- [Typed-output quickstart](https://github.com/heyclawdia/clawdia_sdk/blob/main/docs/examples/typed-output-quickstart.md)
+- [Tool-approval quickstart](https://github.com/heyclawdia/clawdia_sdk/blob/main/docs/examples/tool-approval-quickstart.md)
+
+Each one shows the canonical runtime path underneath the ergonomic call. The
+separate `agent-sdk-provider` crate supplies live provider adapters; core keeps
+the primitive provider port and deterministic test support.
+
 ## Package Shape
 
 The crate follows the SDK package architecture gate:
@@ -43,4 +55,4 @@ Root integration tests are stable Cargo target shims. Full test bodies live unde
 
 ## Unsupported In This Handoff
 
-This crate does not ship live provider adapters, concrete container/runtime adapters, product UI adapters, remote-channel adapters, marketplace/extension host runtimes, network telemetry exporters, or workflow-engine ownership. Those remain host-owned or optional-crate responsibilities until a later release adds matching contracts and tests.
+This crate does not ship live provider adapters, concrete container/runtime adapters, product UI adapters, remote-channel adapters, marketplace/extension host runtimes, network telemetry exporters, or workflow-engine ownership. The separate `agent-sdk-provider` crate supplies live provider adapters over `ProviderAdapter`; live credentials, endpoint policy, journals, events, approval, and tool execution remain host-owned or optional-crate responsibilities.

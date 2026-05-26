@@ -1,6 +1,6 @@
 # Phase 13 Contract To Code Traceability
 
-This matrix links each normative contract to the first implementation slice. It is a release-readiness handoff map, not a claim of live adapter support.
+This matrix links each normative contract to the first implementation slice and the current optional adapter follow-up. It is a release-readiness handoff map; live provider support is only claimed for the `agent-sdk-provider` adapter crate rows below.
 
 | Contract | Source responsibility folders | Primary tests/fixtures |
 | --- | --- | --- |
@@ -24,10 +24,12 @@ This matrix links each normative contract to the first implementation slice. It 
 | `output-delivery-contract.md` | `src/records/output_delivery.rs`, `src/ports/output_delivery.rs`, `src/application/output_delivery.rs`, `src/testing/output_delivery.rs` | `tests/feature_layers/output_delivery_contract.rs`, `tests/fixtures/output_delivery` |
 | `otel-mapping-contract.md` | `src/records/telemetry.rs`, `src/ports/telemetry.rs`, `src/application/telemetry.rs`, `src/testing/telemetry.rs` | `tests/feature_layers/telemetry_core_contract.rs`, `tests/golden/contract_golden.rs`, `tests/fixtures/golden/otel-run-model-tool-v1.json`, `tests/fixtures/telemetry` |
 | `telemetry-privacy-contract.md` | `src/domain/policy.rs`, `src/domain/privacy.rs`, `src/application/telemetry.rs`, `src/ports/event_bus.rs`, `src/records/telemetry.rs` | `tests/privacy_performance/mod.rs`, `tests/feature_layers/telemetry_core_contract.rs`, `tests/fixtures/privacy`, `tests/fixtures/telemetry/content-capture-denial.json` |
+| Live provider adapters | `crates/agent-sdk-core/src/ports/provider.rs`, `crates/agent-sdk-core/src/application/loop_driver.rs`, `crates/agent-sdk-provider/src` | `tests/ports/provider_projection_contract.rs`, `tests/feature_layers/p1_typed_output.rs`, `crates/agent-sdk-provider/tests/live_adapters.rs`, `crates/agent-sdk-provider/tests/openai_compatible.rs` |
 | Scenario references | `tests/scenarios/mod.rs`, `src/testing`, public ports and records above | `tests/scenario_matrix.rs`, `tests/fixtures/scenarios/scenario-matrix-v1.json`, `tests/domain/public_api.rs` |
 
 ## Boundary Notes
 
-- Live providers, concrete containers, product UIs, remote channels, network telemetry exporters, and workflow engines are not implemented in this handoff.
+- Live OpenAI Responses, Anthropic Messages, and Gemini generateContent adapters are implemented in optional `agent-sdk-provider` over `ProviderAdapter`. Concrete containers, product UIs, remote channels, network telemetry exporters, workflow engines, and product-specific host adapters are still not implemented in this handoff.
+- Provider adapters must remain transport-injected or host-configured, must not own approval/tool execution/journals/events, and must keep credentials and provider-visible prompt/schema/tool material out of `Debug` output and process argv.
 - Reserved feature ports and records are present to keep package fingerprints, events, journals, policy, replay, and testability aligned before concrete optional crates exist.
 - SDK-consumer mockability is exposed through `agent_sdk_core::testing`; those fakes exercise public ports and records rather than fake-only shortcuts.

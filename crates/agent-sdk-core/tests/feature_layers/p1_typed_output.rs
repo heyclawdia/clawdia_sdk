@@ -552,6 +552,7 @@ fn assert_structured_output_hint(request: &agent_sdk_core::ProviderRequest) {
         ProviderHintPolicy::SchemaRequired
     );
     assert!(hint.include_schema_ref);
+    assert!(hint.redacted_schema.is_some());
 }
 
 fn assert_structured_events_are_journal_backed(frames: &[agent_sdk_core::EventFrame]) {

@@ -8,28 +8,58 @@ This is a monorepo with separable Rust crates:
 
 - `crates/agent-sdk-core`: the lightweight SDK kernel for users who only want agent primitives, records, runtime packages, ports, deterministic fakes, and conformance helpers.
 - `crates/agent-sdk-toolkit`: an optional add-on crate for users who want concrete workspace tools, shell/resource helpers, discovery, and ACP/MCP protocol conformance scaffolding.
+- `crates/agent-sdk-provider`: an optional aggregate crate for live OpenAI, Anthropic, and Gemini provider adapters layered over `ProviderAdapter`, plus deterministic transport hooks for tests.
 
 Keep this package boundary deliberate. New capabilities with heavy parser/runtime/provider dependencies should live in optional crates layered over `agent-sdk-core`, not as default core dependencies. Core must remain usable by hosts that only need the primitive SDK contracts.
 
-The first public alpha release is available from crates.io:
+The current public alpha release is available from crates.io:
 
 ```toml
 [dependencies]
-agent-sdk-core = "0.1.0-alpha.1"
-agent-sdk-toolkit = { version = "0.1.0-alpha.1", optional = true }
+agent-sdk-core = "0.1.0-alpha.2"
+agent-sdk-toolkit = { version = "0.1.0-alpha.2", optional = true }
 ```
 
-Consumers can also depend on either crate from the repository:
+The repository checkout is a `0.1.0-alpha.3` release candidate. It contains the
+source-breaking provider structured-output hint change and the optional live
+provider adapter crate. After the next publish, the dependency shape is:
+
+```toml
+[dependencies]
+agent-sdk-core = "0.1.0-alpha.3"
+agent-sdk-toolkit = { version = "0.1.0-alpha.3", optional = true }
+agent-sdk-provider = { version = "0.1.0-alpha.3", optional = true }
+```
+
+Consumers can also depend on these crates from the repository:
 
 ```toml
 [dependencies]
 agent-sdk-core = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-core" }
 agent-sdk-toolkit = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-toolkit", optional = true }
+agent-sdk-provider = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-provider", optional = true }
 ```
 
 The repository checkout can be ahead of the latest published alpha. Treat
 crate-level READMEs and tests as the source of truth for current local API
 surfaces, then publish only after the release-readiness gates pass.
+
+## Quickstarts
+
+Start from a live provider and keep the canonical runtime path visible:
+
+1. [Live provider quickstart](docs/examples/live-provider-quickstart.md): one text run through `AgentRuntime`, `RuntimePackage`, a real `ProviderAdapter`, event bus, and journal.
+2. [Typed-output quickstart](docs/examples/typed-output-quickstart.md): ergonomic typed output helper lowering into `RunRequest` plus `OutputContract`, with provider-native schema hints when the schema is inline and safe to project.
+3. [Tool-approval quickstart](docs/examples/tool-approval-quickstart.md): tool route, policy, journal intent/result, and effect records without direct callback execution.
+
+The crate family intentionally does not publish a crate named `agent-sdk`.
+Consumers should depend on the split crates explicitly: `agent-sdk-core` for
+the primitive kernel, `agent-sdk-toolkit` for optional concrete helpers, and
+`agent-sdk-provider` for provider adapters. Future adapter families should use
+clear optional crates such as `agent-sdk-mcp`, `agent-sdk-browser-toolkit`,
+`agent-sdk-isolation`, `agent-sdk-otel`, and `agent-sdk-workflow`, with
+backend-specific crates added only when dependency weight, platform constraints,
+release cadence, licensing, or SemVer pressure justify the split.
 
 ## Core Map
 
@@ -86,6 +116,7 @@ users should still import explicit crate-root items, `agent_sdk_core::ports`, or
 | Contract workstream ownership and validation | [docs/workstreams](docs/workstreams/README.md) | Completed documentation-packet phase sequencing, owner roles, write boundaries, and validation gates |
 | Implementation workstream launch map | [docs/implementation-workstreams](docs/implementation-workstreams/README.md) | Rust coding phases, parallel launch targets, phase dependencies, and implementation exit gates |
 | Optional adapter/toolkit roadmap | [docs/agent-sdk-toolkit](docs/agent-sdk-toolkit/README.md) | Live provider, OpenAI-compatible provider, ACP, MCP, isolation runtime, browser/web access, MLX, and llama.cpp adapter planning |
+| Persistence ownership | [docs/reference/persistence-ownership-map.md](docs/reference/persistence-ownership-map.md) | Journal, checkpoint, content, event cursor, agent pool, tool execution, and provider-argument store boundaries |
 | Standards and review | [coding_standards.md](coding_standards.md), [docs/reference/sdk-review-checklist.md](docs/reference/sdk-review-checklist.md) | Coding posture and SDK review rubric |
 | Simplicity audit | [docs/reference/simplicity-audit.md](docs/reference/simplicity-audit.md) | Simplification guidance that preserves capability |
 | Scenario coverage | [docs/examples](docs/examples/README.md) | Generic host workflows and boundary examples, not SDK core |
@@ -100,6 +131,6 @@ For contract-packet review, use [docs/workstreams](docs/workstreams/README.md). 
 
 ## Current Implementation Posture
 
-The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core` and `crates/agent-sdk-toolkit`. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
+The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-toolkit`, and the unreleased `crates/agent-sdk-provider` adapter crate. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
 
-This alpha release includes deterministic fake/test-kit support and optional toolkit helpers, but it does not claim live provider, concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or host-adapter support.
+This checkout includes deterministic fake/test-kit support, optional toolkit helpers, and live provider adapters for OpenAI Responses, Anthropic Messages, and Gemini generateContent in the aggregate `agent-sdk-provider` crate. It does not claim concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or product-specific host-adapter support.

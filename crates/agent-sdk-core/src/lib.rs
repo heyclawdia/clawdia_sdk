@@ -776,7 +776,7 @@ pub use provider::{
     ProviderAdapter, ProviderCapabilities, ProviderConformanceCase, ProviderMessage,
     ProviderMessageRole, ProviderModality, ProviderProjectedMetadata, ProviderProjectionPolicy,
     ProviderRequest, ProviderResponse, ProviderStopReason, ProviderStreamChunk,
-    ProviderStreamDelta, ProviderStructuredOutputHint, ProviderUsage,
+    ProviderStreamDelta, ProviderStructuredOutputHint, ProviderToolCall, ProviderUsage,
 };
 pub use realtime::{RealtimeCompletionGate, RealtimeSessionController};
 pub use realtime_records::{

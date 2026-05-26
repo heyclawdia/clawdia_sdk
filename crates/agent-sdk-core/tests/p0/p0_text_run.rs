@@ -2,14 +2,17 @@ use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 
 use agent_sdk_core::{
-    Agent, AgentError, AgentEventBus, AgentId, AgentRuntime, ContextProjection,
-    HookExecutionOutcome, InMemoryAgentEventBus, PolicyDecision, PolicyKind, PolicyOutcome,
-    PolicyRef, PolicyStage, PrivacyClass, ProviderAdapter, ProviderCapabilities,
-    ProviderProjectionPolicy, ProviderRequest, ProviderResponse, ProviderRouteSnapshot,
-    ProviderStopReason, ProviderUsage, RetentionClass, RunId, RunRequest, RunStatus,
-    RuntimePackage, RuntimePackageId, RuntimePolicyPort, SessionId, SessionTimeline, SourceKind,
-    SourceRef, TurnId, TurnTrace,
-    event::{EventFilterSet, EventIndexField, EventKind},
+    Agent, AgentError, AgentEventBus, AgentId, AgentRuntime, AllowToolPolicy, CapabilityId,
+    CapabilityNamespace, CapabilitySpec, ContextProjection, DestinationKind, DestinationRef,
+    EffectClass, ExecutorRef, HookExecutionOutcome, InMemoryAgentEventBus, PackageSidecarRef,
+    PolicyDecision, PolicyKind, PolicyOutcome, PolicyRef, PolicyStage, PrivacyClass,
+    ProviderAdapter, ProviderCapabilities, ProviderMessageRole, ProviderProjectionPolicy,
+    ProviderRequest, ProviderResponse, ProviderRouteSnapshot, ProviderStopReason, ProviderToolCall,
+    ProviderUsage, RetentionClass, RiskClass, RunId, RunRequest, RunStatus, RuntimePackage,
+    RuntimePackageId, RuntimePolicyPort, SessionId, SessionTimeline, SourceKind, SourceRef,
+    ToolCallId, ToolExecutionOutput, ToolRoute, TurnId, TurnTrace,
+    domain::ContentRef as ContentRefId,
+    event::{EventFamily, EventFilterSet, EventIndexField, EventKind},
     hook_ports::InMemoryHookExecutorRegistry,
     package_hooks::{
         ContextInjectionRequest, HookFailurePolicy, HookMutationRight, HookMutationRights,
@@ -17,8 +20,9 @@ use agent_sdk_core::{
         StopReason,
     },
     project_context_projection,
-    testing::ScriptedHookExecutor,
     testing::{FakeContentResolver, FakeJournalStore, FakeProvider},
+    testing::{ScriptedHookExecutor, ScriptedToolExecutor},
+    tool_records::{CanonicalToolName, ToolCallRecordStatus},
 };
 
 #[derive(Clone, Debug)]
@@ -127,6 +131,110 @@ fn agent_and_runtime_text_paths_use_the_same_run_request_shape() {
     assert_eq!(provider.requests()[0].messages[0].content, expected.input);
     assert_eq!(expected.agent_id, agent.id().clone());
     assert_eq!(expected.source, source);
+}
+
+#[test]
+fn provider_tool_use_executes_tool_and_continues_with_tool_result() {
+    let agent = p0_agent();
+    let provider = ToolLoopProvider::with_responses([
+        ProviderResponse::tool_use([ProviderToolCall::new(
+            ToolCallId::new("tool.call.p0.read"),
+            CanonicalToolName::new("workspace_read"),
+            "read docs/start-here.md",
+        )
+        .with_args_ref(ContentRefId::new("content.args.p0.read"))]),
+        ProviderResponse::text("final answer after reading"),
+    ]);
+    let journal = FakeJournalStore::default();
+    let event_bus = InMemoryAgentEventBus::default();
+    let executor = Arc::new(ScriptedToolExecutor::new(
+        ExecutorRef::new("executor.workspace_read.v1"),
+        ToolExecutionOutput::completed("workspace read returned content refs"),
+    ));
+    let package = p0_package_with_tool(&agent);
+    let runtime = AgentRuntime::builder()
+        .default_package(package)
+        .provider("provider.fake", provider.clone())
+        .expect("provider route registers")
+        .journal(journal.clone())
+        .event_bus(event_bus.clone())
+        .content(FakeContentResolver::default())
+        .policy(AllowP0Policy)
+        .tool_route(p0_read_tool_route())
+        .tool_executor(executor.clone())
+        .expect("tool executor registers")
+        .tool_policy(AllowToolPolicy)
+        .build()
+        .expect("runtime builds");
+
+    let result = runtime
+        .run_text(RunRequest::text(
+            RunId::new("run.p0.tool-loop"),
+            agent.id().clone(),
+            SourceRef::with_kind(SourceKind::Host, "source.p0.tool-loop"),
+            "use the workspace tool",
+        ))
+        .expect("provider tool loop succeeds");
+
+    assert_eq!(result.status, RunStatus::Completed);
+    assert_eq!(result.output, "final answer after reading");
+    assert_eq!(executor.call_count(), 1);
+    assert_eq!(
+        executor.calls()[0]
+            .resolved_call
+            .request
+            .requested_args_refs,
+        vec![ContentRefId::new("content.args.p0.read")]
+    );
+
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 2);
+    let tool_message = requests[1]
+        .messages
+        .last()
+        .expect("tool result continuation message");
+    assert_eq!(tool_message.role, ProviderMessageRole::Tool);
+    assert_eq!(
+        tool_message.content,
+        "workspace_read: workspace read returned content refs"
+    );
+    assert_eq!(
+        requests[1].projection_item_count,
+        requests[1].messages.len()
+    );
+
+    let tool_records = journal
+        .records()
+        .into_iter()
+        .filter_map(|record| match record.payload {
+            agent_sdk_core::JournalRecordPayload::Tool(tool) => Some(tool),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(tool_records.len(), 2);
+    assert_eq!(
+        tool_records.last().unwrap().status,
+        ToolCallRecordStatus::Completed
+    );
+
+    let frames = event_bus
+        .subscribe_run(RunId::new("run.p0.tool-loop"), None)
+        .expect("event stream")
+        .collect::<Vec<_>>();
+    let model_completed_events = frames
+        .iter()
+        .filter(|frame| frame.event.envelope.event_kind == EventKind::ModelMessageCompleted)
+        .count();
+    assert_eq!(model_completed_events, 2);
+    let tool_event_kinds = frames
+        .iter()
+        .filter(|frame| frame.event.envelope.event_family == EventFamily::Tool)
+        .map(|frame| frame.event.envelope.event_kind.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        tool_event_kinds,
+        vec![EventKind::ToolStarted, EventKind::ToolCompleted]
+    );
 }
 
 #[test]
@@ -958,8 +1066,51 @@ impl ProviderAdapter for CapturingProvider {
             schema_version: ProviderResponse::SCHEMA_VERSION,
             output_text,
             stop_reason: ProviderStopReason::EndTurn,
+            tool_calls: Vec::new(),
             usage: Some(ProviderUsage::default()),
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ToolLoopProvider {
+    responses: Arc<Mutex<Vec<ProviderResponse>>>,
+    requests: Arc<Mutex<Vec<ProviderRequest>>>,
+}
+
+impl ToolLoopProvider {
+    fn with_responses(responses: impl IntoIterator<Item = ProviderResponse>) -> Self {
+        let mut responses = responses.into_iter().collect::<Vec<_>>();
+        responses.reverse();
+        Self {
+            responses: Arc::new(Mutex::new(responses)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn requests(&self) -> Vec<ProviderRequest> {
+        self.requests
+            .lock()
+            .expect("tool loop provider requests")
+            .clone()
+    }
+}
+
+impl ProviderAdapter for ToolLoopProvider {
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities::text_only("provider.fake")
+    }
+
+    fn complete(&self, request: &ProviderRequest) -> Result<ProviderResponse, AgentError> {
+        self.requests
+            .lock()
+            .expect("tool loop provider requests")
+            .push(request.clone());
+        self.responses
+            .lock()
+            .expect("tool loop provider responses")
+            .pop()
+            .ok_or_else(|| AgentError::contract_violation("tool loop provider exhausted"))
     }
 }
 
@@ -1116,6 +1267,50 @@ fn p0_package(agent: &Agent) -> RuntimePackage {
         ))
         .build()
         .expect("package builds")
+}
+
+fn p0_package_with_tool(agent: &Agent) -> RuntimePackage {
+    RuntimePackage::builder(RuntimePackageId::new("package.p0.contract"))
+        .agent(agent.snapshot())
+        .provider_route(ProviderRouteSnapshot::new("provider.fake", "model.fake.p0"))
+        .policy(PolicyRef::with_kind(
+            PolicyKind::RuntimePackage,
+            "policy.p0.package",
+        ))
+        .capability(CapabilitySpec::fake_tool(
+            CapabilityId::new("cap.tool.read"),
+            "workspace_read",
+            PackageSidecarRef::new("sidecar.schema.read", "json_schema", "v1"),
+            ExecutorRef::new("executor.workspace_read.v1"),
+            PolicyRef::with_kind(PolicyKind::Approval, "policy.approval.read"),
+            SourceRef::with_kind(SourceKind::Sdk, "source.sdk.toolpack"),
+        ))
+        .build()
+        .expect("tool package builds")
+}
+
+fn p0_read_tool_route() -> ToolRoute {
+    ToolRoute {
+        capability_id: CapabilityId::new("cap.tool.read"),
+        canonical_tool_name: CanonicalToolName::new("workspace_read"),
+        namespace: CapabilityNamespace::new("tool.workspace_read"),
+        source: SourceRef::with_kind(SourceKind::Sdk, "source.sdk.toolpack"),
+        destination: DestinationRef::with_kind(DestinationKind::Tool, "destination.tool.read"),
+        executor_ref: Some(ExecutorRef::new("executor.workspace_read.v1")),
+        policy_refs: vec![PolicyRef::with_kind(
+            PolicyKind::Approval,
+            "policy.approval.read",
+        )],
+        sidecar_refs: vec![PackageSidecarRef::new(
+            "sidecar.schema.read",
+            "json_schema",
+            "v1",
+        )],
+        effect_class: EffectClass::Read,
+        risk_class: RiskClass::Low,
+        privacy: PrivacyClass::ContentRefsOnly,
+        retention: RetentionClass::RunScoped,
+    }
 }
 
 fn event_summary(frames: &[agent_sdk_core::EventFrame]) -> Value {

@@ -3,16 +3,19 @@
 //! metadata. Implementations may perform network I/O and must preserve redaction and
 //! stop/usage semantics.
 //!
+use core::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
     context::ContextProjection,
     domain::{
-        AgentError, AgentErrorKind, DestinationKind, OutputSchemaId, PrivacyClass,
-        RetryClassification, SourceKind,
+        AgentError, AgentErrorKind, ContentRef, DestinationKind, OutputSchemaId, PrivacyClass,
+        RetryClassification, SourceKind, ToolCallId,
     },
-    output::{ContentHash, OutputContract, ProviderHintPolicy, SchemaVersion},
+    output::{ContentHash, OutputContract, OutputSchemaRef, ProviderHintPolicy, SchemaVersion},
     projection::project_context_projection,
+    tool_records::CanonicalToolName,
 };
 
 /// Port or behavior contract for provider adapter. Implementors should
@@ -46,11 +49,30 @@ pub trait ProviderAdapter: Send + Sync {
     /// policy, journaling, and event publication around it.
     fn stream(&self, request: &ProviderRequest) -> Result<Vec<ProviderStreamChunk>, AgentError> {
         let response = self.complete(request)?;
-        Ok(vec![ProviderStreamChunk::final_text(
-            response.output_text.clone(),
+        if response.tool_calls.is_empty() {
+            return Ok(vec![ProviderStreamChunk::final_text(
+                response.output_text.clone(),
+                response.stop_reason.clone(),
+                response.usage.clone(),
+            )]);
+        }
+
+        let mut chunks = Vec::new();
+        let mut chunk_index = 0;
+        if !response.output_text.is_empty() {
+            chunks.push(ProviderStreamChunk::text(
+                chunk_index,
+                response.output_text.clone(),
+            ));
+            chunk_index += 1;
+        }
+        chunks.push(ProviderStreamChunk::final_tool_calls(
+            chunk_index,
+            response.tool_calls.clone(),
             response.stop_reason.clone(),
             response.usage.clone(),
-        )])
+        ));
+        Ok(chunks)
     }
 
     /// Extracts provider usage accounting from a response.
@@ -146,7 +168,7 @@ impl ProviderProjectionPolicy {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 /// Carries provider request data across a host-port boundary.
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct ProviderRequest {
@@ -180,7 +202,21 @@ impl ProviderRequest {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+impl fmt::Debug for ProviderRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderRequest")
+            .field("schema_version", &self.schema_version)
+            .field("projection_policy_ref", &self.projection_policy_ref)
+            .field("message_count", &self.messages.len())
+            .field("messages", &"<redacted>")
+            .field("projection_item_count", &self.projection_item_count)
+            .field("structured_output_hint", &self.structured_output_hint)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 /// Carries provider structured output hint data across a host-port boundary.
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct ProviderStructuredOutputHint {
@@ -197,21 +233,48 @@ pub struct ProviderStructuredOutputHint {
     /// Typed include schema ref reference. Resolving or executing it is a
     /// separate policy-gated step.
     pub include_schema_ref: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional redacted inline schema body available for provider-native
+    /// structured-output hints. This is only populated when the output
+    /// contract already carries an inline schema safe for provider projection;
+    /// SDK-owned validation remains authoritative.
+    pub redacted_schema: Option<serde_json::Value>,
 }
 
 impl From<&OutputContract> for ProviderStructuredOutputHint {
     fn from(contract: &OutputContract) -> Self {
+        let redacted_schema = match &contract.schema {
+            OutputSchemaRef::InlineJson {
+                redacted_schema, ..
+            } => Some(redacted_schema.clone()),
+            _ => None,
+        };
         Self {
             schema_id: contract.schema_id.clone(),
             schema_version: contract.schema_version,
             schema_fingerprint: contract.schema_fingerprint(),
             provider_hint_policy: contract.projection_hint.provider_hint_policy.clone(),
             include_schema_ref: contract.projection_hint.include_schema_ref,
+            redacted_schema,
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+impl fmt::Debug for ProviderStructuredOutputHint {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderStructuredOutputHint")
+            .field("schema_id", &self.schema_id)
+            .field("schema_version", &self.schema_version)
+            .field("schema_fingerprint", &self.schema_fingerprint)
+            .field("provider_hint_policy", &self.provider_hint_policy)
+            .field("include_schema_ref", &self.include_schema_ref)
+            .field("redacted_schema_present", &self.redacted_schema.is_some())
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 /// Carries provider message data across a host-port boundary.
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct ProviderMessage {
@@ -227,6 +290,19 @@ pub struct ProviderMessage {
     /// Optional projected metadata value.
     /// When absent, callers should use the documented default or skip that optional behavior.
     pub projected_metadata: Option<ProviderProjectedMetadata>,
+}
+
+impl fmt::Debug for ProviderMessage {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderMessage")
+            .field("role", &self.role)
+            .field("content", &"<redacted>")
+            .field("content_chars", &self.content.chars().count())
+            .field("privacy", &self.privacy)
+            .field("projected_metadata", &self.projected_metadata)
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -269,7 +345,7 @@ pub struct ProviderProjectedMetadata {
     pub subject_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 /// Carries provider response data across a host-port boundary.
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct ProviderResponse {
@@ -279,6 +355,11 @@ pub struct ProviderResponse {
     pub output_text: String,
     /// Stop reason used by this record or request.
     pub stop_reason: ProviderStopReason,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Provider-requested tool calls. These are model-visible tool call
+    /// requests only; execution still must pass through the SDK tool router,
+    /// policy, journal intent/result, and effect contracts.
+    pub tool_calls: Vec<ProviderToolCall>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Optional usage value.
     /// When absent, callers should use the documented default or skip that optional behavior.
@@ -298,6 +379,21 @@ impl ProviderResponse {
             schema_version: Self::SCHEMA_VERSION,
             output_text: output_text.into(),
             stop_reason: ProviderStopReason::EndTurn,
+            tool_calls: Vec::new(),
+            usage: None,
+        }
+    }
+
+    /// Builds a provider response that requests tool execution through
+    /// canonical SDK tool-call material. This does not execute any tool;
+    /// runtime code must lower these requests through `ToolRouter`,
+    /// policy, journal, and effect contracts before calling an executor.
+    pub fn tool_use(tool_calls: impl IntoIterator<Item = ProviderToolCall>) -> Self {
+        Self {
+            schema_version: Self::SCHEMA_VERSION,
+            output_text: String::new(),
+            stop_reason: ProviderStopReason::ToolUse,
+            tool_calls: tool_calls.into_iter().collect(),
             usage: None,
         }
     }
@@ -311,6 +407,20 @@ impl ProviderResponse {
     }
 }
 
+impl fmt::Debug for ProviderResponse {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderResponse")
+            .field("schema_version", &self.schema_version)
+            .field("output_text", &"<redacted>")
+            .field("output_text_chars", &self.output_text.chars().count())
+            .field("stop_reason", &self.stop_reason)
+            .field("tool_calls", &self.tool_calls)
+            .field("usage", &self.usage)
+            .finish()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// Enumerates the finite provider stop reason cases.
@@ -320,6 +430,11 @@ pub enum ProviderStopReason {
     EndTurn,
     /// Use this variant when the contract needs to represent max tokens; selecting it has no side effect by itself.
     MaxTokens,
+    /// Use this variant when the contract needs to represent a provider
+    /// request for tool execution. Selecting it does not execute a tool;
+    /// runtime code must route tool calls through SDK policy, journal, and
+    /// effect contracts.
+    ToolUse,
     /// Use this variant when the contract needs to represent cancelled; selecting it has no side effect by itself.
     Cancelled,
     /// Use this variant when the contract needs to represent provider error; selecting it has no side effect by itself.
@@ -328,7 +443,7 @@ pub enum ProviderStopReason {
     Unknown,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 /// Carries provider stream chunk data across a host-port boundary.
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct ProviderStreamChunk {
@@ -387,9 +502,60 @@ impl ProviderStreamChunk {
             usage,
         }
     }
+
+    /// Builds a tool-call delta. This is provider output data only and
+    /// does not route, approve, journal, or execute tools.
+    pub fn tool_calls(
+        chunk_index: u32,
+        tool_calls: impl IntoIterator<Item = ProviderToolCall>,
+    ) -> Self {
+        Self {
+            schema_version: Self::SCHEMA_VERSION,
+            chunk_index,
+            delta: ProviderStreamDelta::ToolCalls {
+                tool_calls: tool_calls.into_iter().collect(),
+                stop_reason: None,
+            },
+            is_terminal: false,
+            usage: None,
+        }
+    }
+
+    /// Builds a terminal tool-call delta. This is provider output data
+    /// only and does not route, approve, journal, or execute tools.
+    pub fn final_tool_calls(
+        chunk_index: u32,
+        tool_calls: impl IntoIterator<Item = ProviderToolCall>,
+        stop_reason: ProviderStopReason,
+        usage: Option<ProviderUsage>,
+    ) -> Self {
+        Self {
+            schema_version: Self::SCHEMA_VERSION,
+            chunk_index,
+            delta: ProviderStreamDelta::ToolCalls {
+                tool_calls: tool_calls.into_iter().collect(),
+                stop_reason: Some(stop_reason),
+            },
+            is_terminal: true,
+            usage,
+        }
+    }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+impl fmt::Debug for ProviderStreamChunk {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderStreamChunk")
+            .field("schema_version", &self.schema_version)
+            .field("chunk_index", &self.chunk_index)
+            .field("delta", &self.delta)
+            .field("is_terminal", &self.is_terminal)
+            .field("usage", &self.usage)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 /// Enumerates the finite provider stream delta cases.
 /// Serialized names are part of the SDK contract; update fixtures when variants change.
@@ -409,6 +575,19 @@ pub enum ProviderStreamDelta {
         /// Usage used by this record or request.
         usage: ProviderUsage,
     },
+    /// Provider requested one or more tool calls. This is a request
+    /// envelope only; runtime code must lower it into `ToolCallRequest`
+    /// values and route through package policy, journal, events, and
+    /// effect records before executing anything.
+    ToolCalls {
+        /// Tool calls requested by the provider output.
+        tool_calls: Vec<ProviderToolCall>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        /// Optional stop reason value.
+        /// When absent, callers should use the documented default or skip that optional
+        /// behavior.
+        stop_reason: Option<ProviderStopReason>,
+    },
     /// Provider stream or transport error. The payload must stay
     /// redacted so live event observers do not require raw content.
     Error {
@@ -416,6 +595,95 @@ pub enum ProviderStreamDelta {
         /// logs.
         redacted_summary: String,
     },
+}
+
+impl fmt::Debug for ProviderStreamDelta {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Text { text, stop_reason } => formatter
+                .debug_struct("Text")
+                .field("text", &"<redacted>")
+                .field("text_chars", &text.chars().count())
+                .field("stop_reason", stop_reason)
+                .finish(),
+            Self::Usage { usage } => formatter
+                .debug_struct("Usage")
+                .field("usage", usage)
+                .finish(),
+            Self::ToolCalls {
+                tool_calls,
+                stop_reason,
+            } => formatter
+                .debug_struct("ToolCalls")
+                .field("tool_calls", tool_calls)
+                .field("stop_reason", stop_reason)
+                .finish(),
+            Self::Error { redacted_summary } => formatter
+                .debug_struct("Error")
+                .field("redacted_summary", redacted_summary)
+                .finish(),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
+/// Canonical provider-side request for a tool call. Constructing this
+/// value does not execute a tool, resolve arguments, append journals, or
+/// publish events. Runtime code must lower it into the SDK tool router,
+/// policy, journal intent/result, event, and effect contracts.
+pub struct ProviderToolCall {
+    /// Stable tool call id used for typed lineage, lookup, or dedupe.
+    pub tool_call_id: ToolCallId,
+    /// Canonical tool name requested by the provider output.
+    pub canonical_tool_name: CanonicalToolName,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Typed requested args refs references. Resolving them is separate from
+    /// constructing this record.
+    pub requested_args_refs: Vec<ContentRef>,
+    /// Redacted summary for display, logs, events, or telemetry.
+    /// It should describe the value without exposing raw private content.
+    pub redacted_args_summary: String,
+}
+
+impl ProviderToolCall {
+    /// Creates a provider tool-call DTO. This is data construction only;
+    /// the runtime must perform routing, approval, journaling, and
+    /// execution separately.
+    pub fn new(
+        tool_call_id: ToolCallId,
+        canonical_tool_name: CanonicalToolName,
+        redacted_args_summary: impl Into<String>,
+    ) -> Self {
+        Self {
+            tool_call_id,
+            canonical_tool_name,
+            requested_args_refs: Vec::new(),
+            redacted_args_summary: redacted_args_summary.into(),
+        }
+    }
+
+    /// Returns this value with one requested argument content ref added.
+    /// The ref is metadata only; resolving it is a separate policy-gated
+    /// content operation.
+    pub fn with_args_ref(mut self, args_ref: ContentRef) -> Self {
+        self.requested_args_refs.push(args_ref);
+        self
+    }
+}
+
+impl fmt::Debug for ProviderToolCall {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderToolCall")
+            .field("tool_call_id", &self.tool_call_id)
+            .field("canonical_tool_name", &self.canonical_tool_name)
+            .field("requested_args_refs", &self.requested_args_refs)
+            .field(
+                "redacted_args_summary_chars",
+                &self.redacted_args_summary.chars().count(),
+            )
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
