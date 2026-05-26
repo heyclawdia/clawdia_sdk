@@ -15,7 +15,7 @@ use crate::{
     content_ports::ContentResolver,
     domain::{
         AgentError, AgentErrorKind, AgentId, RetryClassification, RunId, RuntimePackageId,
-        SourceRef,
+        SessionId, SourceRef, TurnId,
     },
     error::CausalIds,
     event::{CompiledEventFilter, EventCursor, EventKind},
@@ -77,6 +77,8 @@ impl AgentRuntime {
         let cancellation = CancellationHandle::new();
         let entry = RegisteredRun {
             run_id: request.run_id.clone(),
+            session_id: request.session_id.clone(),
+            turn_id: request.turn_id.clone(),
             agent_id: request.agent_id.clone(),
             source: request.source.clone(),
             status: RunRegistryStatus::Registered,
@@ -723,6 +725,10 @@ pub struct EffectiveRuntimePackage {
 pub struct RunSnapshot {
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
+    /// Optional host-provided turn identifier for this run.
+    pub turn_id: Option<TurnId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     /// Source label or ref for this item; it is metadata and does not fetch
@@ -796,6 +802,8 @@ impl std::fmt::Debug for CancellationHandle {
 #[derive(Clone, Debug)]
 struct RegisteredRun {
     run_id: RunId,
+    session_id: Option<SessionId>,
+    turn_id: Option<TurnId>,
     agent_id: AgentId,
     source: SourceRef,
     status: RunRegistryStatus,
@@ -810,6 +818,8 @@ impl RegisteredRun {
     fn snapshot(&self) -> RunSnapshot {
         RunSnapshot {
             run_id: self.run_id.clone(),
+            session_id: self.session_id.clone(),
+            turn_id: self.turn_id.clone(),
             agent_id: self.agent_id.clone(),
             source: self.source.clone(),
             status: self.status.clone(),

@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
-        AgentId, EffectId, EntityKind, EntityRef, PolicyRef, PrivacyClass, RunId, SourceKind,
-        SourceRef,
+        AgentId, AttemptId, EffectId, EntityKind, EntityRef, PolicyRef, PrivacyClass, RunId,
+        SessionId, SourceKind, SourceRef, TurnId,
     },
     effect::{EffectIntent, EffectKind, EffectResult},
     journal::{
@@ -169,6 +169,9 @@ impl HookRecord {
         record_id: impl Into<String>,
         run_id: RunId,
         agent_id: AgentId,
+        session_id: Option<SessionId>,
+        turn_id: Option<TurnId>,
+        attempt_id: Option<AttemptId>,
         source: SourceRef,
         spec: &HookSpec,
         invocation_id: impl Into<String>,
@@ -185,6 +188,9 @@ impl HookRecord {
             agent_id,
             source,
         );
+        base.session_id = session_id;
+        base.turn_id = turn_id;
+        base.attempt_id = attempt_id;
         base.runtime_package_fingerprint = runtime_package_fingerprint.into();
         base.privacy = PrivacyClass::ContentRefsOnly;
         base.redaction_policy_id = "policy.redaction.hook.default".to_string();
@@ -313,6 +319,9 @@ impl HookMutationJournalPlan {
         record_id: impl Into<String>,
         run_id: RunId,
         agent_id: AgentId,
+        session_id: Option<SessionId>,
+        turn_id: Option<TurnId>,
+        attempt_id: Option<AttemptId>,
         source: SourceRef,
         spec: &HookSpec,
         invocation_id: impl Into<String>,
@@ -350,6 +359,9 @@ impl HookMutationJournalPlan {
             agent_id.clone(),
             source.clone(),
         );
+        hook_base.session_id = session_id.clone();
+        hook_base.turn_id = turn_id.clone();
+        hook_base.attempt_id = attempt_id.clone();
         hook_base.runtime_package_fingerprint = runtime_package_fingerprint.clone();
         hook_base.privacy = PrivacyClass::ContentRefsOnly;
         hook_base.redaction_policy_id = "policy.redaction.hook.default".to_string();
@@ -360,6 +372,9 @@ impl HookMutationJournalPlan {
             agent_id.clone(),
             source.clone(),
         );
+        intent_base.session_id = session_id.clone();
+        intent_base.turn_id = turn_id.clone();
+        intent_base.attempt_id = attempt_id.clone();
         intent_base.runtime_package_fingerprint = runtime_package_fingerprint.clone();
         intent_base.privacy = PrivacyClass::ContentRefsOnly;
         intent_base.redaction_policy_id = "policy.redaction.hook.default".to_string();
@@ -370,6 +385,9 @@ impl HookMutationJournalPlan {
             agent_id,
             source,
         );
+        result_base.session_id = session_id;
+        result_base.turn_id = turn_id;
+        result_base.attempt_id = attempt_id;
         result_base.runtime_package_fingerprint = runtime_package_fingerprint;
         result_base.privacy = PrivacyClass::ContentRefsOnly;
         result_base.redaction_policy_id = "policy.redaction.hook.default".to_string();
@@ -418,6 +436,7 @@ fn hook_journal_record(
         record_id: base.record_id,
         record_kind: JournalRecordKind::Hook,
         run_id: base.run_id.clone(),
+        session_id: base.session_id.clone(),
         agent_id: base.agent_id.clone(),
         turn_id: base.turn_id.clone(),
         attempt_id: base.attempt_id.clone(),
@@ -431,6 +450,7 @@ fn hook_journal_record(
         delivery_semantics: "journal_backed".to_string(),
         event_index: EventIndexProjection {
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             event_family: "hook".to_string(),

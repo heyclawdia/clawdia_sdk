@@ -611,6 +611,7 @@ fn journal_payload_kinds(records: &[JournalRecord]) -> Vec<&'static str> {
 fn payload_kind(payload: &JournalRecordPayload) -> &'static str {
     match payload {
         JournalRecordPayload::RunLifecycle(_) => "run_lifecycle",
+        JournalRecordPayload::TurnLifecycle(_) => "turn_lifecycle",
         JournalRecordPayload::ContextProjection(_) => "context_projection",
         JournalRecordPayload::ModelAttempt(_) => "model_attempt",
         JournalRecordPayload::Message(_) => "message",

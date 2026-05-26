@@ -930,6 +930,7 @@ fn event_envelope(seq: u64, family: EventFamily, kind: EventKind) -> EventEnvelo
         timestamp: "2026-05-24T00:00:00Z".to_string(),
         recorded_at: "2026-05-24T00:00:00Z".to_string(),
         run_id: run_id.clone(),
+        session_id: None,
         agent_id: AgentId::new("agent.privacy"),
         turn_id: None,
         attempt_id: None,

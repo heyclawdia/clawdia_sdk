@@ -679,6 +679,7 @@ fn approval_request_for_action(
             request.request_id.as_str()
         )),
         run_id: context.run_id.clone(),
+        session_id: None,
         agent_id: context.agent_id.clone(),
         turn_id: context
             .turn_id

@@ -245,6 +245,7 @@ fn source_scoped_request() -> ApprovalRequest {
         approval_request_id: agent_sdk_core::domain::ApprovalRequestId::new("approval.request.1"),
         approval_dispatch_effect_id: agent_sdk_core::EffectId::new("effect.approval.1"),
         run_id: RunId::new("run.approval.1"),
+        session_id: None,
         agent_id: AgentId::new("agent.approval.1"),
         turn_id: TurnId::new("turn.approval.1"),
         tool_call_id: ToolCallId::new("tool.call.approval.1"),

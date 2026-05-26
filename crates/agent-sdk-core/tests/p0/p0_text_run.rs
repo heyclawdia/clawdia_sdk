@@ -7,8 +7,9 @@ use agent_sdk_core::{
     PolicyRef, PolicyStage, PrivacyClass, ProviderAdapter, ProviderCapabilities,
     ProviderProjectionPolicy, ProviderRequest, ProviderResponse, ProviderRouteSnapshot,
     ProviderStopReason, ProviderUsage, RetentionClass, RunId, RunRequest, RunStatus,
-    RuntimePackage, RuntimePackageId, RuntimePolicyPort, SourceKind, SourceRef,
-    event::EventKind,
+    RuntimePackage, RuntimePackageId, RuntimePolicyPort, SessionId, SessionTimeline, SourceKind,
+    SourceRef, TurnId, TurnTrace,
+    event::{EventFilterSet, EventIndexField, EventKind},
     hook_ports::InMemoryHookExecutorRegistry,
     package_hooks::{
         ContextInjectionRequest, HookFailurePolicy, HookMutationRight, HookMutationRights,
@@ -86,7 +87,7 @@ fn p0_fake_provider_text_run_emits_journal_events_and_result() {
     );
     assert_eq!(
         frames.last().unwrap().event.envelope.event_kind,
-        EventKind::RunCompleted
+        EventKind::TurnCompleted
     );
     assert!(
         frames
@@ -129,6 +130,136 @@ fn agent_and_runtime_text_paths_use_the_same_run_request_shape() {
 }
 
 #[test]
+fn session_turn_trace_groups_only_records_for_one_user_turn() {
+    let agent = p0_agent();
+    let provider = CapturingProvider::with_responses(["first output", "second output"]);
+    let journal = FakeJournalStore::default();
+    let event_bus = InMemoryAgentEventBus::default();
+    let hook = HookSpec::blocking(
+        "inject.trace_context",
+        HookPoint::BeforeContextAssembly,
+        HookSource::InProcess,
+        "executor.trace_context",
+        hook_policy("policy.hooks.trace"),
+        HookMutationRights::from_rights([HookMutationRight::InjectContext]),
+    );
+    let registry = registry_with(ScriptedHookExecutor::new(
+        "executor.trace_context",
+        [
+            Ok(HookExecutionOutcome::new(
+                HookResponse::InjectContext(vec![ContextInjectionRequest {
+                    redacted_summary: "turn one context".to_string(),
+                    policy_refs: vec![hook_policy("policy.hooks.trace.context")],
+                }]),
+                1,
+            )),
+            Ok(HookExecutionOutcome::new(HookResponse::ObserveOnly, 1)),
+        ],
+    ));
+    let runtime = p0_runtime_with_package(
+        p0_package_with_hook(&agent, hook),
+        provider.clone(),
+        journal.clone(),
+        event_bus.clone(),
+        registry,
+    );
+    let session_id = SessionId::new("session.p0.trace");
+    let turn_one = TurnId::new("turn.p0.trace.one");
+    let turn_two = TurnId::new("turn.p0.trace.two");
+
+    runtime
+        .run_text(
+            RunRequest::text(
+                RunId::new("run.p0.trace.one"),
+                agent.id().clone(),
+                SourceRef::with_kind(SourceKind::Host, "source.p0.trace"),
+                "first question",
+            )
+            .with_session_turn(session_id.clone(), turn_one.clone()),
+        )
+        .expect("first traced turn succeeds");
+    runtime
+        .run_text(
+            RunRequest::text(
+                RunId::new("run.p0.trace.two"),
+                agent.id().clone(),
+                SourceRef::with_kind(SourceKind::Host, "source.p0.trace"),
+                "second question",
+            )
+            .with_session_turn(session_id.clone(), turn_two.clone()),
+        )
+        .expect("second traced turn succeeds");
+
+    assert_eq!(provider.projections()[0].items.len(), 2);
+    assert_eq!(provider.projections()[1].items.len(), 1);
+
+    let records = journal.records();
+    let turn_one_trace = TurnTrace::from_records(&turn_one, records.iter());
+    let turn_two_trace = TurnTrace::from_records(&turn_two, records.iter());
+    assert_eq!(turn_one_trace.session_id, Some(session_id.clone()));
+    assert_eq!(turn_one_trace.turn_id, Some(turn_one.clone()));
+    assert_eq!(turn_one_trace.run_ids, vec![RunId::new("run.p0.trace.one")]);
+    assert!(turn_one_trace.records.iter().all(|record| {
+        record.session_id.as_ref() == Some(&session_id)
+            && record.turn_id.as_ref() == Some(&turn_one)
+            && record.run_id == RunId::new("run.p0.trace.one")
+    }));
+    assert!(turn_two_trace.records.iter().all(|record| {
+        record.session_id.as_ref() == Some(&session_id)
+            && record.turn_id.as_ref() == Some(&turn_two)
+            && record.run_id == RunId::new("run.p0.trace.two")
+    }));
+    assert!(
+        turn_one_trace
+            .records
+            .iter()
+            .any(|record| payload_type(&record.payload) == "hook")
+    );
+    assert_eq!(
+        turn_one_trace
+            .records
+            .iter()
+            .filter(|record| payload_type(&record.payload) == "turn_lifecycle")
+            .count(),
+        2
+    );
+    assert_eq!(turn_one_trace.context_projection_ids.len(), 1);
+    assert_eq!(turn_one_trace.message_ids.len(), 2);
+    assert!(!turn_one_trace.effect_ids.is_empty());
+
+    let timeline = SessionTimeline::from_records(&session_id, records.iter());
+    assert_eq!(
+        timeline
+            .turns
+            .iter()
+            .map(|trace| trace.turn_id.clone())
+            .collect::<Vec<_>>(),
+        vec![Some(turn_one.clone()), Some(turn_two.clone())]
+    );
+
+    let session_filter = agent_sdk_core::EventFilter {
+        session_ids: EventFilterSet::Include(vec![session_id.clone()]),
+        ..agent_sdk_core::EventFilter::default()
+    }
+    .compile()
+    .expect("session filter compiles");
+    assert!(
+        session_filter
+            .indexed_fields
+            .contains(&EventIndexField::SessionId)
+    );
+    let frames = event_bus
+        .subscribe_all(None)
+        .expect("event stream")
+        .collect::<Vec<_>>();
+    assert!(
+        frames
+            .iter()
+            .all(|frame| { frame.event.envelope.session_id.as_ref() == Some(&session_id) })
+    );
+}
+
+#[test]
 fn p0_event_bus_assigns_monotonic_sequences_across_runs() {
     let agent = p0_agent();
     let provider = FakeProvider::with_responses(["first output", "second output"]);
@@ -166,15 +297,15 @@ fn p0_event_bus_assigns_monotonic_sequences_across_runs() {
             .iter()
             .map(|frame| frame.event.envelope.event_seq)
             .collect::<Vec<_>>(),
-        (1..=12).collect::<Vec<_>>()
+        (1..=16).collect::<Vec<_>>()
     );
 
-    let first_terminal_cursor = all_frames[5].cursor.clone();
+    let first_terminal_cursor = all_frames[7].cursor.clone();
     let resumed_all = event_bus
         .subscribe_all(Some(first_terminal_cursor.clone()))
         .expect("resume all")
         .collect::<Vec<_>>();
-    assert_eq!(resumed_all.len(), 6);
+    assert_eq!(resumed_all.len(), 8);
     assert!(
         resumed_all
             .iter()
@@ -185,12 +316,12 @@ fn p0_event_bus_assigns_monotonic_sequences_across_runs() {
         .subscribe_agent(agent.id().clone(), None)
         .expect("agent stream")
         .collect::<Vec<_>>();
-    let first_agent_terminal_cursor = agent_frames[5].cursor.clone();
+    let first_agent_terminal_cursor = agent_frames[7].cursor.clone();
     let resumed_agent = event_bus
         .subscribe_agent(agent.id().clone(), Some(first_agent_terminal_cursor))
         .expect("resume agent")
         .collect::<Vec<_>>();
-    assert_eq!(resumed_agent.len(), 6);
+    assert_eq!(resumed_agent.len(), 8);
     assert_eq!(
         resumed_agent[0].event.envelope.event_seq,
         resumed_all[0].event.envelope.event_seq
@@ -1019,6 +1150,7 @@ fn journal_summary(records: &[agent_sdk_core::JournalRecord]) -> Value {
 fn payload_type(payload: &agent_sdk_core::JournalRecordPayload) -> &'static str {
     match payload {
         agent_sdk_core::JournalRecordPayload::RunLifecycle(_) => "run_lifecycle",
+        agent_sdk_core::JournalRecordPayload::TurnLifecycle(_) => "turn_lifecycle",
         agent_sdk_core::JournalRecordPayload::ContextProjection(_) => "context_projection",
         agent_sdk_core::JournalRecordPayload::ModelAttempt(_) => "model_attempt",
         agent_sdk_core::JournalRecordPayload::Message(_) => "message",

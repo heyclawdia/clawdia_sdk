@@ -11,7 +11,7 @@ use crate::{
     domain::{
         AgentError, AgentId, AgentPoolId, AttemptId, ContentRef, ContextProjectionId,
         CorrelationEntry, DedupeKey, DestinationRef, EntityRef, IdempotencyKey, MessageId,
-        PolicyRef, PrivacyClass, RunId, SourceRef, TopicId, TurnId, WakeConditionId,
+        PolicyRef, PrivacyClass, RunId, SessionId, SourceRef, TopicId, TurnId, WakeConditionId,
     },
     effect::{EffectIntent, EffectResult},
     event::{EventCorrelation, EventFilterFingerprint},
@@ -95,6 +95,9 @@ pub enum JournalRecordKind {
 pub struct EventIndexProjection {
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -152,6 +155,9 @@ pub struct JournalRecord {
     pub record_kind: JournalRecordKind,
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -242,6 +248,7 @@ impl JournalRecord {
             record_id: base.record_id,
             record_kind: JournalRecordKind::EffectIntent,
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             attempt_id: base.attempt_id,
@@ -281,6 +288,7 @@ impl JournalRecord {
             record_id: base.record_id,
             record_kind: JournalRecordKind::EffectResult,
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             attempt_id: base.attempt_id,
@@ -316,6 +324,7 @@ impl JournalRecord {
             record_id: base.record_id,
             record_kind: JournalRecordKind::Checkpoint,
             run_id: base.run_id.clone(),
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             attempt_id: base.attempt_id,
@@ -351,6 +360,7 @@ impl JournalRecord {
             record_id: base.record_id,
             record_kind: JournalRecordKind::Recovery,
             run_id: base.run_id.clone(),
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             attempt_id: base.attempt_id,
@@ -401,6 +411,7 @@ impl JournalRecord {
             record_id: base.record_id,
             record_kind,
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             attempt_id: base.attempt_id,
@@ -436,6 +447,9 @@ pub struct JournalRecordBase {
     pub record_id: String,
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -493,6 +507,7 @@ impl JournalRecordBase {
             journal_seq,
             record_id: record_id.into(),
             run_id,
+            session_id: None,
             agent_id,
             turn_id: None,
             attempt_id: None,
@@ -515,6 +530,7 @@ impl JournalRecordBase {
     ) -> EventIndexProjection {
         EventIndexProjection {
             run_id: self.run_id.clone(),
+            session_id: self.session_id.clone(),
             agent_id: self.agent_id.clone(),
             turn_id: self.turn_id.clone(),
             event_family: event_family.into(),
@@ -542,6 +558,8 @@ impl JournalRecordBase {
 pub enum JournalRecordPayload {
     /// Use this variant when the contract needs to represent run lifecycle; selecting it has no side effect by itself.
     RunLifecycle(RunLifecycleRecord),
+    /// Use this variant when the contract needs to represent turn lifecycle; selecting it has no side effect by itself.
+    TurnLifecycle(TurnLifecycleRecord),
     /// Use this variant when the contract needs to represent context projection; selecting it has no side effect by itself.
     ContextProjection(ContextProjectionRecord),
     /// Use this variant when the contract needs to represent model attempt; selecting it has no side effect by itself.
@@ -621,6 +639,57 @@ pub struct RunLifecycleRecord {
     pub status: String,
     /// Redacted explanation for a denial, failure, status, or package delta.
     pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Carries the turn lifecycle record payload for journal, event, or fixture surfaces.
+/// Creating or cloning it only preserves serialized SDK state; append, publish, replay, or export effects are documented on the runtime and port methods that store it.
+pub struct TurnLifecycleRecord {
+    /// Turn identifier for one loop turn within a run.
+    pub turn_id: TurnId,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Run identifiers causally associated with this turn.
+    pub run_ids: Vec<RunId>,
+    /// Lifecycle status used by this record or request.
+    pub status: TurnLifecycleStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Message identifier for transcript, projection, or provider-response
+    /// lineage.
+    pub input_message_id: Option<MessageId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Message identifier for transcript, projection, or provider-response
+    /// lineage.
+    pub output_message_id: Option<MessageId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Stable projection id used for typed lineage, lookup, or dedupe.
+    pub context_projection_id: Option<ContextProjectionId>,
+    /// Redacted human-readable summary safe for events, telemetry, and logs.
+    pub redacted_summary: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+/// Enumerates the finite turn lifecycle status cases.
+/// Serialized names are part of the SDK contract; update fixtures when variants change.
+pub enum TurnLifecycleStatus {
+    /// Use this variant when the contract needs to represent started; selecting it has no side effect by itself.
+    Started,
+    /// Use this variant when the contract needs to represent completed; selecting it has no side effect by itself.
+    Completed,
+    /// Use this variant when the contract needs to represent failed; selecting it has no side effect by itself.
+    Failed,
+}
+
+impl TurnLifecycleStatus {
+    /// Returns the stable wire label for this lifecycle status.
+    /// This is a pure helper for journal and event lowering.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Started => "started",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

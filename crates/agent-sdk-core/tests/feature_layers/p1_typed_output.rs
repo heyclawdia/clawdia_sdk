@@ -648,6 +648,7 @@ fn journal_summary(records: &[agent_sdk_core::JournalRecord]) -> Value {
 fn payload_type(payload: &JournalRecordPayload) -> &'static str {
     match payload {
         JournalRecordPayload::RunLifecycle(_) => "run_lifecycle",
+        JournalRecordPayload::TurnLifecycle(_) => "turn_lifecycle",
         JournalRecordPayload::ContextProjection(_) => "context_projection",
         JournalRecordPayload::ModelAttempt(_) => "model_attempt",
         JournalRecordPayload::Message(_) => "message",

@@ -9,8 +9,8 @@ use sha2::{Digest, Sha256};
 use crate::{
     domain::{
         AgentId, AttemptId, ContentRef, DedupeKey, DestinationRef, EffectId, EntityKind, EntityRef,
-        IdempotencyKey, MessageId, PolicyRef, PrivacyClass, RetentionClass, RunId, SourceRef,
-        TurnId, ValidatedOutputId,
+        IdempotencyKey, MessageId, PolicyRef, PrivacyClass, RetentionClass, RunId, SessionId,
+        SourceRef, TurnId, ValidatedOutputId,
     },
     effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus},
     error::RetryClassification,
@@ -319,6 +319,9 @@ pub struct OutputDeliveryRequest {
     pub effect_id: EffectId,
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -980,6 +983,9 @@ pub struct OutputDeliveryJournalBase {
     pub record_id: String,
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1079,6 +1085,7 @@ fn output_delivery_effect_record(
         record_id: base.record_id,
         record_kind,
         run_id: base.run_id.clone(),
+        session_id: base.session_id.clone(),
         agent_id: base.agent_id.clone(),
         turn_id: base.turn_id.clone(),
         attempt_id: base.attempt_id.clone(),
@@ -1092,6 +1099,7 @@ fn output_delivery_effect_record(
         delivery_semantics: "journal_backed".to_string(),
         event_index: EventIndexProjection {
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             event_family: "output_delivery".to_string(),

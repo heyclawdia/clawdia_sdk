@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         AgentError, AgentId, ApprovalRequestId, ContentRef, DestinationRef, EffectId, EntityKind,
-        EntityRef, PolicyRef, RunId, SourceRef, ToolCallId, TurnId,
+        EntityRef, PolicyRef, RunId, SessionId, SourceRef, ToolCallId, TurnId,
     },
     effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus},
     journal::{
@@ -30,6 +30,9 @@ pub struct ApprovalRequest {
     pub approval_dispatch_effect_id: EffectId,
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     /// Turn identifier for one loop turn within a run.
@@ -415,6 +418,7 @@ fn approval_journal_record(
         record_id: base.record_id,
         record_kind: JournalRecordKind::Approval,
         run_id: base.run_id.clone(),
+        session_id: base.session_id.clone(),
         agent_id: base.agent_id.clone(),
         turn_id: base.turn_id.clone(),
         attempt_id: base.attempt_id.clone(),
@@ -428,6 +432,7 @@ fn approval_journal_record(
         delivery_semantics: "journal_backed".to_string(),
         event_index: EventIndexProjection {
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             event_family: "approval".to_string(),

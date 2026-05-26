@@ -51,6 +51,7 @@ fn envelope(seq: u64, family: EventFamily, kind: EventKind) -> EventEnvelope {
         timestamp: "2026-05-24T12:00:00Z".to_string(),
         recorded_at: "2026-05-24T12:00:00Z".to_string(),
         run_id: run_id.clone(),
+        session_id: None,
         agent_id: AgentId::new("agent.event.contract"),
         turn_id: Some(TurnId::new("turn.event.contract")),
         attempt_id: None,

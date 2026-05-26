@@ -18,6 +18,7 @@ pub struct EventEnvelope<T> {
     pub timestamp: Timestamp,
     pub recorded_at: Timestamp,
     pub run_id: RunId,
+    pub session_id: Option<SessionId>,
     pub agent_id: AgentId,
     pub turn_id: Option<TurnId>,
     pub attempt_id: Option<AttemptId>,
@@ -47,7 +48,7 @@ pub struct EventEnvelope<T> {
 }
 ```
 
-Envelope fields are enough to route, redact, correlate, replay, filter, and export the event without parsing the payload.
+Envelope fields are enough to route, redact, correlate, replay, filter, and export the event without parsing the payload. When a `RunRequest` carries a `SessionId`, every event causally produced for that run carries the same `session_id`; every question-scoped event also carries the effective `turn_id`.
 
 `subject_ref`, `related_refs`, and `causal_refs` are the generic entity-linking mechanism. The hot-path IDs above them are limited to run-loop primitives that nearly every event stream needs to route: run, agent, turn, attempt, message, and context item. Feature-specific IDs such as tool call, approval request, stream rule, hook, child artifact, execution environment, isolated process, subagent run, extension action, output delivery, or effect IDs belong in `EntityRef` values and event payloads. New feature layers should not add a new optional envelope ID by default. They should attach `EntityRef` values and promote a field to the envelope only when the integration and events/journal roles agree it is a stable universal hot-path index.
 
@@ -226,6 +227,7 @@ pub trait EventArchive {
 
 pub struct EventFilter {
     pub run_ids: EventFilterSet<RunId>,
+    pub session_ids: EventFilterSet<SessionId>,
     pub agent_ids: EventFilterSet<AgentId>,
     pub turn_ids: EventFilterSet<TurnId>,
     pub families: EventFilterSet<EventFamily>,
@@ -663,6 +665,7 @@ let event = EventEnvelope {
     event_kind: EventKind::ToolCompleted,
     payload_schema_version: 1,
     run_id,
+    session_id: Some(session_id),
     agent_id,
     turn_id: Some(turn_id),
     attempt_id: Some(attempt_id),

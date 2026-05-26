@@ -15,7 +15,7 @@ use crate::{
         sdk_context_policy_ref,
     },
     domain::{
-        AdapterRef, AgentError, AgentErrorKind, AgentId, ContentId, ContentRef as ContentRefId,
+        AdapterRef, AgentError, AgentErrorKind, ContentId, ContentRef as ContentRefId,
         ContextItemId, ContextProjectionId, DestinationKind, DestinationRef, EffectId, EntityKind,
         EntityRef, EventId, IdempotencyKey, LineageId, LineageRef, MessageId, PolicyKind,
         PolicyRef, PrivacyClass, RetentionClass, RetryClassification, RunId, SourceKind, SourceRef,
@@ -33,6 +33,7 @@ use crate::{
         ContextProjectionRecord, EventIndexProjection, JOURNAL_SCHEMA_VERSION, JournalRecord,
         JournalRecordBase, JournalRecordKind, JournalRecordPayload, MessageRecord,
         ModelAttemptRecord, RunLifecycleRecord, StructuredOutputRecord, TerminalResultMarker,
+        TurnLifecycleRecord, TurnLifecycleStatus,
     },
     output::OutputContract,
     package_hooks::{
@@ -83,15 +84,14 @@ pub fn run_p0_text(
     }
     let hooks = effective.package.hooks.clone();
     validate_p0_hook_support(&hooks, &request)?;
-    let ids = P0Ids::new(&request.run_id);
+    let ids = P0Ids::new(&request.run_id, request.turn_id.clone());
     let mut event_ids = EventIdSequence::default();
     let fingerprint = snapshot.runtime_package_fingerprint.as_str().to_string();
     let source = SourceRef::with_kind(SourceKind::Sdk, "source.sdk.p0_text_run");
 
     let run_started = journal_record(
-        &request.run_id,
-        &request.agent_id,
-        None,
+        &request,
+        Some(ids.turn_id.clone()),
         None,
         runtime.next_journal_seq(),
         ids.record("run.started"),
@@ -107,15 +107,46 @@ pub fn run_p0_text(
     );
     let run_started_cursor = journal.append(run_started)?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
-        None,
+        &request,
+        Some(ids.turn_id.clone()),
         None,
         event_ids.next(),
         EventFamily::Run,
         EventKind::RunStarted,
         "run started",
         Some(run_started_cursor),
+        fingerprint.clone(),
+        &ids,
+    ))?;
+
+    let turn_started = journal_record(
+        &request,
+        Some(ids.turn_id.clone()),
+        None,
+        runtime.next_journal_seq(),
+        ids.record("turn.started"),
+        JournalRecordKind::Turn,
+        "turn",
+        "started",
+        source.clone(),
+        fingerprint.clone(),
+        JournalRecordPayload::TurnLifecycle(turn_lifecycle_record(
+            &request,
+            &ids,
+            TurnLifecycleStatus::Started,
+            "turn started",
+        )),
+    );
+    let turn_started_cursor = journal.append(turn_started)?;
+    events.publish(event_frame(
+        &request,
+        Some(ids.turn_id.clone()),
+        None,
+        event_ids.next(),
+        EventFamily::Turn,
+        EventKind::TurnStarted,
+        "turn started",
+        Some(turn_started_cursor),
         fingerprint.clone(),
         &ids,
     ))?;
@@ -146,9 +177,8 @@ pub fn run_p0_text(
     let context_injections = context_injections_from_outcomes(before_context_outcomes);
     let projection = build_text_projection(&request, &ids, &fingerprint, &context_injections)?;
     let context_record = journal_record(
-        &request.run_id,
-        &request.agent_id,
-        None,
+        &request,
+        Some(ids.turn_id.clone()),
         None,
         runtime.next_journal_seq(),
         ids.record("context.projected"),
@@ -165,8 +195,7 @@ pub fn run_p0_text(
     );
     let context_cursor = journal.append(context_record)?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        &request,
         Some(ids.turn_id.clone()),
         None,
         event_ids.next(),
@@ -199,8 +228,7 @@ pub fn run_p0_text(
         provider_request = provider_request.with_structured_output_hint(output_contract);
     }
     let provider_effect_intent = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        &request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -234,8 +262,7 @@ pub fn run_p0_text(
     );
     let provider_effect_cursor = journal.append(provider_effect_intent)?;
     let model_intent = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        &request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -255,8 +282,7 @@ pub fn run_p0_text(
     );
     let model_intent_cursor = journal.append(model_intent)?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        &request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         event_ids.next(),
@@ -268,8 +294,7 @@ pub fn run_p0_text(
         &ids,
     ))?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        &request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         event_ids.next(),
@@ -636,6 +661,7 @@ where
         source.clone(),
         crate::package::RuntimePackageFingerprint(fingerprint.to_string()),
     );
+    context.session_id = request.session_id.clone();
     context.turn_id = Some(ids.turn_id.clone());
     context.attempt_id = attempt_id;
     let mut coordinator = HookLifecycleCoordinator::new_with_sequence_allocator(
@@ -866,8 +892,7 @@ fn append_model_attempt_completion(
     };
 
     let provider_result = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -890,8 +915,7 @@ fn append_model_attempt_completion(
     journal.append(provider_result)?;
 
     let model_complete = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -911,8 +935,7 @@ fn append_model_attempt_completion(
     );
     let model_complete_cursor = journal.append(model_complete)?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id),
         event_ids.next(),
@@ -947,8 +970,7 @@ fn append_message_and_terminal(
     let events = runtime.event_bus_port(&request.run_id)?;
 
     let message_record = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -971,8 +993,7 @@ fn append_message_and_terminal(
     journal.append(message_record)?;
 
     let terminal_record = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -996,8 +1017,7 @@ fn append_message_and_terminal(
         .seal_terminal_result_from_journal(&terminal_record, output.clone())?
         .with_structured_output_if_present(structured_output);
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(ids.attempt_id.clone()),
         event_ids.next(),
@@ -1005,6 +1025,39 @@ fn append_message_and_terminal(
         terminal_event_kind(&terminal_status),
         "run terminal",
         Some(terminal_cursor),
+        fingerprint.to_string(),
+        ids,
+    ))?;
+
+    let turn_status = turn_lifecycle_status(&terminal_status);
+    let turn_terminal = journal_record(
+        request,
+        Some(ids.turn_id.clone()),
+        Some(ids.attempt_id.clone()),
+        runtime.next_journal_seq(),
+        ids.record("turn.terminal"),
+        JournalRecordKind::Turn,
+        "turn",
+        turn_status.as_str(),
+        source.clone(),
+        fingerprint.to_string(),
+        JournalRecordPayload::TurnLifecycle(turn_lifecycle_record(
+            request,
+            ids,
+            turn_status.clone(),
+            "turn terminal",
+        )),
+    );
+    let turn_terminal_cursor = journal.append(turn_terminal)?;
+    events.publish(event_frame(
+        request,
+        Some(ids.turn_id.clone()),
+        Some(ids.attempt_id.clone()),
+        event_ids.next(),
+        EventFamily::Turn,
+        turn_event_kind(&turn_status),
+        "turn terminal",
+        Some(turn_terminal_cursor),
         fingerprint.to_string(),
         ids,
     ))?;
@@ -1051,8 +1104,7 @@ fn append_structured_output_requested(
         StructuredOutputRecord::Lifecycle(requested),
     ))?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         event_ids.next(),
@@ -1124,8 +1176,7 @@ fn drive_p1_structured_output(
             StructuredOutputRecord::Lifecycle(started),
         ))?;
         events.publish(event_frame(
-            &request.run_id,
-            &request.agent_id,
+            request,
             Some(ids.turn_id.clone()),
             Some(attempt_id.clone()),
             event_ids.next(),
@@ -1265,8 +1316,7 @@ fn drive_p1_structured_output(
                     ValidatedOutputPublicationStep::TypedResultPublication(publication.clone()),
                 ])?;
                 events.publish(event_frame(
-                    &request.run_id,
-                    &request.agent_id,
+                    request,
                     Some(ids.turn_id.clone()),
                     Some(attempt_id.clone()),
                     event_ids.next(),
@@ -1301,8 +1351,7 @@ fn drive_p1_structured_output(
                     StructuredOutputRecord::Validation(report.record.clone()),
                 ))?;
                 events.publish(event_frame(
-                    &request.run_id,
-                    &request.agent_id,
+                    request,
                     Some(ids.turn_id.clone()),
                     Some(attempt_id.clone()),
                     event_ids.next(),
@@ -1330,8 +1379,7 @@ fn drive_p1_structured_output(
                             StructuredOutputRecord::Repair(record),
                         ))?;
                         events.publish(event_frame(
-                            &request.run_id,
-                            &request.agent_id,
+                            request,
                             Some(ids.turn_id.clone()),
                             Some(attempt_id.clone()),
                             event_ids.next(),
@@ -1410,8 +1458,7 @@ fn drive_p1_structured_output(
                                 StructuredOutputRecord::Validation(failure.record.clone()),
                             ))?;
                         events.publish(event_frame(
-                            &request.run_id,
-                            &request.agent_id,
+                            request,
                             Some(ids.turn_id.clone()),
                             Some(attempt_id),
                             event_ids.next(),
@@ -1454,8 +1501,7 @@ fn append_provider_repair_attempt_started(
         attempt_id.as_str()
     ));
     let provider_effect_intent = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -1493,8 +1539,7 @@ fn append_provider_repair_attempt_started(
     );
     let provider_effect_cursor = journal.append(provider_effect_intent)?;
     let model_intent = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -1514,8 +1559,7 @@ fn append_provider_repair_attempt_started(
     );
     let model_intent_cursor = journal.append(model_intent)?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         event_ids.next(),
@@ -1527,8 +1571,7 @@ fn append_provider_repair_attempt_started(
         ids,
     ))?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id),
         event_ids.next(),
@@ -1566,8 +1609,7 @@ fn append_provider_hook_retry_attempt_started(
         attempt_id.as_str()
     ));
     let provider_effect_intent = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -1605,8 +1647,7 @@ fn append_provider_hook_retry_attempt_started(
     );
     let provider_effect_cursor = journal.append(provider_effect_intent)?;
     let model_intent = journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -1626,8 +1667,7 @@ fn append_provider_hook_retry_attempt_started(
     );
     let model_intent_cursor = journal.append(model_intent)?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         event_ids.next(),
@@ -1639,8 +1679,7 @@ fn append_provider_hook_retry_attempt_started(
         ids,
     ))?;
     events.publish(event_frame(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id),
         event_ids.next(),
@@ -1685,8 +1724,7 @@ fn structured_output_journal_record(
     payload: StructuredOutputRecord,
 ) -> JournalRecord {
     journal_record(
-        &request.run_id,
-        &request.agent_id,
+        request,
         Some(ids.turn_id.clone()),
         Some(attempt_id.clone()),
         runtime.next_journal_seq(),
@@ -1861,8 +1899,7 @@ fn build_text_projection(
     reason = "private journal constructor intentionally spells out durable envelope fields; a builder migration should be fixture-reviewed"
 )]
 fn journal_record(
-    run_id: &RunId,
-    agent_id: &AgentId,
+    request: &RunRequest,
     turn_id: Option<TurnId>,
     attempt_id: Option<crate::ids::AttemptId>,
     journal_seq: u64,
@@ -1877,8 +1914,9 @@ fn journal_record(
     let base = JournalRecordBase {
         journal_seq,
         record_id,
-        run_id: run_id.clone(),
-        agent_id: agent_id.clone(),
+        run_id: request.run_id.clone(),
+        session_id: request.session_id.clone(),
+        agent_id: request.agent_id.clone(),
         turn_id,
         attempt_id,
         source: source.clone(),
@@ -1894,17 +1932,29 @@ fn journal_record(
         redaction_policy_id: "policy.redaction.default".to_string(),
         checkpoint_ref: None,
     };
+    let subject_ref = match (&record_kind, base.turn_id.as_ref()) {
+        (JournalRecordKind::Turn, Some(turn_id)) => {
+            EntityRef::new(EntityKind::Turn, turn_id.clone())
+        }
+        _ => EntityRef::run(base.run_id.clone()),
+    };
+    let related_refs = if record_kind == JournalRecordKind::Turn {
+        vec![EntityRef::run(base.run_id.clone())]
+    } else {
+        Vec::new()
+    };
     JournalRecord {
         journal_schema_version: JOURNAL_SCHEMA_VERSION,
         journal_seq: base.journal_seq,
         record_id: base.record_id,
         record_kind,
         run_id: base.run_id.clone(),
+        session_id: base.session_id.clone(),
         agent_id: base.agent_id.clone(),
         turn_id: base.turn_id.clone(),
         attempt_id: base.attempt_id.clone(),
-        subject_ref: EntityRef::run(base.run_id.clone()),
-        related_refs: Vec::new(),
+        subject_ref: subject_ref.clone(),
+        related_refs: related_refs.clone(),
         causal_refs: base.causal_refs,
         source: base.source.clone(),
         destination: base.destination.clone(),
@@ -1913,14 +1963,15 @@ fn journal_record(
         delivery_semantics: "journal_backed".to_string(),
         event_index: EventIndexProjection {
             run_id: base.run_id.clone(),
+            session_id: base.session_id.clone(),
             agent_id: base.agent_id.clone(),
             turn_id: base.turn_id.clone(),
             event_family: event_family.to_string(),
             event_kind: event_kind.to_string(),
             source: base.source,
             destination: base.destination,
-            subject_ref: EntityRef::run(base.run_id.clone()),
-            related_refs: Vec::new(),
+            subject_ref,
+            related_refs,
             correlation_keys: Vec::new(),
             tags: base.tags,
             privacy_class: base.privacy,
@@ -1943,8 +1994,7 @@ fn journal_record(
     reason = "private event constructor mirrors the published event envelope to keep lineage and cursor evidence explicit"
 )]
 fn event_frame(
-    run_id: &RunId,
-    agent_id: &AgentId,
+    request: &RunRequest,
     turn_id: Option<TurnId>,
     attempt_id: Option<crate::ids::AttemptId>,
     event_seq: u64,
@@ -1955,6 +2005,15 @@ fn event_frame(
     runtime_package_fingerprint: String,
     ids: &P0Ids,
 ) -> EventFrame {
+    let subject_ref = match (&event_family, turn_id.as_ref()) {
+        (EventFamily::Turn, Some(turn_id)) => EntityRef::new(EntityKind::Turn, turn_id.clone()),
+        _ => EntityRef::run(request.run_id.clone()),
+    };
+    let related_refs = if matches!(event_family, EventFamily::Turn) {
+        vec![EntityRef::run(request.run_id.clone())]
+    } else {
+        Vec::new()
+    };
     let event = AgentEvent::with_redacted_summary(
         EventEnvelope {
             schema_version: EVENT_SCHEMA_VERSION,
@@ -1965,8 +2024,9 @@ fn event_frame(
             payload_schema_version: 1,
             timestamp: "1970-01-01T00:00:00Z".to_string(),
             recorded_at: "1970-01-01T00:00:00Z".to_string(),
-            run_id: run_id.clone(),
-            agent_id: agent_id.clone(),
+            run_id: request.run_id.clone(),
+            session_id: request.session_id.clone(),
+            agent_id: request.agent_id.clone(),
             turn_id,
             attempt_id,
             message_id: None,
@@ -1975,8 +2035,8 @@ fn event_frame(
             span_id: SpanId::new(ids.span(event_seq)),
             parent_event_id: None,
             caused_by: None,
-            subject_ref: EntityRef::run(run_id.clone()),
-            related_refs: Vec::new(),
+            subject_ref,
+            related_refs,
             causal_refs: Vec::new(),
             correlation: EventCorrelation::default(),
             tags: Vec::new(),
@@ -1998,7 +2058,9 @@ fn event_frame(
         redacted_summary,
     );
     EventFrame {
-        cursor: event.envelope.cursor(EventStreamScope::Run(run_id.clone())),
+        cursor: event
+            .envelope
+            .cursor(EventStreamScope::Run(request.run_id.clone())),
         event,
         archive_cursor: None,
         overflow: None,
@@ -2020,6 +2082,38 @@ fn terminal_event_kind(status: &RunStatus) -> EventKind {
         RunStatus::Completed => EventKind::RunCompleted,
         RunStatus::Cancelled => EventKind::RunCancelled,
         _ => EventKind::RunFailed,
+    }
+}
+
+fn turn_lifecycle_status(status: &RunStatus) -> TurnLifecycleStatus {
+    match status {
+        RunStatus::Completed => TurnLifecycleStatus::Completed,
+        _ => TurnLifecycleStatus::Failed,
+    }
+}
+
+fn turn_event_kind(status: &TurnLifecycleStatus) -> EventKind {
+    match status {
+        TurnLifecycleStatus::Started => EventKind::TurnStarted,
+        TurnLifecycleStatus::Completed => EventKind::TurnCompleted,
+        TurnLifecycleStatus::Failed => EventKind::TurnFailed,
+    }
+}
+
+fn turn_lifecycle_record(
+    request: &RunRequest,
+    ids: &P0Ids,
+    status: TurnLifecycleStatus,
+    redacted_summary: impl Into<String>,
+) -> TurnLifecycleRecord {
+    TurnLifecycleRecord {
+        turn_id: ids.turn_id.clone(),
+        run_ids: vec![request.run_id.clone()],
+        status,
+        input_message_id: Some(ids.input_message_id.clone()),
+        output_message_id: Some(ids.output_message_id.clone()),
+        context_projection_id: Some(ids.projection_id.clone()),
+        redacted_summary: redacted_summary.into(),
     }
 }
 
@@ -2050,10 +2144,10 @@ impl EventIdSequence {
 }
 
 impl P0Ids {
-    fn new(run_id: &RunId) -> Self {
+    fn new(run_id: &RunId, turn_id: Option<TurnId>) -> Self {
         let fragment = stable_fragment(run_id.as_str());
         Self {
-            turn_id: TurnId::new(format!("turn.p0.{fragment}")),
+            turn_id: turn_id.unwrap_or_else(|| TurnId::new(format!("turn.p0.{fragment}"))),
             attempt_id: crate::ids::AttemptId::new(format!("attempt.p0.{fragment}")),
             input_message_id: MessageId::new(format!("message.p0.{fragment}.input")),
             output_message_id: MessageId::new(format!("message.p0.{fragment}.output")),

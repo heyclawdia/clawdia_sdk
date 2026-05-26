@@ -11,7 +11,7 @@ use crate::{
     domain::{
         AgentError, AgentId, ArchiveCursorId, ContextItemId, CorrelationEntry, DestinationKind,
         DestinationRef, EntityKind, EntityRef, EventId, JournalCursor, MessageId, PolicyRef,
-        PrivacyClass, RunId, SourceKind, SourceRef, SpanId, TraceId, TurnId,
+        PrivacyClass, RunId, SessionId, SourceKind, SourceRef, SpanId, TraceId, TurnId,
     },
     ids::AttemptId,
 };
@@ -489,6 +489,9 @@ pub struct EventEnvelope {
     pub recorded_at: String,
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -903,6 +906,9 @@ pub struct EventFilter {
     /// Run-id selector for event filtering.
     /// `Any` leaves run ids unconstrained; `Include` restricts matches to the listed runs.
     pub run_ids: EventFilterSet<RunId>,
+    /// Session-id selector for event filtering.
+    /// `Any` leaves session ids unconstrained; `Include` restricts matches to listed sessions.
+    pub session_ids: EventFilterSet<SessionId>,
     /// Agent-id selector for event filtering.
     /// `Any` leaves agent ids unconstrained; `Include` restricts matches to the listed agents.
     pub agent_ids: EventFilterSet<AgentId>,
@@ -963,6 +969,7 @@ impl Default for EventFilter {
     fn default() -> Self {
         Self {
             run_ids: EventFilterSet::Any,
+            session_ids: EventFilterSet::Any,
             agent_ids: EventFilterSet::Any,
             turn_ids: EventFilterSet::Any,
             families: EventFilterSet::Any,
@@ -1026,6 +1033,9 @@ impl EventFilter {
         if !self.run_ids.is_any() {
             fields.push(EventIndexField::RunId);
         }
+        if !self.session_ids.is_any() {
+            fields.push(EventIndexField::SessionId);
+        }
         if !self.agent_ids.is_any() {
             fields.push(EventIndexField::AgentId);
         }
@@ -1067,6 +1077,7 @@ impl EventFilter {
 
     fn matches_envelope(&self, envelope: &EventEnvelope) -> bool {
         self.run_ids.matches(&envelope.run_id)
+            && option_matches(&self.session_ids, envelope.session_id.as_ref())
             && self.agent_ids.matches(&envelope.agent_id)
             && option_matches(&self.turn_ids, envelope.turn_id.as_ref())
             && self.families.matches(&envelope.event_family)
@@ -1192,6 +1203,8 @@ fn any_matches<'a, T: PartialEq + 'a>(
 pub enum EventIndexField {
     /// Use this variant when the contract needs to represent run id; selecting it has no side effect by itself.
     RunId,
+    /// Use this variant when the contract needs to represent session id; selecting it has no side effect by itself.
+    SessionId,
     /// Use this variant when the contract needs to represent agent id; selecting it has no side effect by itself.
     AgentId,
     /// Use this variant when the contract needs to represent turn id; selecting it has no side effect by itself.

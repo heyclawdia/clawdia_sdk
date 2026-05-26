@@ -3,7 +3,7 @@
 //! terminal output. Constructors are data-only and do not contact providers.
 //!
 use crate::{
-    domain::{AgentId, RunId, SourceRef},
+    domain::{AgentId, RunId, SessionId, SourceRef, TurnId},
     output::OutputContract,
     typed_output_ports::{TypedOutputDeserializer, TypedOutputModel},
     validated_output::{
@@ -18,6 +18,13 @@ use crate::{
 pub struct RunRequest {
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Optional host-provided session identifier for grouping related turns.
+    /// When present, the runtime copies it into journal and event envelopes.
+    pub session_id: Option<SessionId>,
+    /// Optional host-provided turn identifier for the user message or loop turn
+    /// this run answers. When absent, the runtime may derive a deterministic
+    /// turn id for traceability.
+    pub turn_id: Option<TurnId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     /// Source label or ref for this item; it is metadata and does not fetch
@@ -42,6 +49,8 @@ impl RunRequest {
     ) -> Self {
         Self {
             run_id,
+            session_id: None,
+            turn_id: None,
             agent_id,
             source,
             input: input.into(),
@@ -54,6 +63,28 @@ impl RunRequest {
     /// execute external work.
     pub fn with_output_contract(mut self, output_contract: OutputContract) -> Self {
         self.output_contract = Some(output_contract);
+        self
+    }
+
+    /// Returns this value with a session id attached for trace grouping.
+    /// This is data construction only; hosts still own conversation storage.
+    pub fn with_session_id(mut self, session_id: SessionId) -> Self {
+        self.session_id = Some(session_id);
+        self
+    }
+
+    /// Returns this value with a turn id attached for question-scoped tracing.
+    /// This is data construction only and does not start or resume a run.
+    pub fn with_turn_id(mut self, turn_id: TurnId) -> Self {
+        self.turn_id = Some(turn_id);
+        self
+    }
+
+    /// Returns this value with session and turn lineage attached together.
+    /// This is a thin convenience over the explicit builder methods.
+    pub fn with_session_turn(mut self, session_id: SessionId, turn_id: TurnId) -> Self {
+        self.session_id = Some(session_id);
+        self.turn_id = Some(turn_id);
         self
     }
 

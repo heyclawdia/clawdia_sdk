@@ -26,6 +26,8 @@ pub struct HookLifecycleContext {
     pub run_id: RunId,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<crate::domain::SessionId>,
     /// Turn identifier for one loop turn within a run.
     pub turn_id: Option<crate::domain::TurnId>,
     /// Attempt identifier for retry, repair, provider, or tool execution
@@ -57,6 +59,7 @@ impl HookLifecycleContext {
         Self {
             run_id,
             agent_id,
+            session_id: None,
             turn_id: None,
             attempt_id: None,
             source,
@@ -336,6 +339,9 @@ where
             record_id,
             context.run_id.clone(),
             context.agent_id.clone(),
+            context.session_id.clone(),
+            context.turn_id.clone(),
+            context.attempt_id.clone(),
             context.source.clone(),
             spec,
             invocation_id.clone(),
@@ -400,6 +406,9 @@ where
             record_id,
             context.run_id.clone(),
             context.agent_id.clone(),
+            context.session_id.clone(),
+            context.turn_id.clone(),
+            context.attempt_id.clone(),
             context.source.clone(),
             spec,
             invocation_id,

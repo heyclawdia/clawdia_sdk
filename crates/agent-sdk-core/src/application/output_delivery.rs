@@ -11,7 +11,7 @@ use crate::{
     domain::{
         AgentError, AgentErrorKind, AgentId, AttemptId, ContentRef, DestinationRef, EffectId,
         IdempotencyKey, MessageId, PolicyRef, PrivacyClass, RetentionClass, RetryClassification,
-        RunId, SourceKind, SourceRef, TurnId, ValidatedOutputId,
+        RunId, SessionId, SourceKind, SourceRef, TurnId, ValidatedOutputId,
     },
     effect::EffectKind,
     journal_ports::RunJournal,
@@ -97,6 +97,7 @@ impl OutputDeliveryService {
             delivery_id: delivery_id.clone(),
             effect_id,
             run_id: context.run_id.clone(),
+            session_id: context.session_id.clone(),
             agent_id: context.agent_id.clone(),
             turn_id: context.turn_id.clone(),
             attempt_id: context.attempt_id.clone(),
@@ -556,6 +557,7 @@ impl OutputDeliveryService {
             journal_seq: self.next_seq.fetch_add(1, Ordering::SeqCst) + 1,
             record_id,
             run_id: context.run_id.clone(),
+            session_id: context.session_id.clone(),
             agent_id: context.agent_id.clone(),
             turn_id: context.turn_id.clone(),
             attempt_id: context.attempt_id.clone(),
@@ -574,6 +576,8 @@ impl OutputDeliveryService {
 pub struct OutputDeliveryContext {
     /// Run identifier used for lineage, filtering, replay, and dedupe.
     pub run_id: RunId,
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
     /// Turn identifier for one loop turn within a run.
@@ -601,6 +605,7 @@ impl OutputDeliveryContext {
     ) -> Self {
         Self {
             run_id,
+            session_id: None,
             agent_id,
             turn_id: None,
             attempt_id: None,

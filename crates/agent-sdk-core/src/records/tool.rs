@@ -539,6 +539,7 @@ pub fn tool_call_journal_record(
         record_id: base.record_id,
         record_kind: JournalRecordKind::Tool,
         run_id: base.run_id.clone(),
+        session_id: base.session_id.clone(),
         agent_id: base.agent_id.clone(),
         turn_id: base.turn_id.clone(),
         attempt_id: base.attempt_id.clone(),
@@ -552,6 +553,7 @@ pub fn tool_call_journal_record(
         delivery_semantics: "journal_backed".to_string(),
         event_index: EventIndexProjection {
             run_id: base.run_id,
+            session_id: base.session_id,
             agent_id: base.agent_id,
             turn_id: base.turn_id,
             event_family: "tool".to_string(),

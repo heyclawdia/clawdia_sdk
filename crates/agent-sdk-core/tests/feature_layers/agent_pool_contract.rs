@@ -949,6 +949,7 @@ fn runtime_event_frame(
             timestamp: "1970-01-01T00:00:00Z".to_string(),
             recorded_at: "1970-01-01T00:00:00Z".to_string(),
             run_id: RunId::new(run_id),
+            session_id: None,
             agent_id: AgentId::new(agent_id),
             turn_id: None,
             attempt_id: None,

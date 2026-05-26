@@ -54,7 +54,7 @@ The first slice has three explicit profiles. P0 proves one fake-provider text ru
 - run control: `Agent`, `AgentRuntime`, `RunRequest`, `RunHandle`, `RunResult`;
 - package snapshot: `RuntimePackage`, `RuntimePackageRef`, first-slice `CapabilitySpec`, typed package sidecars, `PolicyRef`;
 - content, context, and output: `AgentMessage`, `ArtifactRef`, `ContentRef`, `ContextContribution`, `ContextItem`, `ContextProjection`, `OutputContract`, `ValidatedOutput`;
-- observability and durability: `AgentEvent`, `EventFrame`, `EventFilter`, `EventCursor`, `RunJournal`, `JournalRecord`, `JournalCursor`;
+- observability and durability: `AgentEvent`, `EventFrame`, `EventFilter`, `EventCursor`, `RunJournal`, `JournalRecord`, `JournalCursor`, `TurnTrace`, `RunTrace`, `SessionTimeline`;
 - side effects: `EffectIntent`, `EffectResult`, `IdempotencyKey`, `DedupeKey`, `PolicyDecision`;
 - ports: `ProviderAdapter`, optional fake `OutputSink`, journal/store ports; P2 activates `ToolExecutor` and approval policy/broker ports;
 - boundaries: `EntityRef`, `SourceRef`, `DestinationRef`, `PrivacyClass`, `RetentionClass`, `TrustClass`, `LineageRef`, and typed IDs.
@@ -88,7 +88,7 @@ The P0/P1 public contract targets only the names needed for one fake-provider te
 | `Agent` | Immutable agent identity, default instructions, default model route, default context/memory policy handles. | Active execution, provider clients, UI routing, approval transport. |
 | `AgentBuilder` | Construction of an `Agent` from typed identity, instructions, default route refs, and context policy refs. | Runtime package mutation after build or lifecycle hook registration in the MVP path. |
 | `AgentRuntime` | Active run orchestration for provider/output ports, journal, policies, subscriptions, and per-run effective package resolution. | Product dispatch between external runtimes, desktop, CLI, remote, or scheduled surfaces; owning a mutable global execution package. |
-| `RunRequest` | One requested execution: source, destination, input parts, runtime package ref, output contract, cancellation, and host metadata. | Provider-specific wire request. |
+| `RunRequest` | One requested execution: optional session/turn lineage, source, destination, input parts, runtime package ref, output contract, cancellation, and host metadata. | Provider-specific wire request or host conversation row. |
 | `RunHandle` | Event stream, cancellation handle, final result receiver, and replay cursor for one run. | UI rendering decisions. |
 | `RunResult` | Terminal status, final message or structured output, usage/cost summary, and causal IDs. | Durable analytics storage. |
 | `RuntimePackage` | Immutable per-run effective snapshot for provider route, callable/discoverable capabilities, typed sidecars, policies, output contracts, output sinks, lifecycle bounds, and isolation requirements. | Live discovery after the run starts or feature-specific parallel registries. |
@@ -185,6 +185,8 @@ impl AgentRuntime {
 
 pub struct RunRequestBuilder {
     agent_id: AgentId,
+    session_id: Option<SessionId>,
+    turn_id: Option<TurnId>,
     input: AgentInput,
     source: Option<SourceRef>,
     destination: Option<DestinationRef>,
@@ -194,6 +196,8 @@ pub struct RunRequestBuilder {
 }
 
 impl RunRequestBuilder {
+    pub fn session_id(self, session_id: SessionId) -> Self;
+    pub fn turn_id(self, turn_id: TurnId) -> Self;
     pub fn source(self, source: SourceRef) -> Self;
     pub fn destination(self, destination: DestinationRef) -> Self;
     pub fn runtime_package(self, package: RuntimePackageRef) -> Self;
@@ -247,11 +251,24 @@ Rules:
 
 All durable and cross-boundary identity fields are typed newtypes:
 
-- `RunId`, `TurnId`, `AttemptId`, `MessageId`, `ContextItemId`, `ContextProjectionId`
+- `SessionId`, `RunId`, `TurnId`, `AttemptId`, `MessageId`, `ContextItemId`, `ContextProjectionId`
 - `ToolCallId`, `ApprovalRequestId`, `AgentId`, `SubagentRunId`
 - `RuntimePackageId`, `RuntimePackageFingerprint`, `EventId`, `HookId`, `ChildArtifactId`
 - `ArtifactId`, `ContentId`, `OutputSchemaId`, `ValidatedOutputId`, `ValidationAttemptId`, `RepairAttemptId`
 - `TraceId`, `SpanId`, `ExecutionEnvironmentId`, `StreamRuleId`, `IsolatedProcessId`
+
+Session and turn lineage follow this cardinality:
+
+- `SessionId -> many TurnId`
+- `TurnId -> one or more RunId`
+- `RunId -> many AttemptId / ToolCallId / EffectId / ContextItemId / MessageId`
+
+`SessionId` is host-provided and optional for non-chat or legacy hosts, but when
+present it is copied into every journal and event envelope produced for that
+run. `TurnId` is caller-provided when the host already has a user-message id;
+otherwise the runtime may derive a deterministic run-scoped turn id so P0/P1
+records remain traceable. `TurnTrace`, `RunTrace`, and `SessionTimeline` are
+derived journal views; they are not a host chat store or trace database.
 
 `AgentError` must distinguish:
 
@@ -382,6 +399,8 @@ let runtime = AgentRuntime::builder()
 
 let request = RunRequest {
     run_id: RunId::new(),
+    session_id: Some(SessionId::new("session.example")),
+    turn_id: Some(TurnId::new("turn.example.1")),
     source: SourceRef::new(SourceKind::Host, SourceId::new("surface.chat"))
         .with_correlation(CorrelationKey::new("conversation.example")),
     destination: DestinationRef::new(DestinationKind::User, DestinationId::new("surface.reply")),

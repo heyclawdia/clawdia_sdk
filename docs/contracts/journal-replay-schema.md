@@ -14,6 +14,7 @@ pub struct JournalRecordEnvelope<T> {
     pub record_id: JournalRecordId,
     pub record_kind: JournalRecordKind,
     pub run_id: RunId,
+    pub session_id: Option<SessionId>,
     pub agent_id: AgentId,
     pub turn_id: Option<TurnId>,
     pub attempt_id: Option<AttemptId>,
@@ -39,6 +40,7 @@ pub struct JournalRecordEnvelope<T> {
 
 pub struct EventIndexProjection {
     pub run_id: RunId,
+    pub session_id: Option<SessionId>,
     pub agent_id: AgentId,
     pub turn_id: Option<TurnId>,
     pub event_family: EventFamily,
@@ -55,7 +57,7 @@ pub struct EventIndexProjection {
 ```
 
 `journal_seq` is monotonic per run. Wall-clock timestamp is not an ordering source.
-Every journal record that can produce an event frame must carry or deterministically derive `EventIndexProjection`. Durable replay and archive filters use this projection, not raw payload parsing.
+Every journal record that can produce an event frame must carry or deterministically derive `EventIndexProjection`. Durable replay and archive filters use this projection, not raw payload parsing. When a run was started with `session_id`, both the journal envelope and event-index projection carry it directly.
 
 `subject_ref` and `related_refs` are the durable counterpart to event entity refs. They let replay, anti-entropy, and archive indexes reason about context contributions, artifacts, package sidecars, effect intents/results, child artifacts, output deliveries, extension actions, and future feature entities without adding a new journal envelope field for every feature.
 
@@ -75,6 +77,19 @@ Every journal record that can produce an event frame must carry or deterministic
 | OTel exporter | telemetry sink | derived spans/metrics/logs | sink policy | no run control |
 
 Checkpoint/session/analytics/app-event stores cannot introduce facts that are absent from journal records.
+
+Session and turn trace cardinality is fixed:
+
+- `SessionId -> many TurnId`
+- `TurnId -> one or more RunId`
+- `RunId -> many AttemptId / ToolCallId / EffectId / ContextItemId / MessageId`
+
+`TurnRecord` is canonical lifecycle evidence, not host transcript storage. The
+runtime appends turn start and turn terminal records around the run-loop work
+that causally answers a user message. Derived query helpers such as `TurnTrace`,
+`RunTrace`, and `SessionTimeline` are projections over journal records and event
+indexes; they must not fetch raw payload content or invent facts absent from the
+journal.
 
 `AgentEventBus::replay_run_from_cursor(run_id, journal_cursor)` is the core durable projection over one run journal. It emits `derived_replay` frames after the cursor, then can tail the live run stream. Replay filtering must use envelope/index fields recorded in or derived from the journal; it must not require raw payload content to reconstruct subscription state.
 

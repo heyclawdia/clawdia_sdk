@@ -40,6 +40,35 @@
         ]
       },
       {
+        "kind": "turn_started",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-events.json",
+          "tests/fixtures/p1/typed-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p0/text-run-events.json"
+        ]
+      },
+      {
+        "kind": "turn_completed",
+        "fixtures": [
+          "tests/fixtures/p0/text-run-events.json",
+          "tests/fixtures/p1/typed-run-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p1/typed-run-events.json"
+        ]
+      },
+      {
+        "kind": "turn_failed",
+        "fixtures": [
+          "tests/fixtures/p1/repair-exhausted-events.json"
+        ],
+        "redaction_cases": [
+          "tests/fixtures/p1/repair-exhausted-events.json"
+        ]
+      },
+      {
         "kind": "provider_request_projected",
         "fixtures": [
           "tests/fixtures/p0/text-run-events.json",
@@ -418,9 +447,6 @@
       "run_cancel_requested",
       "run_resume_requested",
       "run_resume_failed",
-      "turn_started",
-      "turn_completed",
-      "turn_failed",
       "message_accepted",
       "message_committed",
       "model_attempt_failed",

@@ -9,122 +9,134 @@
     {
       "delivery_semantics": "journal_backed",
       "journal_seq": 2,
+      "payload_type": "turn_lifecycle",
+      "record_kind": "Turn"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 3,
       "payload_type": "context_projection",
       "record_kind": "Context"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 3,
+      "journal_seq": 4,
       "payload_type": "structured_output_requested",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 4,
+      "journal_seq": 5,
       "payload_type": "effect_intent",
       "record_kind": "EffectIntent"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 5,
+      "journal_seq": 6,
       "payload_type": "model_attempt",
       "record_kind": "ModelAttempt"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 6,
+      "journal_seq": 7,
       "payload_type": "effect_result",
       "record_kind": "EffectResult"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 7,
+      "journal_seq": 8,
       "payload_type": "model_attempt",
       "record_kind": "ModelAttempt"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 8,
-      "payload_type": "structured_output_validation_started",
-      "record_kind": "StructuredOutput"
-    },
-    {
-      "delivery_semantics": "journal_backed",
       "journal_seq": 9,
-      "payload_type": "structured_output_validation_failed",
+      "payload_type": "structured_output_validation_started",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
       "journal_seq": 10,
-      "payload_type": "structured_output_repair_requested",
+      "payload_type": "structured_output_validation_failed",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
       "journal_seq": 11,
+      "payload_type": "structured_output_repair_requested",
+      "record_kind": "StructuredOutput"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 12,
       "payload_type": "effect_intent",
       "record_kind": "EffectIntent"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 12,
+      "journal_seq": 13,
       "payload_type": "model_attempt",
       "record_kind": "ModelAttempt"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 13,
+      "journal_seq": 14,
       "payload_type": "effect_result",
       "record_kind": "EffectResult"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 14,
+      "journal_seq": 15,
       "payload_type": "model_attempt",
       "record_kind": "ModelAttempt"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 15,
+      "journal_seq": 16,
       "payload_type": "structured_output_validation_started",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 16,
+      "journal_seq": 17,
       "payload_type": "structured_output_validation_succeeded",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 17,
+      "journal_seq": 18,
       "payload_type": "structured_output_validation_report",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 18,
+      "journal_seq": 19,
       "payload_type": "structured_output_validated_output",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 19,
+      "journal_seq": 20,
       "payload_type": "structured_output_typed_result_publication",
       "record_kind": "StructuredOutput"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 20,
+      "journal_seq": 21,
       "payload_type": "message",
       "record_kind": "Message"
     },
     {
       "delivery_semantics": "journal_backed",
-      "journal_seq": 21,
+      "journal_seq": 22,
       "payload_type": "terminal_result",
       "record_kind": "Run"
+    },
+    {
+      "delivery_semantics": "journal_backed",
+      "journal_seq": 23,
+      "payload_type": "turn_lifecycle",
+      "record_kind": "Turn"
     }
   ],
   "schema_version": 1

@@ -182,6 +182,7 @@ fn fake_event(seq: u64) -> AgentEvent {
         timestamp: "2026-05-24T12:00:00Z".to_string(),
         recorded_at: "2026-05-24T12:00:00Z".to_string(),
         run_id: run_id.clone(),
+        session_id: None,
         agent_id: AgentId::new("agent.1"),
         turn_id: Some(TurnId::new("turn.1")),
         attempt_id: None,

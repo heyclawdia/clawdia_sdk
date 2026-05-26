@@ -567,6 +567,11 @@ impl AgentPool {
             .run_snapshot(&run_id)
             .map(|snapshot| snapshot.runtime_package_fingerprint.as_str().to_string())
             .unwrap_or_else(|_| "runtime.package.fingerprint.agent_pool".to_string());
+        let session_id = self
+            .runtime
+            .run_snapshot(&run_id)
+            .ok()
+            .and_then(|snapshot| snapshot.session_id);
         let event_family = event_family.into();
         let event_kind = event_kind.into();
 
@@ -576,6 +581,7 @@ impl AgentPool {
             record_id: format!("journal.record.agent_pool.{journal_seq}"),
             record_kind,
             run_id: run_id.clone(),
+            session_id: session_id.clone(),
             agent_id: agent_id.clone(),
             turn_id: None,
             attempt_id: None,
@@ -592,6 +598,7 @@ impl AgentPool {
             delivery_semantics: "journal_backed".to_string(),
             event_index: EventIndexProjection {
                 run_id,
+                session_id,
                 agent_id,
                 turn_id: None,
                 event_family,
@@ -647,6 +654,11 @@ impl AgentPool {
             .run_snapshot(&run_id)
             .map(|snapshot| snapshot.runtime_package_fingerprint.as_str().to_string())
             .unwrap_or_else(|_| "runtime.package.fingerprint.agent_pool".to_string());
+        let session_id = self
+            .runtime
+            .run_snapshot(&run_id)
+            .ok()
+            .and_then(|snapshot| snapshot.session_id);
         let event = AgentEvent::with_redacted_summary(
             EventEnvelope {
                 schema_version: EVENT_SCHEMA_VERSION,
@@ -662,6 +674,7 @@ impl AgentPool {
                 timestamp: format!("1970-01-01T00:00:{event_counter:02}Z"),
                 recorded_at: format!("1970-01-01T00:00:{event_counter:02}Z"),
                 run_id,
+                session_id,
                 agent_id,
                 turn_id: None,
                 attempt_id: None,

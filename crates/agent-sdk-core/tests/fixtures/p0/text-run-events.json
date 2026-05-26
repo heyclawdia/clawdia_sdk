@@ -11,37 +11,51 @@
     {
       "delivery_semantics": "JournalBacked",
       "event_family": "Turn",
-      "event_kind": "ContextAssembled",
+      "event_kind": "TurnStarted",
       "event_seq": 2,
       "journal_cursor": "journal.2"
     },
     {
       "delivery_semantics": "JournalBacked",
       "event_family": "Turn",
-      "event_kind": "ProviderRequestProjected",
+      "event_kind": "ContextAssembled",
       "event_seq": 3,
       "journal_cursor": "journal.3"
     },
     {
       "delivery_semantics": "JournalBacked",
-      "event_family": "Model",
-      "event_kind": "ModelAttemptStarted",
+      "event_family": "Turn",
+      "event_kind": "ProviderRequestProjected",
       "event_seq": 4,
       "journal_cursor": "journal.4"
     },
     {
       "delivery_semantics": "JournalBacked",
       "event_family": "Model",
-      "event_kind": "ModelMessageCompleted",
+      "event_kind": "ModelAttemptStarted",
       "event_seq": 5,
-      "journal_cursor": "journal.6"
+      "journal_cursor": "journal.5"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Model",
+      "event_kind": "ModelMessageCompleted",
+      "event_seq": 6,
+      "journal_cursor": "journal.7"
     },
     {
       "delivery_semantics": "JournalBacked",
       "event_family": "Run",
       "event_kind": "RunCompleted",
-      "event_seq": 6,
-      "journal_cursor": "journal.8"
+      "event_seq": 7,
+      "journal_cursor": "journal.9"
+    },
+    {
+      "delivery_semantics": "JournalBacked",
+      "event_family": "Turn",
+      "event_kind": "TurnCompleted",
+      "event_seq": 8,
+      "journal_cursor": "journal.10"
     }
   ]
 }

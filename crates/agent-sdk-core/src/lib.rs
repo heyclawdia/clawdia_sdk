@@ -534,6 +534,11 @@ pub mod tool_ports;
 pub mod tool_records;
 #[path = "testing/tool.rs"]
 mod tool_testing;
+#[path = "application/trace.rs"]
+/// Public trace namespace. Use it for derived journal trace views; prefer
+/// crate-root re-exports for common imports. Module items must preserve
+/// the core ownership and side-effect boundaries described in this file.
+pub mod trace;
 #[path = "ports/typed_output.rs"]
 /// Public typed output ports namespace. Use it for the documented typed
 /// output ports API surface; prefer crate-root re-exports for common
@@ -604,8 +609,9 @@ pub use domain::{
     CorrelationKey, CorrelationValue, DedupeKey, DestinationKind, DestinationRef, EffectId,
     EntityKind, EntityRef, EventCursorId, EventId, IdValidationError, IdempotencyKey, LineageId,
     LineageRef, MAX_ID_LEN, MessageId, OutputSchemaId, PolicyKind, PolicyRef, PrivacyClass,
-    RepairAttemptId, RetentionClass, RunId, RuntimePackageId, SourceKind, SourceRef, ToolCallId,
-    TopicId, TraceId, TrustClass, TurnId, ValidatedOutputId, ValidationAttemptId, WakeConditionId,
+    RepairAttemptId, RetentionClass, RunId, RuntimePackageId, SessionId, SourceKind, SourceRef,
+    ToolCallId, TopicId, TraceId, TrustClass, TurnId, ValidatedOutputId, ValidationAttemptId,
+    WakeConditionId,
 };
 pub use effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus};
 pub use error::{AgentError, AgentErrorKind, CausalIds, ErrorContext, RetryClassification};
@@ -643,8 +649,8 @@ pub use journal::{
     JournalCursor, JournalRecord, JournalRecordBase, JournalRecordKind, JournalRecordPayload,
     MessageRecord, ModelAttemptRecord, PendingSideEffect, RecoveryMarker, RunCheckpoint,
     RunLifecycleRecord, RunMessageAddressTargetRecord, RunMessageDeliveryStatus, RunMessageRecord,
-    StructuredOutputRecord, TerminalResultMarker, WakeRecord, WakeResumeInputPolicyRecord,
-    WakeTriggerStatus,
+    StructuredOutputRecord, TerminalResultMarker, TurnLifecycleRecord, TurnLifecycleStatus,
+    WakeRecord, WakeResumeInputPolicyRecord, WakeTriggerStatus,
 };
 pub use journal_ports::{RunJournal, append_before_effect, append_result_or_recovery};
 pub use loop_state::{
@@ -867,6 +873,7 @@ pub use tool_records::{
     CanonicalToolName, ToolCallRecord, ToolCallRecordParams, ToolCallRecordStatus, ToolResultRef,
     tool_call_journal_record,
 };
+pub use trace::{RunTrace, SessionTimeline, TurnTrace};
 pub use typed_output_ports::{TypedOutputDeserializer, TypedOutputModel};
 pub use validated_output::{
     DecodedTypedOutput, OutputLineage, StructuredOutputResult, TypedOutputError,

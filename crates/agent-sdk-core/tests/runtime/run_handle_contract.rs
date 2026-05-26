@@ -591,6 +591,7 @@ fn envelope(
         timestamp: "2026-05-24T12:00:00Z".to_string(),
         recorded_at: "2026-05-24T12:00:00Z".to_string(),
         run_id: run_id.clone(),
+        session_id: None,
         agent_id,
         turn_id: None,
         attempt_id: None,
@@ -645,6 +646,7 @@ fn terminal_record(
         record_id: format!("journal.record.terminal.{journal_seq}"),
         record_kind: JournalRecordKind::Run,
         run_id: run_id.clone(),
+        session_id: None,
         agent_id: agent_id.clone(),
         turn_id: None,
         attempt_id: None,
@@ -658,6 +660,7 @@ fn terminal_record(
         delivery_semantics: "journal_backed".to_string(),
         event_index: EventIndexProjection {
             run_id: run_id.clone(),
+            session_id: None,
             agent_id,
             turn_id: None,
             event_family: "run".to_string(),

@@ -276,6 +276,7 @@ impl ApprovalBroker {
             request.agent_id.clone(),
             request.source.clone(),
         );
+        base.session_id = request.session_id.clone();
         base.turn_id = Some(request.turn_id.clone());
         base.destination = Some(request.destination.clone());
         base.timestamp_millis = request.created_at_millis + journal_seq;

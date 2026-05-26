@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::{
     domain::{
         AgentError, AgentErrorKind, AgentId, EffectId, EntityKind, EntityRef, JournalCursor,
-        PolicyRef, PrivacyClass, RetryClassification, RunId, SourceRef, TurnId,
+        PolicyRef, PrivacyClass, RetryClassification, RunId, SessionId, SourceRef, TurnId,
     },
     effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus},
     hook_ports::HookExecutorRegistry,
@@ -507,6 +507,7 @@ impl ToolExecutionCoordinator {
             context.source.clone(),
             RuntimePackageFingerprint(context.runtime_package_fingerprint.clone()),
         );
+        hook_context.session_id = context.session_id.clone();
         hook_context.turn_id = context.turn_id.clone();
         let mut coordinator = HookLifecycleCoordinator::new_with_sequence_allocator(
             registry.as_ref(),
@@ -824,6 +825,8 @@ pub struct ToolExecutionContext {
     pub run_id: RunId,
     /// Agent identifier used for lineage, filtering, and ownership checks.
     pub agent_id: AgentId,
+    /// Optional host-provided session identifier for grouping related turns.
+    pub session_id: Option<SessionId>,
     /// Turn identifier for one loop turn within a run.
     pub turn_id: Option<TurnId>,
     /// Source label or ref for this item; it is metadata and does not fetch
@@ -860,6 +863,7 @@ impl ToolExecutionContext {
         Self {
             run_id,
             agent_id,
+            session_id: None,
             turn_id: None,
             source,
             runtime_package_fingerprint: runtime_package_fingerprint.into(),
@@ -903,6 +907,7 @@ impl ToolExecutionContext {
             self.agent_id.clone(),
             self.source.clone(),
         );
+        base.session_id = self.session_id.clone();
         base.turn_id = self.turn_id.clone();
         base.destination = destination;
         base.timestamp_millis = self.timestamp_millis + journal_seq.saturating_sub(1);
