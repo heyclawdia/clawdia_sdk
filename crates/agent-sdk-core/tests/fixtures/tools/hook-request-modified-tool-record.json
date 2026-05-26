@@ -1,0 +1,18 @@
+{
+  "records": [
+    {
+      "effect_result": null,
+      "event_kind": "tool_request_modified",
+      "hook_id": "modify.before_tool",
+      "journal_seq": 4,
+      "original_redacted_args_summary": "read docs/start-here.md",
+      "original_redacted_result_summary": null,
+      "patched_redacted_args_summary": "read docs/start-here.md with narrowed scope",
+      "patched_redacted_result_summary": null,
+      "record_id": "journal.record.tool.tool.request_modified",
+      "redacted_args_summary": "read docs/start-here.md with narrowed scope",
+      "redacted_result_summary": null,
+      "status": "request_modified"
+    }
+  ]
+}

@@ -19,6 +19,7 @@ use crate::{
         EventIndexProjection, JOURNAL_SCHEMA_VERSION, JournalRecord, JournalRecordBase,
         JournalRecordKind, JournalRecordPayload,
     },
+    package_hooks::HookId,
     policy::{EffectClass, PolicyOutcome, RiskClass},
 };
 
@@ -141,6 +142,12 @@ pub struct ToolCallRecord {
     /// Redacted summary for display, logs, events, or telemetry.
     /// It should describe the value without exposing raw private content.
     pub redacted_args_summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Original redacted argument summary before a hook-owned request modification.
+    pub original_redacted_args_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Patched redacted argument summary applied by a hook-owned request modification.
+    pub patched_redacted_args_summary: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Typed result content refs references. Resolving them is separate from
     /// constructing this record.
@@ -149,6 +156,15 @@ pub struct ToolCallRecord {
     /// Redacted summary for display, logs, events, or telemetry.
     /// It should describe the value without exposing raw private content.
     pub redacted_result_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Original redacted result summary before a hook-owned result rewrite.
+    pub original_redacted_result_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Patched redacted result summary applied by a hook-owned result rewrite.
+    pub patched_redacted_result_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Hook id that proposed the tool-domain mutation represented by this record.
+    pub hook_id: Option<HookId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Idempotency setting or key for deduping retries.
     /// Use it to prevent duplicate side effects during replay or repair.
@@ -196,8 +212,13 @@ impl ToolCallRecord {
             retention: params.retention,
             requested_args_refs: params.requested_args_refs,
             redacted_args_summary: params.redacted_args_summary,
+            original_redacted_args_summary: None,
+            patched_redacted_args_summary: None,
             result_content_refs: Vec::new(),
             redacted_result_summary: None,
+            original_redacted_result_summary: None,
+            patched_redacted_result_summary: None,
+            hook_id: None,
             idempotency_key: params.idempotency_key,
             status: ToolCallRecordStatus::Requested,
             policy_outcome: None,
@@ -223,6 +244,40 @@ impl ToolCallRecord {
         self
     }
 
+    /// Returns this value with hook-owned denial evidence applied.
+    /// This is data construction only and does not append journals or execute tools.
+    pub fn with_hook_denial(
+        mut self,
+        hook_id: HookId,
+        result: EffectResult,
+        policy_outcome: PolicyOutcome,
+    ) -> Self {
+        self.status = ToolCallRecordStatus::DeniedBeforeExecution;
+        self.hook_id = Some(hook_id);
+        self.redacted_result_summary = Some(result.redacted_summary.clone());
+        self.effect_result = Some(result);
+        self.policy_outcome = Some(policy_outcome);
+        self
+    }
+
+    /// Returns this value with hook-owned request modification evidence applied.
+    /// This preserves the original and patched redacted summaries for replay and debugging.
+    pub fn with_hook_request_modification(
+        mut self,
+        hook_id: HookId,
+        original_redacted_summary: impl Into<String>,
+        patched_redacted_summary: impl Into<String>,
+    ) -> Self {
+        let original_redacted_summary = original_redacted_summary.into();
+        let patched_redacted_summary = patched_redacted_summary.into();
+        self.status = ToolCallRecordStatus::RequestModified;
+        self.hook_id = Some(hook_id);
+        self.original_redacted_args_summary = Some(original_redacted_summary);
+        self.patched_redacted_args_summary = Some(patched_redacted_summary.clone());
+        self.redacted_args_summary = patched_redacted_summary;
+        self
+    }
+
     /// Returns this value with its intent setting replaced. The method
     /// follows builder-style data construction and does not execute
     /// external work.
@@ -240,6 +295,27 @@ impl ToolCallRecord {
         self.result_content_refs = result.content_refs.clone();
         self.redacted_result_summary = Some(result.redacted_summary.clone());
         self.policy_outcome = Some(policy_outcome);
+        self.effect_result = Some(result);
+        self
+    }
+
+    /// Returns this value with hook-owned result rewrite evidence applied.
+    /// The original terminal result record remains durable; this record carries the rewrite patch.
+    pub fn with_hook_result_rewrite(
+        mut self,
+        hook_id: HookId,
+        result: EffectResult,
+        original_redacted_summary: impl Into<String>,
+        patched_redacted_summary: impl Into<String>,
+    ) -> Self {
+        let original_redacted_summary = original_redacted_summary.into();
+        let patched_redacted_summary = patched_redacted_summary.into();
+        self.status = ToolCallRecordStatus::ResultRewritten;
+        self.hook_id = Some(hook_id);
+        self.result_content_refs = result.content_refs.clone();
+        self.redacted_result_summary = Some(patched_redacted_summary.clone());
+        self.original_redacted_result_summary = Some(original_redacted_summary);
+        self.patched_redacted_result_summary = Some(patched_redacted_summary);
         self.effect_result = Some(result);
         self
     }
@@ -329,6 +405,8 @@ pub struct ToolCallRecordParams {
 pub enum ToolCallRecordStatus {
     /// Use this variant when the contract needs to represent requested; selecting it has no side effect by itself.
     Requested,
+    /// Use this variant when the contract needs to represent request modified; selecting it has no side effect by itself.
+    RequestModified,
     /// Use this variant when the contract needs to represent intent recorded; selecting it has no side effect by itself.
     IntentRecorded,
     /// Use this variant when the contract needs to represent completed; selecting it has no side effect by itself.
@@ -341,6 +419,8 @@ pub enum ToolCallRecordStatus {
     Cancelled,
     /// Use this variant when the contract needs to represent denied before execution; selecting it has no side effect by itself.
     DeniedBeforeExecution,
+    /// Use this variant when the contract needs to represent result rewritten; selecting it has no side effect by itself.
+    ResultRewritten,
     /// Use this variant when the contract needs to represent unknown; selecting it has no side effect by itself.
     Unknown,
     /// Use this variant when the contract needs to represent recovery required; selecting it has no side effect by itself.
@@ -436,6 +516,9 @@ pub fn tool_call_journal_record(
     }
     if let Some(result) = &record.effect_result {
         related_refs.push(EntityRef::new(EntityKind::Effect, result.effect_id.clone()));
+    }
+    if let Some(hook_id) = &record.hook_id {
+        related_refs.push(EntityRef::new(EntityKind::Hook, hook_id.as_str()));
     }
     related_refs.extend(
         record

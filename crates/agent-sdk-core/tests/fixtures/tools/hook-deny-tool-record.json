@@ -1,0 +1,24 @@
+{
+  "records": [
+    {
+      "effect_result": {
+        "content_refs": [],
+        "effect_id": "effect.tool.call.hook_deny.denied",
+        "error_ref": "tool.hook.denied",
+        "redacted_summary": "hook denied this tool call",
+        "terminal_status": "denied_before_execution"
+      },
+      "event_kind": "tool_denied_by_hook",
+      "hook_id": "deny.before_tool",
+      "journal_seq": 4,
+      "original_redacted_args_summary": null,
+      "original_redacted_result_summary": null,
+      "patched_redacted_args_summary": null,
+      "patched_redacted_result_summary": null,
+      "record_id": "journal.record.tool.tool.denied_by_hook",
+      "redacted_args_summary": "read docs/start-here.md",
+      "redacted_result_summary": "hook denied this tool call",
+      "status": "denied_before_execution"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "records": [
+    {
+      "effect_result": {
+        "content_refs": [],
+        "effect_id": "effect.tool.call.after_rewrite",
+        "error_ref": null,
+        "redacted_summary": "rewritten read summary",
+        "terminal_status": "completed"
+      },
+      "event_kind": "tool_result_rewritten",
+      "hook_id": "rewrite.after_tool",
+      "journal_seq": 6,
+      "original_redacted_args_summary": null,
+      "original_redacted_result_summary": "original read summary",
+      "patched_redacted_args_summary": null,
+      "patched_redacted_result_summary": "rewritten read summary",
+      "record_id": "journal.record.tool.tool.result_rewritten",
+      "redacted_args_summary": "read docs/start-here.md",
+      "redacted_result_summary": "rewritten read summary",
+      "status": "result_rewritten"
+    }
+  ]
+}

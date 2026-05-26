@@ -60,6 +60,16 @@ The canonical lifecycle is:
 
 Mutating tools additionally record side-effect family metadata such as `EffectKind::FileWrite`, `EffectKind::ProcessStart`, `EffectKind::ProcessSignal`, `EffectKind::MemoryWrite`, or `EffectKind::OutputDelivery` when applicable, but those records wrap or map to the same `EffectIntent` / `EffectResult` spine. They must include idempotency or dedupe keys where available, reconciliation metadata for unknown/crash windows, and explicit non-reversible markers when no safe inverse candidate exists.
 
+Active tool lifecycle hooks lower through this same lifecycle rather than a
+parallel callback path. `BeforeToolCall` may observe, deny before tool intent,
+or narrow the redacted argument summary through a hook-owned request-modified
+tool record that preserves both original and patched summaries. `AfterToolCall`
+may observe or rewrite the redacted result summary through a separate
+tool-result-rewritten record after the original result record is durable and
+before `PostTool` policy runs. Hook-requested approval and retry require a later
+tool-domain integration so approval dispatch and retry attempts remain
+journaled and bounded.
+
 ## Policy Stages
 
 Guardrails and policy checks are stage-scoped. A package may install stage policy sidecars, but all stages use the same finite `PolicyDecision` model and journaled decision records.

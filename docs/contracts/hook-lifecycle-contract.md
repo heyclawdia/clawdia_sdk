@@ -207,6 +207,14 @@ behavior-changing `BeforeContextAssembly` hook must be the only hook at that
 point in P0 so accepted context injection cannot be stranded by a later
 same-point failure before projection.
 
+The P2 tool-execution lowering invokes `BeforeToolCall` and `AfterToolCall`.
+Its first active slice lowers `BeforeToolCall` observe, deny, and redacted
+request-summary modification, plus `AfterToolCall` observe and redacted
+result-summary rewrite. `BeforeToolCall` request-approval and `AfterToolCall`
+request-retry remain in the global matrix but fail closed in the active tool
+coordinator until approval-dispatch sequencing and retry/idempotency attempt
+records are wired through the tool domain.
+
 ## Response Lowering Matrix
 
 Hook responses are proposals to lifecycle-specific domain owners. They are not a second event bus, side-effect queue, policy engine, or transcript mutation API.
