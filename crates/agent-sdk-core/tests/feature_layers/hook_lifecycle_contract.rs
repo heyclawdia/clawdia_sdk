@@ -164,6 +164,70 @@ fn hook_helper_and_explicit_hook_spec_emit_equivalent_package_fingerprint() {
 }
 
 #[test]
+fn runtime_package_builder_hook_derives_fingerprint_sidecar() {
+    let spec = observe_spec("audit.before_context");
+    let package = RuntimePackage::builder(RuntimePackageId::new("package.hook.typed"))
+        .agent(agent_sdk_core::AgentSnapshot {
+            agent_id: baseline_agent_id(),
+            name: "hook contract".to_string(),
+            default_behavior_refs: Vec::new(),
+        })
+        .provider_route(ProviderRouteSnapshot::new("provider.fake", "model.fake"))
+        .hook(spec.clone())
+        .build()
+        .expect("package builds");
+    let sidecar_only = RuntimePackage::builder(RuntimePackageId::new("package.hook.typed"))
+        .agent(agent_sdk_core::AgentSnapshot {
+            agent_id: baseline_agent_id(),
+            name: "hook contract".to_string(),
+            default_behavior_refs: Vec::new(),
+        })
+        .provider_route(ProviderRouteSnapshot::new("provider.fake", "model.fake"))
+        .sidecar(spec.sidecar_snapshot().expect("hook sidecar"))
+        .build()
+        .expect("sidecar-only package builds");
+
+    assert_eq!(package.hooks, vec![spec.clone()]);
+    assert_eq!(
+        package
+            .sidecar(&spec.sidecar_id())
+            .expect("derived sidecar"),
+        &spec.sidecar_snapshot().expect("expected sidecar")
+    );
+    assert_eq!(
+        package.fingerprint().expect("typed hook fingerprint"),
+        sidecar_only.fingerprint().expect("sidecar fingerprint")
+    );
+}
+
+#[test]
+fn runtime_package_validation_rejects_hook_sidecar_mismatch() {
+    let spec = observe_spec("audit.before_context");
+    let mut package = RuntimePackage::builder(RuntimePackageId::new("package.hook.mismatch"))
+        .agent(agent_sdk_core::AgentSnapshot {
+            agent_id: baseline_agent_id(),
+            name: "hook contract".to_string(),
+            default_behavior_refs: Vec::new(),
+        })
+        .provider_route(ProviderRouteSnapshot::new("provider.fake", "model.fake"))
+        .hook(spec.clone())
+        .build()
+        .expect("package builds");
+
+    package.sidecars.clear();
+    let missing = package.validate().expect_err("missing sidecar rejected");
+    assert!(missing.context().message.contains("missing"));
+
+    package
+        .sidecars
+        .push(spec.sidecar_snapshot().expect("sidecar"));
+    package.sidecars[0].content_hash =
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string();
+    let mismatched = package.validate().expect_err("mismatched sidecar rejected");
+    assert!(mismatched.context().message.contains("does not match"));
+}
+
+#[test]
 fn hook_execution_mode_and_queue_are_fingerprinted() {
     let baseline = observe_spec("audit.before_context");
     let mut changed = baseline.clone();
@@ -334,6 +398,10 @@ fn hook_mutation_rights_matrix_matches_allowed_response_table() {
     assert!(before_tool.contains(&package_hooks::HookResponseClass::Deny));
     assert!(before_tool.contains(&package_hooks::HookResponseClass::ModifyToolRequest));
     assert!(!before_tool.contains(&package_hooks::HookResponseClass::RewriteToolResult));
+
+    let before_complete = HookPoint::BeforeRunComplete.allowed_response_classes();
+    assert!(before_complete.contains(&package_hooks::HookResponseClass::RequestRetry));
+    assert!(before_complete.contains(&package_hooks::HookResponseClass::ValidateDetach));
 
     let after_terminal = HookPoint::AfterRunTerminal.allowed_response_classes();
     assert_eq!(

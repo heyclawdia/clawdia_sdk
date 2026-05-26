@@ -8,7 +8,7 @@ use crate::{
     domain::{AgentError, AgentErrorKind, AgentId, DestinationRef, RunId, SourceRef},
     error::{CausalIds, RetryClassification},
     hook_ports::HookExecutorRegistry,
-    hook_records::{HookMutationJournalPlan, HookRecord},
+    hook_records::{HookMutationJournalPlan, HookRecord, HookResponseDecision},
     journal::JournalCursor,
     journal_ports::RunJournal,
     package::RuntimePackageFingerprint,
@@ -71,18 +71,19 @@ impl HookLifecycleContext {
 /// Use it with the documented coordinator methods; run, journal, event, provider, or port effects are called out on those methods rather than on construction.
 pub struct HookLifecycleCoordinator<'a, R, J>
 where
-    R: HookExecutorRegistry,
-    J: RunJournal,
+    R: HookExecutorRegistry + ?Sized,
+    J: RunJournal + ?Sized,
 {
     registry: &'a R,
     journal: &'a J,
     next_journal_seq: u64,
+    sequence_allocator: Option<Box<dyn FnMut(u64) -> u64 + 'a>>,
 }
 
 impl<'a, R, J> HookLifecycleCoordinator<'a, R, J>
 where
-    R: HookExecutorRegistry,
-    J: RunJournal,
+    R: HookExecutorRegistry + ?Sized,
+    J: RunJournal + ?Sized,
 {
     /// Creates a new application::hooks value with explicit
     /// caller-provided inputs. This constructor is data-only and
@@ -92,6 +93,26 @@ where
             registry,
             journal,
             next_journal_seq,
+            sequence_allocator: None,
+        }
+    }
+
+    /// Creates a coordinator with a caller-owned journal sequence allocator.
+    /// The allocator is called only when this coordinator is about to append hook journal records.
+    pub fn new_with_sequence_allocator<F>(
+        registry: &'a R,
+        journal: &'a J,
+        next_journal_seq: u64,
+        sequence_allocator: F,
+    ) -> Self
+    where
+        F: FnMut(u64) -> u64 + 'a,
+    {
+        Self {
+            registry,
+            journal,
+            next_journal_seq,
+            sequence_allocator: Some(Box::new(sequence_allocator)),
         }
     }
 
@@ -100,6 +121,13 @@ where
     /// dispatch, journal appends, or adapter calls.
     pub fn validate_package_hooks(&self, specs: &[HookSpec]) -> Result<(), AgentError> {
         validate_package_hooks(specs, self.registry)
+    }
+
+    /// Returns the next journal sequence number this coordinator would use.
+    /// Callers that share an external sequence allocator use this to synchronize after hook
+    /// mutation records have been appended.
+    pub fn next_journal_seq(&self) -> u64 {
+        self.next_journal_seq
     }
 
     /// Invoke point.
@@ -112,20 +140,41 @@ where
         context: HookLifecycleContext,
         view: HookView,
     ) -> Result<Vec<HookInvocationOutcome>, AgentError> {
+        self.invoke_point_guarded(specs, point, context, view, |_, _| Ok(true))
+    }
+
+    /// Invoke point guarded.
+    /// This invokes hooks for one point and lets the guarded domain reject behavior-changing
+    /// responses before they are journaled as accepted.
+    pub fn invoke_point_guarded<F>(
+        &mut self,
+        specs: &[HookSpec],
+        point: HookPoint,
+        context: HookLifecycleContext,
+        view: HookView,
+        mut acceptance_guard: F,
+    ) -> Result<Vec<HookInvocationOutcome>, AgentError>
+    where
+        F: FnMut(&HookSpec, &HookResponse) -> Result<bool, AgentError>,
+    {
         let hooks = ordered_hooks_for_point(specs, point);
         let mut outcomes = Vec::with_capacity(hooks.len());
         for spec in hooks {
-            outcomes.push(self.invoke_one(&spec, &context, view.clone())?);
+            outcomes.push(self.invoke_one(&spec, &context, view.clone(), &mut acceptance_guard)?);
         }
         Ok(outcomes)
     }
 
-    fn invoke_one(
+    fn invoke_one<F>(
         &mut self,
         spec: &HookSpec,
         context: &HookLifecycleContext,
         view: HookView,
-    ) -> Result<HookInvocationOutcome, AgentError> {
+        acceptance_guard: &mut F,
+    ) -> Result<HookInvocationOutcome, AgentError>
+    where
+        F: FnMut(&HookSpec, &HookResponse) -> Result<bool, AgentError>,
+    {
         spec.validate()?;
         let invocation_id = format!("hook.invocation.{}", self.next_journal_seq);
         if context.cancellation.cancelled {
@@ -183,7 +232,13 @@ where
             return self.handle_timeout(spec, context, invocation_id, execution.elapsed_ms);
         }
 
-        self.handle_response(spec, context, invocation_id, execution.response)
+        self.handle_response(
+            spec,
+            context,
+            invocation_id,
+            execution.response,
+            acceptance_guard,
+        )
     }
 
     fn handle_timeout(
@@ -208,13 +263,17 @@ where
         ))
     }
 
-    fn handle_response(
+    fn handle_response<F>(
         &mut self,
         spec: &HookSpec,
         context: &HookLifecycleContext,
         invocation_id: String,
         response: HookResponse,
-    ) -> Result<HookInvocationOutcome, AgentError> {
+        acceptance_guard: &mut F,
+    ) -> Result<HookInvocationOutcome, AgentError>
+    where
+        F: FnMut(&HookSpec, &HookResponse) -> Result<bool, AgentError>,
+    {
         let response_class = response.response_class();
         if !spec
             .point
@@ -246,6 +305,28 @@ where
                 HookInvocationStatus::Completed,
                 HookRecord::completed(spec, invocation_id, 0),
             ));
+        }
+        match acceptance_guard(spec, &response) {
+            Ok(true) => {}
+            Ok(false) => {
+                return self.append_rejected_response_decision(
+                    spec,
+                    context,
+                    invocation_id,
+                    response_class,
+                    HookInvocationStatus::RejectedPolicy,
+                );
+            }
+            Err(error) => {
+                self.append_rejected_response_decision(
+                    spec,
+                    context,
+                    invocation_id,
+                    response_class,
+                    HookInvocationStatus::RejectedPolicy,
+                )?;
+                return Err(error);
+            }
         }
 
         let journal_seq = self.next_seq_block(3);
@@ -297,15 +378,61 @@ where
             hook_id: spec.hook_id.clone(),
             status: HookInvocationStatus::AppliedJournaledMutation,
             response_class: Some(response_class),
+            accepted_response: Some(response),
             journal_cursor: Some(terminal_cursor),
             journaled_before_apply: true,
             record: plan.hook_record,
         })
     }
 
+    fn append_rejected_response_decision(
+        &mut self,
+        spec: &HookSpec,
+        context: &HookLifecycleContext,
+        invocation_id: String,
+        response_class: HookResponseClass,
+        status: HookInvocationStatus,
+    ) -> Result<HookInvocationOutcome, AgentError> {
+        let journal_seq = self.next_seq_block(1);
+        let record_id = format!("journal.hook.{}.{}", spec.hook_id.as_str(), journal_seq);
+        let (record, journal_record) = HookRecord::rejected_response_journal_record(
+            journal_seq,
+            record_id,
+            context.run_id.clone(),
+            context.agent_id.clone(),
+            context.source.clone(),
+            spec,
+            invocation_id,
+            HookResponseDecision::RejectedPolicy,
+            response_class.clone(),
+            context.package_fingerprint.as_str(),
+        );
+        let cursor = self.journal.append(journal_record).map_err(|error| {
+            fail_closed_error(
+                spec,
+                context,
+                error.kind(),
+                "hook rejected response journal append failed before returning policy rejection",
+            )
+        })?;
+        Ok(HookInvocationOutcome {
+            hook_id: spec.hook_id.clone(),
+            status,
+            response_class: Some(response_class),
+            accepted_response: None,
+            journal_cursor: Some(cursor),
+            journaled_before_apply: false,
+            record,
+        })
+    }
+
     fn next_seq_block(&mut self, width: u64) -> u64 {
-        let seq = self.next_journal_seq;
-        self.next_journal_seq += width;
+        let seq = if let Some(sequence_allocator) = &mut self.sequence_allocator {
+            sequence_allocator(width)
+        } else {
+            self.next_journal_seq
+        };
+        self.next_journal_seq = seq.saturating_add(width);
         seq
     }
 }
@@ -315,7 +442,7 @@ where
 /// dispatch, journal appends, or adapter calls.
 pub fn validate_package_hooks<R>(specs: &[HookSpec], registry: &R) -> Result<(), AgentError>
 where
-    R: HookExecutorRegistry,
+    R: HookExecutorRegistry + ?Sized,
 {
     validate_hook_specs(specs)?;
     for spec in specs {
@@ -344,6 +471,10 @@ pub struct HookInvocationOutcome {
     /// Classification value for response class.
     /// Policy and projection paths use it for finite routing decisions.
     pub response_class: Option<HookResponseClass>,
+    /// Accepted hook response for behavior-changing outcomes.
+    /// Callers may lower this into the guarded domain operation after journal-before-apply
+    /// succeeds.
+    pub accepted_response: Option<HookResponse>,
     /// Cursor identifying a replay, export, or subscription position.
     /// Use it to resume without widening the original scope.
     pub journal_cursor: Option<JournalCursor>,
@@ -360,6 +491,7 @@ impl HookInvocationOutcome {
             hook_id: spec.hook_id.clone(),
             status,
             response_class: None,
+            accepted_response: None,
             journal_cursor: None,
             journaled_before_apply: false,
             record,
@@ -379,12 +511,16 @@ impl HookInvocationOutcome {
             HookInvocationStatus::RejectedPointMatrix => {
                 crate::hook_records::HookResponseDecision::RejectedPointMatrix
             }
+            HookInvocationStatus::RejectedPolicy => {
+                crate::hook_records::HookResponseDecision::RejectedPolicy
+            }
             _ => crate::hook_records::HookResponseDecision::RejectedPolicy,
         };
         Self {
             hook_id: spec.hook_id.clone(),
             status,
             response_class: Some(response_class.clone()),
+            accepted_response: None,
             journal_cursor: None,
             journaled_before_apply: false,
             record: HookRecord::response_decision(
@@ -410,6 +546,8 @@ pub enum HookInvocationStatus {
     RejectedMutationRight,
     /// Use this variant when the contract needs to represent rejected point matrix; selecting it has no side effect by itself.
     RejectedPointMatrix,
+    /// Use this variant when the contract needs to represent rejected policy; selecting it has no side effect by itself.
+    RejectedPolicy,
     /// Use this variant when the contract needs to represent timed out fail open; selecting it has no side effect by itself.
     TimedOutFailOpen,
     /// Use this variant when the contract needs to represent failed open; selecting it has no side effect by itself.

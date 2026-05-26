@@ -174,6 +174,7 @@ impl HookPoint {
             Self::OnRunCancelRequested => set([Class::Observe, Class::RequestCleanupRepair]),
             Self::BeforeRunComplete => set([
                 Class::Observe,
+                Class::RequestRetry,
                 Class::ValidateDetach,
                 Class::StopCompletionWithRepairNeeded,
             ]),

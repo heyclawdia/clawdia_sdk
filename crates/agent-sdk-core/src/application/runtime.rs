@@ -20,6 +20,7 @@ use crate::{
     error::CausalIds,
     event::{CompiledEventFilter, EventCursor, EventKind},
     event_bus::{AgentEventBus, AgentEventStream},
+    hook_ports::{HookExecutorRegistry, InMemoryHookExecutorRegistry},
     journal::{JournalCursor, JournalRecord},
     journal_ports::RunJournal,
     package::{RuntimePackage, RuntimePackageFingerprint},
@@ -61,6 +62,16 @@ impl AgentRuntime {
 
         let effective = self.resolve_effective_package(&request)?;
         self.provider_for(&effective.package, &request.run_id)?;
+        crate::hooks::validate_package_hooks(
+            &effective.package.hooks,
+            self.inner.hook_registry.as_ref(),
+        )
+        .map_err(|error| {
+            error.with_causal_ids(CausalIds {
+                run_id: Some(request.run_id.clone()),
+                ..CausalIds::default()
+            })
+        })?;
         self.evaluate_run_start_policy(policy.as_ref(), &request, &effective.package)?;
 
         let cancellation = CancellationHandle::new();
@@ -298,6 +309,12 @@ impl AgentRuntime {
         &self.inner.output_sinks
     }
 
+    /// Returns hook executor registry for application coordinators.
+    /// This retrieves the configured port without invoking hook executors.
+    pub(crate) fn hook_registry_port(&self) -> Arc<dyn HookExecutorRegistry> {
+        self.inner.hook_registry.clone()
+    }
+
     fn insert_run(&self, entry: RegisteredRun, run_id: &RunId) -> Result<(), AgentError> {
         let mut runs = self
             .inner
@@ -465,7 +482,33 @@ impl AgentRuntime {
     /// Allocates the next in-memory journal sequence number for this runtime.
     /// This advances an atomic counter; the caller is responsible for appending the record.
     pub(crate) fn next_journal_seq(&self) -> u64 {
+        let _guard = self
+            .inner
+            .journal_sequence_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.inner.next_journal_seq.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// Reserves a contiguous journal sequence block for records appended by a coordinator.
+    /// This does not append records or call host-controlled code.
+    pub(crate) fn reserve_journal_seq_block(&self, width: u64) -> u64 {
+        debug_assert!(width > 0);
+        let _guard = self
+            .inner
+            .journal_sequence_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.inner
+            .next_journal_seq
+            .fetch_add(width, Ordering::SeqCst)
+            + 1
+    }
+
+    /// Returns the next journal sequence number without reserving it.
+    /// This is used by coordinators that may or may not append records.
+    pub(crate) fn next_journal_seq_hint(&self) -> u64 {
+        self.inner.next_journal_seq.load(Ordering::SeqCst) + 1
     }
 }
 
@@ -490,6 +533,7 @@ pub struct AgentRuntimeBuilder {
     content: Option<Arc<dyn ContentResolver + Send + Sync>>,
     policy: Option<Arc<dyn RuntimePolicyPort>>,
     output_sinks: OutputSinkRegistry,
+    hook_registry: Option<Arc<dyn HookExecutorRegistry>>,
 }
 
 impl AgentRuntimeBuilder {
@@ -601,6 +645,17 @@ impl AgentRuntimeBuilder {
         Ok(self)
     }
 
+    /// Returns hook executor registry for the current value.
+    /// This stores the registry for future run starts and hook invocation; it does not invoke
+    /// hook executors.
+    pub fn hook_executor_registry<R>(mut self, registry: R) -> Self
+    where
+        R: HookExecutorRegistry + 'static,
+    {
+        self.hook_registry = Some(Arc::new(registry));
+        self
+    }
+
     /// Finishes builder validation and returns the configured value.
     /// This is data-only unless the surrounding builder explicitly
     /// documents adapter or store access.
@@ -623,8 +678,12 @@ impl AgentRuntimeBuilder {
                 content: self.content,
                 policy: self.policy,
                 output_sinks: self.output_sinks,
+                hook_registry: self
+                    .hook_registry
+                    .unwrap_or_else(|| Arc::new(InMemoryHookExecutorRegistry::default())),
                 run_control: InMemoryRunControlStore::default(),
                 next_journal_seq: AtomicU64::new(0),
+                journal_sequence_lock: Mutex::new(()),
                 runs: Mutex::new(BTreeMap::new()),
             }),
         })
@@ -640,8 +699,10 @@ struct RuntimeInner {
     content: Option<Arc<dyn ContentResolver + Send + Sync>>,
     policy: Option<Arc<dyn RuntimePolicyPort>>,
     output_sinks: OutputSinkRegistry,
+    hook_registry: Arc<dyn HookExecutorRegistry>,
     run_control: InMemoryRunControlStore,
     next_journal_seq: AtomicU64,
+    journal_sequence_lock: Mutex<()>,
     runs: Mutex<BTreeMap<RunId, RegisteredRun>>,
 }
 

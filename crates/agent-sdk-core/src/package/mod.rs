@@ -15,6 +15,7 @@ use crate::{
         AgentError, AgentId, OutputSchemaId, PolicyRef, RuntimePackageId, SourceRef, TrustClass,
     },
     output::{OutputContract, OutputMode, OutputSchemaDialect, ProviderHintPolicy, SchemaVersion},
+    package_hooks::{HookSpec, validate_hook_specs},
 };
 
 /// Public realtime namespace. Use it for the documented realtime API
@@ -79,6 +80,9 @@ pub struct RuntimePackage {
     #[serde(default)]
     /// Typed sidecar snapshots included in a package or delta.
     pub sidecars: Vec<PackageSidecarSnapshot>,
+    #[serde(default)]
+    /// Hook specs frozen into this package snapshot.
+    pub hooks: Vec<HookSpec>,
     #[serde(default)]
     /// Isolation requirements frozen into the package snapshot.
     pub isolation_requirements: Vec<IsolationRequirementSnapshot>,
@@ -219,6 +223,8 @@ impl RuntimePackage {
         for output_contract in &self.output_contracts {
             output_contract.validate()?;
         }
+        validate_hook_specs(&self.hooks)?;
+        self.validate_hook_sidecars()?;
         for isolation_requirement in &self.isolation_requirements {
             isolation_requirement.validate()?;
         }
@@ -343,6 +349,36 @@ impl RuntimePackage {
         })
     }
 
+    fn validate_hook_sidecars(&self) -> Result<(), AgentError> {
+        for spec in &self.hooks {
+            let expected = canonical_sidecar(spec.sidecar_snapshot()?);
+            let actual = self.sidecar(&expected.sidecar_id).ok_or_else(|| {
+                AgentError::contract_violation(format!(
+                    "hook sidecar {} is missing from runtime package",
+                    expected.sidecar_id
+                ))
+            })?;
+            if canonical_sidecar(actual.clone()) != expected {
+                return Err(AgentError::contract_violation(format!(
+                    "hook sidecar {} does not match hook spec {}",
+                    actual.sidecar_id,
+                    spec.hook_id.as_str()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn sync_hook_sidecars(&mut self) -> Result<(), AgentError> {
+        for spec in &self.hooks {
+            let sidecar = spec.sidecar_snapshot()?;
+            self.sidecars
+                .retain(|existing| existing.sidecar_id != sidecar.sidecar_id);
+            self.sidecars.push(sidecar);
+        }
+        Ok(())
+    }
+
     fn computed_fingerprint_manifest(&self) -> FingerprintInputManifest {
         FingerprintInputManifest {
             algorithm: RUNTIME_PACKAGE_FINGERPRINT_ALGORITHM.to_string(),
@@ -414,6 +450,7 @@ impl RuntimePackageBuilder {
             output_sinks: Vec::new(),
             capabilities: Vec::new(),
             sidecars: Vec::new(),
+            hooks: Vec::new(),
             isolation_requirements: Vec::new(),
             catalogs: Vec::new(),
             child_lifecycle: ChildLifecyclePolicySnapshot::safe_defaults(),
@@ -472,6 +509,14 @@ impl RuntimePackageBuilder {
         self
     }
 
+    /// Returns hook for the current value.
+    /// This records a typed hook spec and derives its canonical sidecar during build; it does
+    /// not resolve or invoke the hook executor.
+    pub fn hook(mut self, hook: HookSpec) -> Self {
+        self.package.hooks.push(hook);
+        self
+    }
+
     /// Returns catalog for the current value.
     /// This is a read-only or data-construction helper unless the method body explicitly calls
     /// a port or store.
@@ -500,6 +545,7 @@ impl RuntimePackageBuilder {
     /// This is data-only unless the surrounding builder explicitly
     /// documents adapter or store access.
     pub fn build(mut self) -> Result<RuntimePackage, AgentError> {
+        self.package.sync_hook_sidecars()?;
         self.package.fingerprint_manifest = self.package.computed_fingerprint_manifest();
         self.package.validate()?;
         Ok(self.package)

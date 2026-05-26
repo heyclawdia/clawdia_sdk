@@ -191,7 +191,7 @@ Hooks mutate only through typed responses. No hook receives arbitrary mutable re
 | `BeforeIsolationProcessStart` | observe, deny, `ModifyProcessRequest` within `ProcessOwnershipPolicy` and isolation policy |
 | `AfterIsolationProcessExit` | observe, `RequestCleanupRepair` |
 | `OnRunCancelRequested` | observe, propose cleanup through `RequestCleanupRepair` or an existing child/process lifecycle operation, cannot veto cancellation |
-| `BeforeRunComplete` | observe, `ValidateDetach`, `StopCompletionWithRepairNeeded` |
+| `BeforeRunComplete` | observe, request retry, `ValidateDetach`, `StopCompletionWithRepairNeeded` |
 | `AfterRunTerminal` | observe only; best effort and cannot change terminal result |
 | `BeforeCompaction` | observe, `MarkProtectedContext` through policy |
 | `AfterCompaction` | observe, `RequestProjectionAuditRepair` |
@@ -199,6 +199,13 @@ Hooks mutate only through typed responses. No hook receives arbitrary mutable re
 If a response class is not in the hook spec's `mutation_rights`, the SDK rejects it as `PolicyDenied` and records `HookResponseRejected`.
 
 `HookResponse` is intentionally closed for the first Rust slice. Future response classes require updating this enum, this table, event payload fixtures, journal fixtures, and mutation-right tests. Hooks do not emit arbitrary events or enqueue generic SDK effects. A behavior-changing hook response is accepted only when it lowers into an existing domain operation such as context injection, tool denial, approval request mutation, process request mutation, child lifecycle action, or cleanup repair; that domain operation emits its normal events and journal records.
+
+Feature slices may impose narrower lowering rules than the global matrix until
+the corresponding domain owner exists. The P0 `run_text` lowering invokes only
+`BeforeContextAssembly`, `BeforeRunComplete`, and `AfterRunTerminal`; a
+behavior-changing `BeforeContextAssembly` hook must be the only hook at that
+point in P0 so accepted context injection cannot be stranded by a later
+same-point failure before projection.
 
 ## Response Lowering Matrix
 
@@ -271,6 +278,9 @@ Rules:
 - A hook response that changes run behavior is journaled before it is applied.
 - Accepted hook proposals lower into normal SDK domain operations. Any side effect created by that operation must satisfy intent-before-effect.
 - Behavior-changing responses use this order: validate hook point and `mutation_rights`; evaluate the effective policy refs; append the accepted or rejected `HookRecord`; append the target domain intent/record when the domain operation is side-effecting; apply the mutation only after those appends succeed; emit `HookResponseApplied` as a journal-backed event.
+- Guard-level rejections such as retry-budget exhaustion, payload-size bounds,
+  or slice-specific lowering limits append a rejected hook response decision
+  before the guarded transition returns failure.
 - If the required journal append fails before applying a mutation, the mutation is not applied. Security-relevant guarded transitions deny, interrupt, or fail according to policy; non-security observe-only failures may record diagnostics and continue.
 - `EffectKind::HookMutation`, when used, records that a hook proposal changed run behavior. It is not a generic authorization to execute arbitrary effects; the target domain operation must still use its normal `EffectIntent` / `EffectResult`, policy, events, and reconciliation records.
 - `HookRegistered` is a run-effective event emitted when a hook spec becomes part of the immutable runtime package for a specific run, after `RunStarted` has a `run_id`. Pre-run package construction is represented by package/capability validation records, not by run-scoped `AgentEvent`s.

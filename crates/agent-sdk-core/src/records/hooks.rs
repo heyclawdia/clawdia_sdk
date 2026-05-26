@@ -156,6 +156,46 @@ impl HookRecord {
             },
         }
     }
+
+    /// Builds a rejected response decision journal record.
+    /// This is data construction and performs no I/O, journal append, event publication, or
+    /// process work.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "hook response records are durable audit DTOs and keep their lineage fields explicit until a record-builder pass"
+    )]
+    pub fn rejected_response_journal_record(
+        journal_seq: u64,
+        record_id: impl Into<String>,
+        run_id: RunId,
+        agent_id: AgentId,
+        source: SourceRef,
+        spec: &HookSpec,
+        invocation_id: impl Into<String>,
+        decision: HookResponseDecision,
+        response_class: HookResponseClass,
+        runtime_package_fingerprint: impl Into<String>,
+    ) -> (Self, JournalRecord) {
+        let hook_record =
+            Self::response_decision(spec, invocation_id, decision, response_class, Vec::new());
+        let mut base = JournalRecordBase::new(
+            journal_seq,
+            format!("{}.response", record_id.into()),
+            run_id,
+            agent_id,
+            source,
+        );
+        base.runtime_package_fingerprint = runtime_package_fingerprint.into();
+        base.privacy = PrivacyClass::ContentRefsOnly;
+        base.redaction_policy_id = "policy.redaction.hook.default".to_string();
+        let journal_record = hook_journal_record(
+            base,
+            hook_record.clone(),
+            SourceRef::with_kind(SourceKind::Hook, spec.hook_id.as_str()),
+            "hook_response_decision",
+        );
+        (hook_record, journal_record)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

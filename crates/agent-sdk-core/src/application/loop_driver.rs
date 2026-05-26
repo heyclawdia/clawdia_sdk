@@ -15,24 +15,30 @@ use crate::{
         sdk_context_policy_ref,
     },
     domain::{
-        AdapterRef, AgentError, AgentId, ContentId, ContentRef as ContentRefId, ContextItemId,
-        ContextProjectionId, DestinationKind, DestinationRef, EffectId, EntityKind, EntityRef,
-        EventId, IdempotencyKey, LineageId, LineageRef, MessageId, PolicyKind, PolicyRef,
-        PrivacyClass, RetentionClass, RunId, SourceKind, SourceRef, SpanId, TraceId, TrustClass,
-        TurnId, ValidatedOutputId, ValidationAttemptId,
+        AdapterRef, AgentError, AgentErrorKind, AgentId, ContentId, ContentRef as ContentRefId,
+        ContextItemId, ContextProjectionId, DestinationKind, DestinationRef, EffectId, EntityKind,
+        EntityRef, EventId, IdempotencyKey, LineageId, LineageRef, MessageId, PolicyKind,
+        PolicyRef, PrivacyClass, RetentionClass, RetryClassification, RunId, SourceKind, SourceRef,
+        SpanId, TraceId, TrustClass, TurnId, ValidatedOutputId, ValidationAttemptId,
     },
     effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus},
+    error::CausalIds,
     event::{
         AgentEvent, ContentCaptureMode, EVENT_SCHEMA_VERSION, EventCorrelation,
         EventDeliverySemantics, EventEnvelope, EventFamily, EventFrame, EventKind,
         EventStreamScope,
     },
+    hooks::{HookInvocationOutcome, HookLifecycleContext, HookLifecycleCoordinator},
     journal::{
         ContextProjectionRecord, EventIndexProjection, JOURNAL_SCHEMA_VERSION, JournalRecord,
         JournalRecordBase, JournalRecordKind, JournalRecordPayload, MessageRecord,
         ModelAttemptRecord, RunLifecycleRecord, StructuredOutputRecord, TerminalResultMarker,
     },
     output::OutputContract,
+    package_hooks::{
+        ContextInjectionRequest, HookId, HookMutationRight, HookPoint, HookResponse, HookSpec,
+        HookView, RetryRequest,
+    },
     provider::{
         ProviderAdapter, ProviderMessage, ProviderMessageRole, ProviderProjectionPolicy,
         ProviderRequest, ProviderResponse, ProviderStopReason,
@@ -65,6 +71,18 @@ pub fn run_p0_text(
     let journal = runtime.journal_port(&request.run_id)?;
     let events = runtime.event_bus_port(&request.run_id)?;
     let provider = runtime.provider_for_route(&snapshot.provider_route_id, &request.run_id)?;
+    let effective = runtime.resolve_effective_package(&request)?;
+    if effective.fingerprint != snapshot.runtime_package_fingerprint {
+        return Err(AgentError::contract_violation(
+            "runtime package fingerprint changed after start_run",
+        )
+        .with_causal_ids(CausalIds {
+            run_id: Some(request.run_id.clone()),
+            ..CausalIds::default()
+        }));
+    }
+    let hooks = effective.package.hooks.clone();
+    validate_p0_hook_support(&hooks, &request)?;
     let ids = P0Ids::new(&request.run_id);
     let mut event_ids = EventIdSequence::default();
     let fingerprint = snapshot.runtime_package_fingerprint.as_str().to_string();
@@ -102,7 +120,31 @@ pub fn run_p0_text(
         &ids,
     ))?;
 
-    let projection = build_text_projection(&request, &ids, &fingerprint)?;
+    let mut accepted_injection_count = 0_usize;
+    let before_context_outcomes = invoke_p0_hook_point_guarded(
+        runtime,
+        &request,
+        &ids,
+        &hooks,
+        HookPoint::BeforeContextAssembly,
+        HookView::redacted("before context assembly envelope"),
+        &fingerprint,
+        &source,
+        None,
+        |_, response| match response {
+            HookResponse::InjectContext(requests) => {
+                validate_context_injection_bounds(
+                    &request,
+                    requests,
+                    &mut accepted_injection_count,
+                )?;
+                Ok(true)
+            }
+            _ => Ok(true),
+        },
+    )?;
+    let context_injections = context_injections_from_outcomes(before_context_outcomes);
+    let projection = build_text_projection(&request, &ids, &fingerprint, &context_injections)?;
     let context_record = journal_record(
         &request.run_id,
         &request.agent_id,
@@ -300,7 +342,7 @@ pub fn run_p0_text(
             }
         }
     } else {
-        append_message_and_terminal(
+        complete_p0_text_with_hooks(
             runtime,
             &handle,
             &request,
@@ -308,11 +350,492 @@ pub fn run_p0_text(
             &mut event_ids,
             &fingerprint,
             &source,
-            RunStatus::Completed,
-            response.output_text,
-            None,
+            provider.as_ref(),
+            &provider_request,
+            &snapshot.provider_route_id,
+            &snapshot.provider_model_id,
+            &hooks,
+            response,
         )
     }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "hook-aware terminal coordination mirrors the existing P0 loop evidence until a run-loop session object is introduced"
+)]
+fn complete_p0_text_with_hooks(
+    runtime: &AgentRuntime,
+    handle: &RunHandle,
+    request: &RunRequest,
+    ids: &P0Ids,
+    event_ids: &mut EventIdSequence,
+    fingerprint: &str,
+    source: &SourceRef,
+    provider: &dyn ProviderAdapter,
+    base_provider_request: &ProviderRequest,
+    provider_route_id: &str,
+    provider_model_id: &str,
+    hooks: &[HookSpec],
+    mut response: ProviderResponse,
+) -> Result<RunResult, AgentError> {
+    let mut retry_count = 0_u8;
+    let mut current_attempt_id = ids.attempt_id.clone();
+    loop {
+        match before_run_complete_action(
+            runtime,
+            request,
+            ids,
+            hooks,
+            fingerprint,
+            source,
+            current_attempt_id.clone(),
+            retry_count,
+            &response,
+        )? {
+            CompletionHookAction::Complete => {
+                let result = append_message_and_terminal(
+                    runtime,
+                    handle,
+                    request,
+                    ids,
+                    event_ids,
+                    fingerprint,
+                    source,
+                    RunStatus::Completed,
+                    response.output_text,
+                    None,
+                )?;
+                invoke_after_run_terminal_best_effort(
+                    runtime,
+                    request,
+                    ids,
+                    hooks,
+                    fingerprint,
+                    source,
+                );
+                return Ok(result);
+            }
+            CompletionHookAction::Retry(retry) => {
+                retry_count += 1;
+                let attempt_id = crate::ids::AttemptId::new(format!(
+                    "attempt.p0.{}.hook_retry.{}",
+                    ids.fragment, retry_count
+                ));
+                let retry_request =
+                    hook_retry_provider_request(base_provider_request, &retry.redacted_summary);
+                let retry_effect_id = append_provider_hook_retry_attempt_started(
+                    runtime,
+                    request,
+                    ids,
+                    event_ids,
+                    fingerprint,
+                    source,
+                    attempt_id.clone(),
+                    provider_route_id,
+                    provider_model_id,
+                    retry_request.messages.len() as u32,
+                )?;
+                let retry_response = provider.complete(&retry_request)?;
+                response = append_model_attempt_completion(
+                    runtime,
+                    request,
+                    ids,
+                    event_ids,
+                    fingerprint,
+                    source,
+                    attempt_id.clone(),
+                    provider_route_id,
+                    provider_model_id,
+                    retry_request.messages.len() as u32,
+                    retry_effect_id,
+                    retry_response,
+                )?;
+                current_attempt_id = attempt_id;
+            }
+            CompletionHookAction::RepairNeeded(summary) => {
+                append_message_and_terminal(
+                    runtime,
+                    handle,
+                    request,
+                    ids,
+                    event_ids,
+                    fingerprint,
+                    source,
+                    RunStatus::Failed,
+                    summary.clone(),
+                    None,
+                )?;
+                invoke_after_run_terminal_best_effort(
+                    runtime,
+                    request,
+                    ids,
+                    hooks,
+                    fingerprint,
+                    source,
+                );
+                return Err(repair_needed_error(request, summary));
+            }
+        }
+    }
+}
+
+const P0_HOOK_RETRY_BUDGET: u8 = 1;
+const P0_HOOK_MAX_CONTEXT_INJECTIONS: usize = 4;
+const P0_HOOK_MAX_REDACTED_SUMMARY_CHARS: usize = 2048;
+
+#[derive(Clone, Debug)]
+struct HookContextInjection {
+    hook_id: HookId,
+    request: ContextInjectionRequest,
+}
+
+enum CompletionHookAction {
+    Complete,
+    Retry(RetryRequest),
+    RepairNeeded(String),
+}
+
+fn validate_p0_hook_support(specs: &[HookSpec], request: &RunRequest) -> Result<(), AgentError> {
+    let mut before_context_total_hooks = 0_usize;
+    let mut before_context_mutating_hooks = 0_usize;
+    let mut before_complete_mutating_hooks = 0_usize;
+    for spec in specs {
+        match spec.point {
+            HookPoint::BeforeContextAssembly => {
+                before_context_total_hooks += 1;
+                if spec.mutation_rights.can_change_behavior() {
+                    before_context_mutating_hooks += 1;
+                }
+            }
+            HookPoint::AfterRunTerminal => {}
+            HookPoint::BeforeRunComplete => {
+                if spec.mutation_rights.can_change_behavior() {
+                    before_complete_mutating_hooks += 1;
+                }
+                let supported = [
+                    HookMutationRight::Observe,
+                    HookMutationRight::RequestRetry,
+                    HookMutationRight::StopCompletionWithRepairNeeded,
+                ];
+                if let Some(right) = spec
+                    .mutation_rights
+                    .rights
+                    .iter()
+                    .find(|right| !supported.contains(right))
+                {
+                    return Err(AgentError::new(
+                        AgentErrorKind::InvalidPackage,
+                        RetryClassification::HostConfigurationNeeded,
+                        format!(
+                            "P0 run_text does not lower {:?} hooks at BeforeRunComplete",
+                            right
+                        ),
+                    )
+                    .with_causal_ids(CausalIds {
+                        run_id: Some(request.run_id.clone()),
+                        ..CausalIds::default()
+                    }));
+                }
+            }
+            _ if spec.mutation_rights.can_change_behavior() => {
+                return Err(AgentError::new(
+                    AgentErrorKind::InvalidPackage,
+                    RetryClassification::HostConfigurationNeeded,
+                    format!(
+                        "P0 run_text does not invoke behavior-changing hooks at {:?}",
+                        spec.point
+                    ),
+                )
+                .with_causal_ids(CausalIds {
+                    run_id: Some(request.run_id.clone()),
+                    ..CausalIds::default()
+                }));
+            }
+            _ => {}
+        }
+    }
+    if before_context_mutating_hooks > 0 && before_context_total_hooks > 1 {
+        return Err(AgentError::new(
+            AgentErrorKind::InvalidPackage,
+            RetryClassification::HostConfigurationNeeded,
+            "P0 run_text supports behavior-changing BeforeContextAssembly hooks only when they are the only hook at that point",
+        )
+        .with_causal_ids(CausalIds {
+            run_id: Some(request.run_id.clone()),
+            ..CausalIds::default()
+        }));
+    }
+    if before_complete_mutating_hooks > 1 {
+        return Err(AgentError::new(
+            AgentErrorKind::InvalidPackage,
+            RetryClassification::HostConfigurationNeeded,
+            "P0 run_text supports at most one behavior-changing BeforeRunComplete hook",
+        )
+        .with_causal_ids(CausalIds {
+            run_id: Some(request.run_id.clone()),
+            ..CausalIds::default()
+        }));
+    }
+    Ok(())
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "hook invocation needs the same explicit run-loop lineage fields as journal and event helpers"
+)]
+fn invoke_p0_hook_point(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    specs: &[HookSpec],
+    point: HookPoint,
+    view: HookView,
+    fingerprint: &str,
+    source: &SourceRef,
+    attempt_id: Option<crate::ids::AttemptId>,
+) -> Result<Vec<HookInvocationOutcome>, AgentError> {
+    invoke_p0_hook_point_guarded(
+        runtime,
+        request,
+        ids,
+        specs,
+        point,
+        view,
+        fingerprint,
+        source,
+        attempt_id,
+        |_, _| Ok(true),
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "hook invocation needs caller-owned acceptance checks in addition to run-loop lineage fields"
+)]
+fn invoke_p0_hook_point_guarded<F>(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    specs: &[HookSpec],
+    point: HookPoint,
+    view: HookView,
+    fingerprint: &str,
+    source: &SourceRef,
+    attempt_id: Option<crate::ids::AttemptId>,
+    mut acceptance_guard: F,
+) -> Result<Vec<HookInvocationOutcome>, AgentError>
+where
+    F: FnMut(&HookSpec, &HookResponse) -> Result<bool, AgentError>,
+{
+    let registry = runtime.hook_registry_port();
+    let journal = runtime.journal_port(&request.run_id)?;
+    let mut context = HookLifecycleContext::new(
+        request.run_id.clone(),
+        request.agent_id.clone(),
+        source.clone(),
+        crate::package::RuntimePackageFingerprint(fingerprint.to_string()),
+    );
+    context.turn_id = Some(ids.turn_id.clone());
+    context.attempt_id = attempt_id;
+    let mut coordinator = HookLifecycleCoordinator::new_with_sequence_allocator(
+        registry.as_ref(),
+        journal.as_ref(),
+        runtime.next_journal_seq_hint(),
+        |width| runtime.reserve_journal_seq_block(width),
+    );
+    coordinator.invoke_point_guarded(specs, point, context, view, |spec, response| {
+        acceptance_guard(spec, response)
+    })
+}
+
+fn context_injections_from_outcomes(
+    outcomes: Vec<HookInvocationOutcome>,
+) -> Vec<HookContextInjection> {
+    let mut injections = Vec::new();
+    for outcome in outcomes {
+        if let Some(HookResponse::InjectContext(requests)) = outcome.accepted_response {
+            injections.extend(requests.into_iter().map(|request| HookContextInjection {
+                hook_id: outcome.hook_id.clone(),
+                request,
+            }));
+        }
+    }
+    injections
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "completion hook lowering keeps run, attempt, response, and package evidence explicit until hook session state is factored out"
+)]
+fn before_run_complete_action(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    hooks: &[HookSpec],
+    fingerprint: &str,
+    source: &SourceRef,
+    attempt_id: crate::ids::AttemptId,
+    retry_count: u8,
+    response: &ProviderResponse,
+) -> Result<CompletionHookAction, AgentError> {
+    let mut retry_rejected_for_budget = false;
+    let outcomes = invoke_p0_hook_point_guarded(
+        runtime,
+        request,
+        ids,
+        hooks,
+        HookPoint::BeforeRunComplete,
+        HookView::redacted(format!(
+            "before run complete envelope: {:?}",
+            response.stop_reason
+        )),
+        fingerprint,
+        source,
+        Some(attempt_id),
+        |_, response| match response {
+            HookResponse::RequestRetry(retry) => {
+                validate_redacted_summary_bound(
+                    request,
+                    "hook retry request",
+                    &retry.redacted_summary,
+                )?;
+                if retry_count >= P0_HOOK_RETRY_BUDGET {
+                    retry_rejected_for_budget = true;
+                    Ok(false)
+                } else {
+                    Ok(true)
+                }
+            }
+            HookResponse::StopCompletionWithRepairNeeded(reason) => {
+                validate_redacted_summary_bound(
+                    request,
+                    "hook repair-needed reason",
+                    &reason.redacted_summary,
+                )?;
+                Ok(true)
+            }
+            _ => Ok(true),
+        },
+    )?;
+    for outcome in outcomes {
+        let status = outcome.status.clone();
+        let response_class = outcome.response_class.clone();
+        match outcome.accepted_response {
+            Some(HookResponse::RequestRetry(retry)) => {
+                return Ok(CompletionHookAction::Retry(retry));
+            }
+            Some(HookResponse::StopCompletionWithRepairNeeded(reason)) => {
+                return Ok(CompletionHookAction::RepairNeeded(reason.redacted_summary));
+            }
+            _ => {}
+        }
+        if retry_rejected_for_budget
+            && status == crate::hooks::HookInvocationStatus::RejectedPolicy
+            && response_class == Some(crate::package_hooks::HookResponseClass::RequestRetry)
+        {
+            return Ok(CompletionHookAction::RepairNeeded(
+                "hook retry budget exhausted before run completion".to_string(),
+            ));
+        }
+    }
+    Ok(CompletionHookAction::Complete)
+}
+
+fn invoke_after_run_terminal_best_effort(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    hooks: &[HookSpec],
+    fingerprint: &str,
+    source: &SourceRef,
+) {
+    let _ = invoke_p0_hook_point(
+        runtime,
+        request,
+        ids,
+        hooks,
+        HookPoint::AfterRunTerminal,
+        HookView::redacted("after run terminal envelope"),
+        fingerprint,
+        source,
+        Some(ids.attempt_id.clone()),
+    );
+}
+
+fn hook_retry_provider_request(
+    base_provider_request: &ProviderRequest,
+    redacted_summary: &str,
+) -> ProviderRequest {
+    let mut request = base_provider_request.clone();
+    request.messages.push(ProviderMessage {
+        role: ProviderMessageRole::Developer,
+        content: redacted_summary.to_string(),
+        privacy: PrivacyClass::ContentRefsOnly,
+        projected_metadata: None,
+    });
+    request.projection_item_count = request.messages.len();
+    request
+}
+
+fn repair_needed_error(request: &RunRequest, message: impl Into<String>) -> AgentError {
+    AgentError::new(
+        AgentErrorKind::RecoveryRepairNeeded,
+        RetryClassification::RepairNeeded,
+        message,
+    )
+    .with_causal_ids(CausalIds {
+        run_id: Some(request.run_id.clone()),
+        ..CausalIds::default()
+    })
+}
+
+fn validate_context_injection_bounds(
+    request: &RunRequest,
+    injections: &[ContextInjectionRequest],
+    accepted_injection_count: &mut usize,
+) -> Result<(), AgentError> {
+    if *accepted_injection_count + injections.len() > P0_HOOK_MAX_CONTEXT_INJECTIONS {
+        return Err(hook_payload_error(
+            request,
+            "hook context injection count exceeds P0 bound",
+        ));
+    }
+    for injection in injections {
+        validate_redacted_summary_bound(
+            request,
+            "hook context injection",
+            &injection.redacted_summary,
+        )?;
+    }
+    *accepted_injection_count += injections.len();
+    Ok(())
+}
+
+fn validate_redacted_summary_bound(
+    request: &RunRequest,
+    label: &str,
+    summary: &str,
+) -> Result<(), AgentError> {
+    if summary.chars().count() > P0_HOOK_MAX_REDACTED_SUMMARY_CHARS {
+        return Err(hook_payload_error(
+            request,
+            format!("{label} exceeds P0 redacted summary bound"),
+        ));
+    }
+    Ok(())
+}
+
+fn hook_payload_error(request: &RunRequest, message: impl Into<String>) -> AgentError {
+    AgentError::new(
+        AgentErrorKind::PolicyDenial,
+        RetryClassification::RepairNeeded,
+        message,
+    )
+    .with_causal_ids(CausalIds {
+        run_id: Some(request.run_id.clone()),
+        ..CausalIds::default()
+    })
 }
 
 #[expect(
@@ -1019,6 +1542,118 @@ fn append_provider_repair_attempt_started(
     Ok(effect_id)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "hook retry attempt journaling keeps provider lineage explicit and mirrors the P1 repair helper"
+)]
+fn append_provider_hook_retry_attempt_started(
+    runtime: &AgentRuntime,
+    request: &RunRequest,
+    ids: &P0Ids,
+    event_ids: &mut EventIdSequence,
+    fingerprint: &str,
+    source: &SourceRef,
+    attempt_id: crate::ids::AttemptId,
+    provider_route_id: &str,
+    provider_model_id: &str,
+    request_message_count: u32,
+) -> Result<EffectId, AgentError> {
+    let journal = runtime.journal_port(&request.run_id)?;
+    let events = runtime.event_bus_port(&request.run_id)?;
+    let effect_id = EffectId::new(format!(
+        "effect.p0.{}.provider_hook_retry.{}",
+        ids.fragment,
+        attempt_id.as_str()
+    ));
+    let provider_effect_intent = journal_record(
+        &request.run_id,
+        &request.agent_id,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id.clone()),
+        runtime.next_journal_seq(),
+        ids.record(&format!(
+            "provider.hook_retry.effect.intent.{}",
+            attempt_id.as_str()
+        )),
+        JournalRecordKind::EffectIntent,
+        "effect",
+        "provider_hook_retry_intent",
+        source.clone(),
+        fingerprint.to_string(),
+        JournalRecordPayload::EffectIntent(EffectIntent {
+            effect_id: effect_id.clone(),
+            kind: EffectKind::ProviderRequest,
+            subject_ref: EntityRef::run(request.run_id.clone()),
+            source: source.clone(),
+            destination: Some(DestinationRef::with_kind(
+                DestinationKind::Provider,
+                "destination.provider.p0_hook_retry",
+            )),
+            policy_refs: vec![PolicyRef::with_kind(
+                PolicyKind::RuntimePackage,
+                "policy.p0.provider_hook_retry_request",
+            )],
+            idempotency_key: Some(IdempotencyKey::new(format!(
+                "idempotency.p0.{}.{}",
+                ids.fragment,
+                attempt_id.as_str()
+            ))),
+            dedupe_key: None,
+            content_refs: Vec::new(),
+            redacted_summary: "provider hook retry request intent".to_string(),
+        }),
+    );
+    let provider_effect_cursor = journal.append(provider_effect_intent)?;
+    let model_intent = journal_record(
+        &request.run_id,
+        &request.agent_id,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id.clone()),
+        runtime.next_journal_seq(),
+        ids.record(&format!("model.hook_retry.intent.{}", attempt_id.as_str())),
+        JournalRecordKind::ModelAttempt,
+        "model",
+        "hook_retry_request_projected",
+        source.clone(),
+        fingerprint.to_string(),
+        JournalRecordPayload::ModelAttempt(ModelAttemptRecord {
+            provider_route_id: provider_route_id.to_string(),
+            provider_model_id: provider_model_id.to_string(),
+            request_message_count,
+            stop_reason: None,
+            usage: None,
+        }),
+    );
+    let model_intent_cursor = journal.append(model_intent)?;
+    events.publish(event_frame(
+        &request.run_id,
+        &request.agent_id,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id.clone()),
+        event_ids.next(),
+        EventFamily::Turn,
+        EventKind::ProviderRequestProjected,
+        "provider hook retry request projected",
+        Some(provider_effect_cursor),
+        fingerprint.to_string(),
+        ids,
+    ))?;
+    events.publish(event_frame(
+        &request.run_id,
+        &request.agent_id,
+        Some(ids.turn_id.clone()),
+        Some(attempt_id),
+        event_ids.next(),
+        EventFamily::Model,
+        EventKind::ModelAttemptStarted,
+        "model hook retry attempt started",
+        Some(model_intent_cursor),
+        fingerprint.to_string(),
+        ids,
+    ))?;
+    Ok(effect_id)
+}
+
 fn repair_provider_request(
     base_provider_request: &ProviderRequest,
     prompt_summary: &str,
@@ -1148,6 +1783,7 @@ fn build_text_projection(
     request: &RunRequest,
     ids: &P0Ids,
     runtime_package_fingerprint: &str,
+    hook_injections: &[HookContextInjection],
 ) -> Result<ContextProjection, AgentError> {
     let policy_ref = sdk_context_policy_ref();
     let message = AgentMessage::user_text(
@@ -1173,13 +1809,47 @@ fn build_text_projection(
         DestinationRef::with_kind(DestinationKind::Provider, "destination.provider.p0_text"),
         ProjectionRole::User,
     );
+    let provider_destination =
+        DestinationRef::with_kind(DestinationKind::Provider, "destination.provider.p0_text");
+    let mut items = vec![item];
+    for (index, injection) in hook_injections.iter().enumerate() {
+        let policy_ref = injection
+            .request
+            .policy_refs
+            .first()
+            .cloned()
+            .unwrap_or_else(sdk_context_policy_ref);
+        let mut contribution = ContextContribution::new(
+            ContextContributionId::new(format!(
+                "context.contribution.p0.{}.hook.{}",
+                ids.fragment, index
+            )),
+            ContextContributionKind::HostContext,
+            EntityRef::new(EntityKind::Hook, injection.hook_id.as_str()),
+            SourceRef::with_kind(SourceKind::Hook, injection.hook_id.as_str()),
+            policy_ref,
+            injection.request.redacted_summary.clone(),
+        );
+        if !injection.request.policy_refs.is_empty() {
+            contribution.policy_refs = injection.request.policy_refs.clone();
+        }
+        contribution.inline_redacted_summary = Some(injection.request.redacted_summary.clone());
+        contribution.privacy_class = PrivacyClass::ContentRefsOnly;
+        let item = ContextItem::admit(
+            contribution,
+            ContextItemId::new(format!("context.item.p0.{}.hook.{}", ids.fragment, index)),
+            provider_destination.clone(),
+            ProjectionRole::AssistantContext,
+        );
+        items.push(item);
+    }
 
     ContextProjection::build(
         ids.projection_id.clone(),
         vec![message],
-        vec![item],
+        items,
         Vec::new(),
-        DestinationRef::with_kind(DestinationKind::Provider, "destination.provider.p0_text"),
+        provider_destination,
         ContextBudgetSummary::default(),
         PolicyRef::with_kind(PolicyKind::Redaction, "policy.redaction.default"),
         runtime_package_fingerprint,
