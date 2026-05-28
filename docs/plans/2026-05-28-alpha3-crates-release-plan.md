@@ -40,9 +40,15 @@ Triggering the release without updating the workflow would leave the `0.1.0-alph
 - The workflow can publish from a GitHub release, an explicit publish
   dispatch, or a `v*` release-tag push so release execution is not blocked by a
   local `gh` credential failure.
+- When publishing from a `v*` tag push, the workflow creates the GitHub
+  prerelease from the matching changelog section after crates.io publication
+  succeeds.
 - The workflow parses local `cargo pkgid` output that uses `#<version>` as well
   as registry-style output that uses `@<version>`, so crates.io lookups use the
   real version string.
+- The workflow sends an explicit release-check User-Agent for crates.io API
+  visibility probes so reruns do not mistake registry API blocking for
+  propagation delay.
 - `EnvironmentRuntime` and `AgentWorkspaceEnvironmentProfile::runtime` have rustdoc that makes clear they are data-only aliases/lowering helpers and do not register or run isolation adapters.
 - Release notes mention the typed toolkit environment runtime helper.
 
@@ -83,8 +89,13 @@ Triggering the release without updating the workflow would leave the `0.1.0-alph
 - Do not publish toolkit before both `agent-sdk-core` and `agent-sdk-eval` are visible on crates.io; toolkit has registry-pinned dependencies on both.
 - Do not assume `agent-sdk-provider` is transitively published by toolkit; it is an independent optional adapter crate.
 - Do not derive crates.io version checks with an `@`-only parser; local workspace package IDs use `#<version>`.
+- Do not use curl's default User-Agent for crates.io version checks; crates.io
+  can reject those probes and make an already published crate look invisible.
 - If local GitHub CLI credentials are unavailable, prefer the release-tag trigger
   over manual local `cargo publish` so the repository secret remains the only
   crates.io credential source.
+- Do not create the GitHub prerelease before the crates publish step succeeds;
+  failed partial publishes should remain visible as failed Actions runs rather
+  than completed release objects.
 - Keep `EnvironmentRuntime` data-only. If a future runtime crate registers real adapters, route that through core isolation runtime ports and host policy, not this enum.
 - Keep release workflow rerunnable. Existing crates at the same version should be skipped rather than failing the entire publish job.

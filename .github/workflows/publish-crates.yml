@@ -15,7 +15,7 @@ on:
         type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish-crates:
@@ -44,8 +44,9 @@ jobs:
 
       - name: Package core dry run
         run: |
+          crates_io_user_agent="agent-sdk-release-check/${GITHUB_REPOSITORY:-local}"
           core_version="$(cargo pkgid -p agent-sdk-core | sed -E 's/.*[#@]//')"
-          status="$(curl -sS -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/agent-sdk-core/${core_version}")"
+          status="$(curl -sS -A "$crates_io_user_agent" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/agent-sdk-core/${core_version}")"
           if [[ "$status" == "200" ]]; then
             echo "agent-sdk-core ${core_version} is already on crates.io; skipping dry run."
           else
@@ -60,11 +61,13 @@ jobs:
             cargo pkgid -p "$1" | sed -E 's/.*[#@]//'
           }
 
+          crates_io_user_agent="agent-sdk-release-check/${GITHUB_REPOSITORY:-local}"
+
           crate_exists() {
             local name="$1"
             local version="$2"
             local status
-            status="$(curl -sS -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${name}/${version}")"
+            status="$(curl -sS -A "$crates_io_user_agent" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${name}/${version}")"
             [[ "$status" == "200" ]]
           }
 
@@ -126,11 +129,13 @@ jobs:
             cargo pkgid -p "$1" | sed -E 's/.*[#@]//'
           }
 
+          crates_io_user_agent="agent-sdk-release-check/${GITHUB_REPOSITORY:-local}"
+
           crate_exists() {
             local name="$1"
             local version="$2"
             local status
-            status="$(curl -sS -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${name}/${version}")"
+            status="$(curl -sS -A "$crates_io_user_agent" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${name}/${version}")"
             [[ "$status" == "200" ]]
           }
 
@@ -192,3 +197,35 @@ jobs:
 
           wait_for_crate agent-sdk-provider "$provider_version"
           wait_for_crate agent-sdk-toolkit "$toolkit_version"
+
+      - name: Create GitHub release for tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          notes_file="$(mktemp)"
+
+          awk -v version="$version" '
+            $0 == "## " version { in_section=1; print; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > "$notes_file"
+
+          if [[ ! -s "$notes_file" ]]; then
+            printf 'Release %s\n' "$tag" > "$notes_file"
+          fi
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub release ${tag} already exists; skipping."
+          else
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$tag" \
+              --notes-file "$notes_file" \
+              --prerelease
+          fi
