@@ -17,16 +17,6 @@ The current public alpha release is available from crates.io:
 
 ```toml
 [dependencies]
-agent-sdk-core = "0.1.0-alpha.2"
-agent-sdk-toolkit = { version = "0.1.0-alpha.2", optional = true }
-```
-
-The repository checkout is a `0.1.0-alpha.3` release candidate. It contains the
-source-breaking provider structured-output hint change and the optional live
-provider adapter crate. After the next publish, the dependency shape is:
-
-```toml
-[dependencies]
 agent-sdk-core = "0.1.0-alpha.3"
 agent-sdk-eval = { version = "0.1.0-alpha.3", optional = true }
 agent-sdk-toolkit = { version = "0.1.0-alpha.3", optional = true }
@@ -142,6 +132,6 @@ For contract-packet review, use [docs/workstreams](docs/workstreams/README.md). 
 
 ## Current Implementation Posture
 
-The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-toolkit`, and the unreleased `crates/agent-sdk-provider` adapter crate. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
+The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-toolkit`, and `crates/agent-sdk-provider`. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
 
 This checkout includes deterministic fake/test-kit support, optional toolkit helpers, and live provider adapters for OpenAI Responses, Anthropic Messages, and Gemini generateContent in the aggregate `agent-sdk-provider` crate. It does not claim concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or product-specific host-adapter support.

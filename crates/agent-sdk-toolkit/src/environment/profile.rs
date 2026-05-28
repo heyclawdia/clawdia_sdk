@@ -69,7 +69,13 @@ impl AgentWorkspaceEnvironmentProfile {
         self
     }
 
-    /// Sets the minimum isolation class and preferred runtime from a known toolkit runtime.
+    /// Sets the minimum isolation class and preferred adapter from a known toolkit runtime.
+    ///
+    /// This is a data-only shortcut for calling [`Self::isolation_class`] with
+    /// the runtime's matching class and [`Self::prefer_runtime`] with its stable
+    /// core [`IsolationRuntimeRef`]. It does not register adapters, start
+    /// containers, open sockets, or relax host policy; runtime selection still
+    /// requires a host-provided adapter capability report during execution.
     pub fn runtime(mut self, runtime: EnvironmentRuntime) -> Self {
         self.isolation_class = runtime.isolation_class();
         self.preferred_runtimes.push(runtime.into());

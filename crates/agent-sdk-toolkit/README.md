@@ -16,6 +16,7 @@ SDK consumers should import through the crate root:
   independent local handles
 - `AgentTraceEvaluation` for post-hoc trace/session evaluation and deterministic session comparison
 - `AiTraceEvaluator` for explicit provider-backed evaluator interpretation over supplied evidence and deterministic metric deltas
+- `AgentWorkspaceEnvironmentProfile`, `AgentWorkspaceEnvironment`, `EgressAllowlist`, and `EnvironmentRuntime` for data-only environment profiles that lower into core isolation contracts without registering or starting runtime adapters
 - `JsonRpcLineCodec` and `JsonRpcLineEndpoint` for JSON-RPC stdio-style line framing
 - `testing::InMemoryJsonArgumentStore` and `testing::InMemoryToolkitContentStore` for deterministic tests
 - `testing::{ScriptedAcpClient, ScriptedAcpAgent, McpHostProxy, ScriptedMcpServer, IsolatedJsonRpcProcess}` for transport-level ACP/MCP conformance tests
@@ -31,6 +32,21 @@ tool pack or store is needed:
 
 Toolkit helpers still lower into core capability snapshots, policy checks,
 content refs, journal records, events, and effect intent/result records.
+
+Environment helpers are profile builders, not runtime adapters:
+
+```rust
+use agent_sdk_toolkit::{AgentWorkspaceEnvironmentProfile, EnvironmentRuntime};
+
+let profile = AgentWorkspaceEnvironmentProfile::new("env.agent.workspace")
+    .workspace("workspace.primary")
+    .runtime(EnvironmentRuntime::LocalContainer)
+    .build()?;
+```
+
+This produces a core execution environment and isolation requirement. The host
+or a future optional runtime crate still owns adapter registration, policy
+enforcement, process/container startup, networking, and cleanup.
 
 For eval workflows, start with local metrics:
 

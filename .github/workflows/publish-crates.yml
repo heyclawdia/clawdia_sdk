@@ -41,12 +41,61 @@ jobs:
 
       - name: Package core dry run
         run: |
-          core_version="$(cargo pkgid -p agent-sdk-core | sed 's/.*@//')"
+          core_version="$(cargo pkgid -p agent-sdk-core | sed -E 's/.*[#@]//')"
           status="$(curl -sS -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/agent-sdk-core/${core_version}")"
           if [[ "$status" == "200" ]]; then
             echo "agent-sdk-core ${core_version} is already on crates.io; skipping dry run."
           else
             cargo publish -p agent-sdk-core --dry-run
+          fi
+
+      - name: Package independent optional crates when core is available
+        run: |
+          set -euo pipefail
+
+          crate_version() {
+            cargo pkgid -p "$1" | sed -E 's/.*[#@]//'
+          }
+
+          crate_exists() {
+            local name="$1"
+            local version="$2"
+            local status
+            status="$(curl -sS -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${name}/${version}")"
+            [[ "$status" == "200" ]]
+          }
+
+          core_version="$(crate_version agent-sdk-core)"
+          eval_version="$(crate_version agent-sdk-eval)"
+          provider_version="$(crate_version agent-sdk-provider)"
+          toolkit_version="$(crate_version agent-sdk-toolkit)"
+
+          if ! crate_exists agent-sdk-core "$core_version"; then
+            echo "agent-sdk-core ${core_version} is not on crates.io yet; dependent dry runs happen during publish."
+            exit 0
+          fi
+
+          if crate_exists agent-sdk-eval "$eval_version"; then
+            echo "agent-sdk-eval ${eval_version} is already on crates.io; skipping dry run."
+          else
+            cargo publish -p agent-sdk-eval --dry-run
+          fi
+
+          if crate_exists agent-sdk-provider "$provider_version"; then
+            echo "agent-sdk-provider ${provider_version} is already on crates.io; skipping dry run."
+          else
+            cargo publish -p agent-sdk-provider --dry-run
+          fi
+
+          if ! crate_exists agent-sdk-eval "$eval_version"; then
+            echo "agent-sdk-eval ${eval_version} is not on crates.io yet; toolkit dry run happens during publish."
+            exit 0
+          fi
+
+          if crate_exists agent-sdk-toolkit "$toolkit_version"; then
+            echo "agent-sdk-toolkit ${toolkit_version} is already on crates.io; skipping dry run."
+          else
+            cargo publish -p agent-sdk-toolkit --dry-run
           fi
 
       - name: Decide publish mode
@@ -71,7 +120,7 @@ jobs:
           fi
 
           crate_version() {
-            cargo pkgid -p "$1" | sed 's/.*@//'
+            cargo pkgid -p "$1" | sed -E 's/.*[#@]//'
           }
 
           crate_exists() {
@@ -94,21 +143,49 @@ jobs:
             cargo publish -p "$name" --token "$CARGO_REGISTRY_TOKEN"
           }
 
+          wait_for_crate() {
+            local name="$1"
+            local version="$2"
+
+            for attempt in {1..24}; do
+              if crate_exists "$name" "$version"; then
+                echo "${name} ${version} is visible on crates.io."
+                return 0
+              fi
+
+              echo "Waiting for ${name} ${version} to propagate to crates.io (${attempt}/24)."
+              sleep 15
+            done
+
+            echo "${name} ${version} was not visible on crates.io after propagation wait." >&2
+            return 1
+          }
+
           core_version="$(crate_version agent-sdk-core)"
+          eval_version="$(crate_version agent-sdk-eval)"
+          provider_version="$(crate_version agent-sdk-provider)"
           toolkit_version="$(crate_version agent-sdk-toolkit)"
 
           publish_if_missing agent-sdk-core "$core_version"
+          wait_for_crate agent-sdk-core "$core_version"
+
+          publish_if_missing agent-sdk-eval "$eval_version"
+          publish_if_missing agent-sdk-provider "$provider_version"
+          wait_for_crate agent-sdk-eval "$eval_version"
 
           for attempt in {1..24}; do
             if publish_if_missing agent-sdk-toolkit "$toolkit_version"; then
-              exit 0
+              break
             fi
 
             if [[ "$attempt" == "24" ]]; then
-              echo "agent-sdk-toolkit publish failed after dependency propagation retries." >&2
+              echo "agent-sdk-toolkit publish failed after dependency propagation retries for agent-sdk-eval." >&2
               exit 1
             fi
 
             echo "agent-sdk-toolkit publish attempt ${attempt} failed; waiting for registry propagation."
             sleep 15
           done
+
+          wait_for_crate agent-sdk-provider "$provider_version"
+          wait_for_crate agent-sdk-toolkit "$toolkit_version"
