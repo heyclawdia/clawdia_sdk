@@ -8,7 +8,7 @@ use agent_sdk_core::{
     SourceKind, SourceRef, WorkspaceMountMode,
 };
 
-use crate::environment::EgressAllowlist;
+use crate::environment::{EgressAllowlist, EnvironmentRuntime};
 
 #[derive(Clone, Debug)]
 /// Builder for common isolated agent workspace environments.
@@ -66,6 +66,13 @@ impl AgentWorkspaceEnvironmentProfile {
     /// registered adapter capability report that satisfies the package policy.
     pub fn prefer_runtime(mut self, runtime_ref: impl Into<IsolationRuntimeRef>) -> Self {
         self.preferred_runtimes.push(runtime_ref.into());
+        self
+    }
+
+    /// Sets the minimum isolation class and preferred runtime from a known toolkit runtime.
+    pub fn runtime(mut self, runtime: EnvironmentRuntime) -> Self {
+        self.isolation_class = runtime.isolation_class();
+        self.preferred_runtimes.push(runtime.into());
         self
     }
 

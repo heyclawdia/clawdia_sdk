@@ -50,7 +50,7 @@ pub use agent_pool::SqliteAgentPoolStore;
 pub use discovery::{ToolDiscoveryExecutor, ToolDiscoveryIndex, ToolDiscoveryRequest};
 pub use environment::{
     AgentWorkspaceEnvironment, AgentWorkspaceEnvironmentProfile, EgressAllowlist, EgressProtocol,
-    EgressTarget,
+    EgressTarget, EnvironmentRuntime,
 };
 pub use evaluation::{AgentTraceEvaluation, AiTraceEvaluator};
 pub use packs::{

@@ -4,6 +4,8 @@
 //! containers, opening sockets, or configuring host firewalls.
 mod egress;
 mod profile;
+mod runtime;
 
 pub use egress::{EgressAllowlist, EgressProtocol, EgressTarget};
 pub use profile::{AgentWorkspaceEnvironment, AgentWorkspaceEnvironmentProfile};
+pub use runtime::EnvironmentRuntime;

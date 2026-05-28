@@ -3,13 +3,15 @@ use std::{env, process::Command, sync::Arc};
 use agent_sdk_core::{
     AgentId, AgentSnapshot, EffectTerminalStatus, IsolationCapability, IsolationCapabilityReport,
     IsolationClass, IsolationLifecycleContext, IsolationLifecycleCoordinator, IsolationMatchStatus,
-    IsolationRecord, IsolationRequirementSnapshot, IsolationRuntimeKind, IsolationRuntimeRegistry,
-    JournalRecordKind, NetworkIsolationPolicy, PolicyKind, PolicyRef, ProviderRouteSnapshot,
-    RuntimePackage, RuntimePackageId, RuntimePackageSidecarId, WorkspaceMountMode,
+    IsolationRecord, IsolationRequirementSnapshot, IsolationRuntimeKind, IsolationRuntimeRef,
+    IsolationRuntimeRegistry, JournalRecordKind, NetworkIsolationPolicy, PolicyKind, PolicyRef,
+    ProviderRouteSnapshot, RuntimePackage, RuntimePackageId, RuntimePackageSidecarId,
+    WorkspaceMountMode,
     testing::{FakeIsolationRuntime, FakeJournalStore},
 };
 use agent_sdk_toolkit::environment::{
     AgentWorkspaceEnvironment, AgentWorkspaceEnvironmentProfile, EgressAllowlist,
+    EnvironmentRuntime,
 };
 
 #[test]
@@ -120,6 +122,50 @@ fn workspace_environment_profile_lowers_allowlist_to_environment_and_snapshot() 
             policy("policy.environment.cleanup"),
             policy("policy.environment.child"),
         )
+    );
+}
+
+#[test]
+fn environment_runtime_enum_lowers_to_stable_runtime_refs_and_classes() {
+    assert_eq!(
+        EnvironmentRuntime::LocalContainer.as_str(),
+        "runtime:local.container"
+    );
+    assert_eq!(
+        EnvironmentRuntime::LocalContainer.to_string(),
+        "runtime:local.container"
+    );
+    let runtime_ref: IsolationRuntimeRef = EnvironmentRuntime::LocalContainer.into();
+    assert_eq!(runtime_ref.as_str(), "runtime:local.container");
+    assert_eq!(
+        EnvironmentRuntime::LocalContainer.isolation_class(),
+        IsolationClass::Container
+    );
+    assert_eq!(
+        serde_json::to_string(&EnvironmentRuntime::LocalContainer).expect("runtime serializes"),
+        "\"runtime:local.container\""
+    );
+}
+
+#[test]
+fn workspace_environment_profile_can_use_known_runtime_enum() {
+    let profile = AgentWorkspaceEnvironmentProfile::new("env.agent.workspace")
+        .workspace("workspace.primary")
+        .runtime(EnvironmentRuntime::LocalContainer)
+        .build()
+        .expect("profile builds");
+
+    assert_eq!(
+        profile.environment().spec.requirement.minimum_class,
+        IsolationClass::Container
+    );
+    assert_eq!(
+        profile.environment().spec.kind,
+        agent_sdk_core::ExecutionEnvironmentKind::Container
+    );
+    assert_eq!(
+        profile.environment().spec.requirement.preferred_adapters,
+        vec![IsolationRuntimeRef::new("runtime:local.container")]
     );
 }
 
@@ -268,7 +314,7 @@ fn local_container_runtime_smoke_is_opt_in() {
     let profile = AgentWorkspaceEnvironmentProfile::new("env.agent.local_container_smoke")
         .workspace("workspace.primary")
         .isolation_class(IsolationClass::Container)
-        .prefer_runtime("runtime.local.container")
+        .prefer_runtime(EnvironmentRuntime::LocalContainer)
         .build()
         .expect("profile builds");
     assert_eq!(
