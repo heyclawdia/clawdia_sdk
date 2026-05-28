@@ -9,6 +9,9 @@
 /// adapters layered over `agent-sdk-core` coordination ports.
 pub mod agent_pool;
 pub mod discovery;
+/// Public evaluation namespace. Use it for optional post-hoc agent-run
+/// evaluation helpers layered over `agent-sdk-eval` and core traces.
+pub mod evaluation;
 /// Public packs namespace. Use it for the documented packs API surface;
 /// prefer crate-root re-exports for common imports. Module items must
 /// preserve the toolkit ownership and side-effect boundaries described
@@ -42,6 +45,7 @@ pub mod workspace;
 
 pub use agent_pool::SqliteAgentPoolStore;
 pub use discovery::{ToolDiscoveryExecutor, ToolDiscoveryIndex, ToolDiscoveryRequest};
+pub use evaluation::{AgentTraceEvaluation, AiTraceEvaluator};
 pub use packs::{
     AsyncTool, Tool, ToolBuilder, ToolPackBuilder, ToolkitPackBundle, ToolkitToolExecutionMode,
     tool_snapshot,

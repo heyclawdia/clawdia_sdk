@@ -1,0 +1,15 @@
+[package]
+name = "agent-sdk-eval"
+version = "0.1.0-alpha.3"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Optional evaluation framework primitives layered over agent-sdk-core traces and evidence."
+documentation = "https://docs.rs/agent-sdk-eval"
+readme = "README.md"
+
+[dependencies]
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3" }
+serde.workspace = true
+serde_json.workspace = true

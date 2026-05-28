@@ -7,6 +7,7 @@ This workspace is the authoritative planning and implementation packet for a new
 This is a monorepo with separable Rust crates:
 
 - `crates/agent-sdk-core`: the lightweight SDK kernel for users who only want agent primitives, records, runtime packages, ports, deterministic fakes, and conformance helpers.
+- `crates/agent-sdk-eval`: an optional evaluation framework crate for users who want post-hoc run, turn, session, expected-outcome, cited-support, and comparison evaluation primitives.
 - `crates/agent-sdk-toolkit`: an optional add-on crate for users who want concrete workspace tools, shell/resource helpers, discovery, and ACP/MCP protocol conformance scaffolding.
 - `crates/agent-sdk-provider`: an optional aggregate crate for live OpenAI, Anthropic, and Gemini provider adapters layered over `ProviderAdapter`, plus deterministic transport hooks for tests.
 
@@ -27,6 +28,7 @@ provider adapter crate. After the next publish, the dependency shape is:
 ```toml
 [dependencies]
 agent-sdk-core = "0.1.0-alpha.3"
+agent-sdk-eval = { version = "0.1.0-alpha.3", optional = true }
 agent-sdk-toolkit = { version = "0.1.0-alpha.3", optional = true }
 agent-sdk-provider = { version = "0.1.0-alpha.3", optional = true }
 ```
@@ -36,6 +38,7 @@ Consumers can also depend on these crates from the repository:
 ```toml
 [dependencies]
 agent-sdk-core = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-core" }
+agent-sdk-eval = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-eval", optional = true }
 agent-sdk-toolkit = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-toolkit", optional = true }
 agent-sdk-provider = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-provider", optional = true }
 ```
@@ -54,7 +57,8 @@ Start from a live provider and keep the canonical runtime path visible:
 
 The crate family intentionally does not publish a crate named `agent-sdk`.
 Consumers should depend on the split crates explicitly: `agent-sdk-core` for
-the primitive kernel, `agent-sdk-toolkit` for optional concrete helpers, and
+the primitive kernel, `agent-sdk-eval` for optional post-hoc evaluation
+framework primitives, `agent-sdk-toolkit` for optional concrete helpers, and
 `agent-sdk-provider` for provider adapters. Future adapter families should use
 clear optional crates such as `agent-sdk-mcp`, `agent-sdk-browser-toolkit`,
 `agent-sdk-isolation`, `agent-sdk-otel`, and `agent-sdk-workflow`, with

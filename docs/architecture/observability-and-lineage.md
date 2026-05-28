@@ -313,6 +313,65 @@ Recommended span attributes. The exporter contract pins OpenTelemetry GenAI sema
 
 Raw content should be opt-in. Default traces should use summaries, hashes, sizes, MIME types, and IDs.
 
+## Outcome Attribution And Step Impact
+
+The SDK should make it possible to ask "did this context item, skill, tool result, hook, or step help the outcome?" without pretending that a trace alone proves causality.
+
+Outcome attribution is a derived evidence view over existing records and optional `agent-sdk-eval` reports:
+
+- `RunJournal`, `JournalRecord`, `TurnTrace`, `RunTrace`, and `SessionTimeline` provide the durable run facts and ordering.
+- `ContextContribution`, `ContextItem`, `ContextSelectionDecision`, `ContextProjection`, and `ContextProjectionAudit` show what was available to the model and why.
+- `AgentEvent`, `EventEnvelope`, `EffectIntent`, and `EffectResult` link tools, hooks, approvals, provider attempts, output delivery, and child runs to their causes.
+- `ValidatedOutput`, structured-output records, terminal run status, usage, and cost projections provide outcome and metric inputs.
+
+Attribution reports should separate three confidence levels:
+
+| Level | Meaning | What can be claimed |
+| --- | --- | --- |
+| `available` | A context item, tool result, skill, hook, package sidecar, or other step existed and was selected, projected, executed, or otherwise visible in the run. | The item could have influenced the outcome. |
+| `cited` | The agent emitted a structured support claim that references known IDs such as context item IDs, content refs, tool call IDs, effect IDs, message IDs, output refs, capability refs, or event IDs. | The agent says this evidence informed a decision, and the SDK can validate that the cited IDs existed and were policy-admitted. |
+| `measured` | A metric was evaluated against a baseline, ablation, paired run, repeated experiment, human judgment, or evaluator result. | The item helped or hurt a named metric by the recorded amount under the recorded method. |
+
+Self-report is useful evidence, not proof. A host or optional eval layer may ask an evaluator to return bounded cited support alongside a decision, but the SDK should treat that claim as auditable metadata. The claim can include:
+
+- `evaluation_id`, `scope`, `subject_ref`, and `outcome_ref`;
+- `support_refs` to `EntityRef`, `ContextItemId`, `ContentRef`, `ToolCallId`, `EffectId`, `MessageId`, `ValidatedOutput`, `CapabilitySpec`, or `AgentEvent`;
+- an evaluation subject role such as primary evidence, constraint, baseline, comparator, or candidate evidence;
+- a redacted rationale summary, confidence, policy refs, usage, privacy class, and retention class;
+- `derived_from` links when the claim summarizes earlier evidence.
+
+The SDK can validate that cited refs exist, that context refs were selected or projected before the decision, that tool/effect refs completed before use, and that policy allowed their visibility. It cannot validate from self-report alone that the evidence caused the final answer.
+
+Carry-forward evidence should use the normal context path. When an agent identifies that a fact, assumption, tool result, skill instruction, or decision support claim may matter later, it can become a bounded `ContextContribution` with `derived_from` pointing at the original refs. Each later turn must admit, omit, compact, redact, or dedupe that contribution through `ContextAssembler`, producing normal `ContextItem` and `ContextProjectionAudit` records. Carry-forward evidence must not bypass context policy, become hidden mutable state, or require raw chain-of-thought capture.
+
+An attribution report can then be derived after the run:
+
+```rust
+pub struct EvaluationReport {
+    pub evaluation_id: EvaluationId,
+    pub scope: EvaluationScope,
+    pub comparison: ComparisonDesign,
+    pub verdict: EvaluationVerdict,
+    pub confidence: EvaluationConfidence,
+    pub judgments: Vec<EvaluatorJudgment>,
+    pub metric_deltas: Vec<EvaluationMetricDelta>,
+    pub evidence_refs: Vec<EntityRef>,
+    pub usage: EvaluationUsage,
+    pub limitations: Vec<RedactedSummary>,
+}
+```
+
+The boundary is the important part: core owns typed refs, lineage, journals, events, and trace views. `agent-sdk-eval` owns optional evaluation requests, evidence bundles, reports, confidence validation, and deterministic fakes. Toolkit or hosts own provider-backed evaluator prompts. Hosts own product rubrics, dashboards, business scoring, human review queues, A/B runners, counterfactual schedulers, and concrete evaluator model choice.
+
+To say "this definitely helped" in a defensible way, the run needs a comparison method recorded with the attribution:
+
+- paired fake-provider or deterministic scenario where the only changed variable is the context item, tool, skill, or step;
+- ablation run with the item removed and the same output metric evaluated;
+- N-run A/B comparison with confidence bounds when model/provider nondeterminism matters;
+- human or evaluator judgment that names the metric and cites the compared outputs.
+
+Without one of those, the strongest honest label is `available` or `cited`, not `measured`.
+
 ## Source-To-Destination Flow
 
 ```mermaid

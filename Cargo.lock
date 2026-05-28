@@ -39,6 +39,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-sdk-eval"
+version = "0.1.0-alpha.3"
+dependencies = [
+ "agent-sdk-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agent-sdk-provider"
 version = "0.1.0-alpha.3"
 dependencies = [
@@ -52,6 +61,7 @@ name = "agent-sdk-toolkit"
 version = "0.1.0-alpha.3"
 dependencies = [
  "agent-sdk-core",
+ "agent-sdk-eval",
  "base64",
  "flate2",
  "image",

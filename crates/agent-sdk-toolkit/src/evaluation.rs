@@ -1,0 +1,312 @@
+//! Toolkit helpers for post-hoc agent-run evaluation.
+
+use std::sync::Arc;
+
+use serde::Deserialize;
+
+use agent_sdk_core::{
+    AgentError, EntityKind, EntityRef, PrivacyClass, ProviderAdapter, ProviderMessage,
+    ProviderMessageRole, ProviderRequest, RunId, RunTrace, SessionTimeline, TurnTrace,
+    domain::EntityId,
+};
+use agent_sdk_eval::{
+    ComparisonDesign, EvaluationBudget, EvaluationConfidence, EvaluationId, EvaluationReport,
+    EvaluationRequest, EvaluationUsage, EvaluationVerdict, Evaluator, EvaluatorJudgment,
+    EvidenceBundle, ExpectedOutcome,
+};
+
+/// Builder for evaluating an agent trace with an arbitrary evaluator.
+#[derive(Clone, Debug)]
+pub struct AgentTraceEvaluation {
+    request: EvaluationRequest,
+    evidence: EvidenceBundle,
+}
+
+impl AgentTraceEvaluation {
+    /// Builds an evaluation from a turn trace.
+    pub fn turn(trace: &TurnTrace, expected_outcome: ExpectedOutcome) -> Result<Self, AgentError> {
+        let evidence = EvidenceBundle::from_turn_trace(trace)?;
+        let turn_id = trace.turn_id.clone().ok_or_else(|| {
+            AgentError::contract_violation("turn trace is missing turn id for evaluation")
+        })?;
+        let request = EvaluationRequest::new(
+            EvaluationId::new(format!("evaluation.turn.{}", turn_id.as_str())),
+            evidence.scope.clone(),
+            expected_outcome,
+        )
+        .with_subject(agent_trace_subject(&evidence)?);
+        Ok(Self { request, evidence })
+    }
+
+    /// Builds an evaluation from a run trace.
+    pub fn run(trace: &RunTrace, expected_outcome: ExpectedOutcome) -> Result<Self, AgentError> {
+        let evidence = EvidenceBundle::from_run_trace(trace)?;
+        let run_id = trace.run_id.clone().ok_or_else(|| {
+            AgentError::contract_violation("run trace is missing run id for evaluation")
+        })?;
+        let request = EvaluationRequest::new(
+            EvaluationId::new(format!("evaluation.run.{}", run_id.as_str())),
+            evidence.scope.clone(),
+            expected_outcome,
+        )
+        .with_subject(agent_trace_subject(&evidence)?);
+        Ok(Self { request, evidence })
+    }
+
+    /// Builds an evaluation from a session timeline.
+    pub fn session(
+        timeline: &SessionTimeline,
+        expected_outcome: ExpectedOutcome,
+    ) -> Result<Self, AgentError> {
+        let evidence = EvidenceBundle::from_session_timeline(timeline)?;
+        let request = EvaluationRequest::new(
+            EvaluationId::new(format!(
+                "evaluation.session.{}",
+                timeline.session_id.as_str()
+            )),
+            evidence.scope.clone(),
+            expected_outcome,
+        )
+        .with_subject(agent_trace_subject(&evidence)?);
+        Ok(Self { request, evidence })
+    }
+
+    /// Returns this evaluation with its comparison design replaced.
+    pub fn compare(mut self, comparison: ComparisonDesign) -> Self {
+        self.request.comparison = comparison;
+        self
+    }
+
+    /// Returns this evaluation with its evaluator budget replaced.
+    pub fn with_budget(mut self, budget: EvaluationBudget) -> Self {
+        self.request.budget = budget;
+        self
+    }
+
+    /// Evaluates this trace using the supplied evaluator.
+    pub fn evaluate<E: Evaluator>(&self, evaluator: &E) -> Result<EvaluationReport, AgentError> {
+        evaluator.evaluate(&self.request, &self.evidence)
+    }
+
+    /// Returns the request this builder will evaluate.
+    pub fn request(&self) -> &EvaluationRequest {
+        &self.request
+    }
+
+    /// Returns the evidence bundle this builder will pass to the evaluator.
+    pub fn evidence(&self) -> &EvidenceBundle {
+        &self.evidence
+    }
+}
+
+/// Provider-backed evaluator that asks for cited evidence refs and validates
+/// them against the supplied bundle.
+pub struct AiTraceEvaluator {
+    provider: Arc<dyn ProviderAdapter>,
+}
+
+impl AiTraceEvaluator {
+    /// Creates an AI evaluator from a provider adapter.
+    pub fn new(provider: Arc<dyn ProviderAdapter>) -> Self {
+        Self { provider }
+    }
+
+    /// Creates an AI evaluator from a concrete provider adapter.
+    pub fn from_provider<P>(provider: P) -> Self
+    where
+        P: ProviderAdapter + 'static,
+    {
+        Self::new(Arc::new(provider))
+    }
+}
+
+impl Evaluator for AiTraceEvaluator {
+    fn evaluate(
+        &self,
+        request: &EvaluationRequest,
+        evidence: &EvidenceBundle,
+    ) -> Result<EvaluationReport, AgentError> {
+        request.budget.require_provider_call()?;
+        let prompt = ai_evaluator_prompt(request, evidence)?;
+        let provider_request = ProviderRequest {
+            schema_version: ProviderRequest::SCHEMA_VERSION,
+            projection_policy_ref: "policy.evaluation.content_refs_only".to_string(),
+            messages: vec![ProviderMessage {
+                role: ProviderMessageRole::Developer,
+                content: prompt,
+                privacy: PrivacyClass::ContentRefsOnly,
+                projected_metadata: None,
+            }],
+            projection_item_count: evidence.items.len(),
+            structured_output_hint: None,
+        };
+        let response = self.provider.complete(&provider_request)?;
+        let usage = EvaluationUsage {
+            provider_calls: 1,
+            provider_usage: Some(self.provider.extract_usage(&response)),
+        };
+        report_from_provider_response(request, evidence, &response.output_text, usage)
+    }
+}
+
+#[derive(Deserialize)]
+struct AiEvaluatorReply {
+    #[serde(default)]
+    verdict: Option<EvaluationVerdict>,
+    #[serde(default)]
+    score: Option<String>,
+    #[serde(default)]
+    confidence: Option<EvaluationConfidence>,
+    #[serde(default)]
+    redacted_summary: Option<String>,
+    #[serde(default)]
+    support_refs: Vec<WireEntityRef>,
+    #[serde(default)]
+    metric_deltas: Vec<agent_sdk_eval::EvaluationMetricDelta>,
+    #[serde(default)]
+    limitations: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct WireEntityRef {
+    kind: EntityKind,
+    id: String,
+}
+
+fn agent_trace_subject(
+    evidence: &EvidenceBundle,
+) -> Result<agent_sdk_eval::EvaluationSubject, AgentError> {
+    let subject_ref = evidence
+        .outcome_ref
+        .clone()
+        .or_else(|| evidence.items.first().map(|item| item.evidence_ref.clone()))
+        .ok_or_else(|| AgentError::contract_violation("evaluation evidence bundle is empty"))?;
+    Ok(agent_sdk_eval::EvaluationSubject::primary(subject_ref))
+}
+
+fn ai_evaluator_prompt(
+    request: &EvaluationRequest,
+    evidence: &EvidenceBundle,
+) -> Result<String, AgentError> {
+    let payload = serde_json::json!({
+        "evaluation_id": request.evaluation_id.as_str(),
+        "scope": request.scope,
+        "expected_outcome": request.expected_outcome,
+        "comparison": request.comparison,
+        "subjects": request.subjects,
+        "available_evidence": evidence.items,
+        "evidence_summary": evidence.redacted_summary,
+    });
+    let payload = serde_json::to_string(&payload).map_err(|error| {
+        AgentError::contract_violation(format!("evaluation prompt JSON encode failed: {error}"))
+    })?;
+    let prompt = format!(
+        concat!(
+            "Evaluate this recorded agent outcome using only the supplied redacted summaries and ids. ",
+            "Return compact JSON only with keys verdict, score, confidence, redacted_summary, support_refs, metric_deltas, and limitations. ",
+            "Cite support_refs only from available_evidence. ",
+            "Use confidence=measured only when comparison evidence and metric_deltas support it. ",
+            "Do not include raw private content.\n",
+            "EVALUATION_PAYLOAD={payload}"
+        ),
+        payload = payload
+    );
+    Ok(truncate_chars(prompt, request.budget.max_prompt_chars))
+}
+
+fn report_from_provider_response(
+    request: &EvaluationRequest,
+    evidence: &EvidenceBundle,
+    output_text: &str,
+    usage: EvaluationUsage,
+) -> Result<EvaluationReport, AgentError> {
+    let mut limitations = Vec::new();
+    let parsed = serde_json::from_str::<AiEvaluatorReply>(output_text).map_err(|error| {
+        AgentError::contract_violation(format!("evaluation provider JSON parse failed: {error}"))
+    })?;
+    let (support_refs, parse_limitations) = raw_support_refs(parsed.support_refs);
+    limitations.extend(parse_limitations);
+    let support = evidence.validate_support_refs(support_refs, request.budget.max_support_refs);
+    limitations.extend(parsed.limitations);
+
+    let fallback_confidence = if support.accepted_refs.is_empty() {
+        EvaluationConfidence::Judged
+    } else {
+        EvaluationConfidence::Cited
+    };
+    let confidence = parsed.confidence.unwrap_or(fallback_confidence.clone());
+    let subject_ref = request
+        .subjects
+        .first()
+        .map(|subject| subject.subject_ref.clone())
+        .or_else(|| evidence.outcome_ref.clone())
+        .unwrap_or_else(|| EntityRef::run(RunId::new("run.evaluation.unknown")));
+    let mut judgment = EvaluatorJudgment::new(
+        subject_ref,
+        parsed
+            .verdict
+            .clone()
+            .unwrap_or(EvaluationVerdict::Inconclusive),
+        confidence.clone(),
+        parsed
+            .redacted_summary
+            .clone()
+            .unwrap_or_else(|| "AI evaluator returned a judgment".to_string()),
+    );
+    judgment.score = parsed.score.clone();
+    judgment.support_refs = support.accepted_refs.clone();
+    judgment.rejected_support_refs = support.rejected_refs.clone();
+
+    let mut report = EvaluationReport::new(
+        request.evaluation_id.clone(),
+        request.scope.clone(),
+        request.comparison.clone(),
+        parsed.verdict.unwrap_or(EvaluationVerdict::Inconclusive),
+        confidence,
+        parsed
+            .redacted_summary
+            .unwrap_or_else(|| "AI evaluator returned a report".to_string()),
+    )
+    .with_usage(usage)
+    .with_judgment(judgment);
+    report.score = parsed.score;
+    report.evidence_refs = support.accepted_refs;
+    report.metric_deltas = parsed.metric_deltas;
+    report.limitations = limitations;
+
+    if report.validate_confidence_contract().is_err() && report.confidence.is_measured() {
+        report.confidence = fallback_confidence.clone();
+        for judgment in &mut report.judgments {
+            if judgment.confidence.is_measured() {
+                judgment.confidence = fallback_confidence.clone();
+            }
+        }
+        report.limitations.push(
+            "evaluator requested measured confidence without sufficient comparison evidence; downgraded"
+                .to_string(),
+        );
+    }
+    report.validate_confidence_contract()?;
+    Ok(report)
+}
+
+fn raw_support_refs(raw_refs: Vec<WireEntityRef>) -> (Vec<EntityRef>, Vec<String>) {
+    let mut refs = Vec::new();
+    let mut limitations = Vec::new();
+    for raw_ref in raw_refs {
+        match EntityId::try_new(raw_ref.id) {
+            Ok(entity_id) => refs.push(EntityRef::new(raw_ref.kind, entity_id)),
+            Err(error) => {
+                limitations.push(format!("provider cited an invalid support ref: {error}"))
+            }
+        }
+    }
+    (refs, limitations)
+}
+
+fn truncate_chars(value: String, max_chars: usize) -> String {
+    if value.chars().count() <= max_chars {
+        return value;
+    }
+    value.chars().take(max_chars).collect()
+}

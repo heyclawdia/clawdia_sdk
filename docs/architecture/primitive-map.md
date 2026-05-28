@@ -56,6 +56,11 @@ Feature primitives must layer on the kernel:
   and usage rollup.
 - Extensions declare `CoreExtensionCapabilities` that a host may resolve into runtime-package capabilities and sidecars after policy checks.
 - Telemetry is a projection from events, journals, and usage records; it is not durable run truth.
+- Outcome attribution is a derived eval-layer report over journals, traces,
+  context projection audits, events, outputs, and `agent-sdk-eval` records.
+  Self-cited support IDs are evidence, not proof; measured impact requires a
+  recorded baseline, ablation, paired run, repeated experiment, or evaluator
+  metric delta.
 - Output delivery is a destination/sink port with dedupe and journaled intent; product channel UX stays host-owned.
 
 Reserved feature ports may be sketched in contracts before implementation, but they are not part of the MVP runtime proof: telemetry exporters, isolation adapters, extension bridges, subagents, realtime providers, stream rules, full tool packs, and global event archive replay.
@@ -173,6 +178,8 @@ New primitives must pass the decision ladder above before they are added.
 | `TelemetrySink` | Non-blocking delivery to abstract telemetry/export destinations declared by host policy. | `record`, `flush`, `health`, `overflow`. | Core loop control decisions or product-specific storage/query semantics. |
 | `UsageExtractor` | Usage/cost extraction from provider/tool events. | `extract`, `merge`, `estimate`. | Billing product UI. |
 | `CostEstimator` | Per-provider/tool cost estimates and budgets. | `estimate`, `budget_check`. | Provider credentials. |
+| `EvidenceBundle` / `EvaluatorJudgment` | Optional eval-layer support claims and evidence bundles that cite existing run, context, tool, output, capability, effect, or event refs. | `support_refs`, `rejected_support_refs`, `redacted_summary`, `validate_support_refs`, `derived_from`. | Causal proof, raw chain-of-thought capture, or bypassing context projection policy. |
+| `EvaluationReport` | Optional eval-layer attribution view connecting cited evidence, expected outcomes, and comparison designs to terminal or intermediate outcomes. | `EvaluationConfidence`, `EvaluationMetricDelta`, `ComparisonDesign`, `EvaluationUsage`, `limitations`. | A second journal, trace database, product scoring rubric, dashboard state, or claim that self-report alone measured impact. |
 
 ## Sessions, Recovery, And Robustness
 
