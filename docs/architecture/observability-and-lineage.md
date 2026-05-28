@@ -342,6 +342,15 @@ Self-report is useful evidence, not proof. A host or optional eval layer may ask
 
 The SDK can validate that cited refs exist, that context refs were selected or projected before the decision, that tool/effect refs completed before use, and that policy allowed their visibility. It cannot validate from self-report alone that the evidence caused the final answer.
 
+Deterministic trace metrics are the first evaluation layer. The optional
+`agent-sdk-eval` crate can derive trace start/end/elapsed time, provider call
+counts, provider token totals, tool call counts, terminal tool status counts,
+and per-tool start/end/elapsed timing from supplied `TurnTrace`, `RunTrace`, and
+`SessionTimeline` records. Session comparison deltas are local derived evidence,
+not model-generated facts. Provider-backed evaluators may interpret those deltas
+only when the caller explicitly invokes them, and the request-owned
+`metric_deltas` remain the authority for measured confidence.
+
 Carry-forward evidence should use the normal context path. When an agent identifies that a fact, assumption, tool result, skill instruction, or decision support claim may matter later, it can become a bounded `ContextContribution` with `derived_from` pointing at the original refs. Each later turn must admit, omit, compact, redact, or dedupe that contribution through `ContextAssembler`, producing normal `ContextItem` and `ContextProjectionAudit` records. Carry-forward evidence must not bypass context policy, become hidden mutable state, or require raw chain-of-thought capture.
 
 An attribution report can then be derived after the run:

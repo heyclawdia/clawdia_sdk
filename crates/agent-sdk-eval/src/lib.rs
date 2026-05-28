@@ -8,6 +8,7 @@ pub mod comparison;
 pub mod evaluator;
 pub mod evidence;
 pub mod identity;
+pub mod metrics;
 pub mod report;
 pub mod request;
 pub mod scope;
@@ -17,6 +18,7 @@ pub use comparison::ComparisonDesign;
 pub use evaluator::Evaluator;
 pub use evidence::{EvidenceBundle, EvidenceItem, EvidenceRole, SupportRefValidation};
 pub use identity::EvaluationId;
+pub use metrics::{ToolTraceMetric, TraceMetrics, TraceMetricsComparison};
 pub use report::{
     EvaluationConfidence, EvaluationMetricDelta, EvaluationReport, EvaluationVerdict,
     EvaluatorJudgment,

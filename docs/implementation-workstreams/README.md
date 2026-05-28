@@ -24,6 +24,7 @@ Launch targets use short titles such as `typed-ids`, `event-frames`, or `text-ru
 | [11 Replay Hardening](11-replay-hardening/README.md) | all targets in parallel | Fill golden fixtures, replay/recovery coverage, performance, and privacy hardening. |
 | [12 Scenario Verification](12-scenario-verification/README.md) | all targets in parallel | Prove generic scenarios and public API readiness after hardening. |
 | [13 Release Readiness](13-release-readiness/README.md) | one target | Run final packaging, feature flag, docs, verification-matrix, and release-handoff checks. |
+| [14 Evaluation Metrics](14-evaluation-metrics/README.md) | one target | Add optional post-hoc evaluation metrics and comparison helpers over released trace/journal primitives. |
 
 Do not start a later phase until the previous phase README exit gate is checked and the phase exit report records reviewer PASS.
 
@@ -50,6 +51,7 @@ The phase graph is shaped around test seams:
 - Phase 11 exists specifically to close cross-cutting fixture, replay, privacy, and performance gaps before release scenarios.
 - Phase 12 runs scenario and API verification in parallel after the hardening phase has made the evidence stable.
 - Phase 13 is a final serialized release-readiness stitching phase that consumes all earlier verification evidence.
+- Phase 14 adds post-release evaluation metrics as an optional layer over the released trace and journal primitives.
 
 If a future implementer finds a hidden dependency between two sibling launch targets, do not coordinate through shared mutable work. Move the dependent work into the next numbered phase and update this launch map.
 
@@ -70,6 +72,7 @@ flowchart TD
   P10 --> P11["11 Replay Hardening<br/>parallel"]
   P11 --> P12["12 Scenario Verification<br/>parallel"]
   P12 --> P13["13 Release Readiness"]
+  P13 --> P14["14 Evaluation Metrics"]
 ```
 
 ## Launch Protocol

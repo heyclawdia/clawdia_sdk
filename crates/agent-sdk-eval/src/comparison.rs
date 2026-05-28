@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use agent_sdk_core::EntityRef;
 
+use crate::EvaluationScope;
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "design", rename_all = "snake_case")]
 /// How an evaluation should compare an observed outcome.
@@ -24,6 +26,13 @@ pub enum ComparisonDesign {
         observed_ref: EntityRef,
         /// Comparison run ref.
         comparison_ref: EntityRef,
+    },
+    /// Compare two durable evaluation scopes without inventing entity refs.
+    PairedScopes {
+        /// Observed scope.
+        observed_scope: EvaluationScope,
+        /// Comparison scope.
+        comparison_scope: EvaluationScope,
     },
     /// Compare the observed result with one or more evidence refs removed.
     Ablation {
@@ -50,6 +59,7 @@ impl ComparisonDesign {
             self,
             Self::BaselineRun { .. }
                 | Self::PairedRuns { .. }
+                | Self::PairedScopes { .. }
                 | Self::Ablation { .. }
                 | Self::RepeatedExperiment { .. }
         )
@@ -64,6 +74,7 @@ impl ComparisonDesign {
                 observed_ref,
                 comparison_ref,
             } => vec![observed_ref.clone(), comparison_ref.clone()],
+            Self::PairedScopes { .. } => Vec::new(),
             Self::Ablation { removed_refs } => removed_refs.clone(),
             Self::RepeatedExperiment { cohort_ref } => vec![cohort_ref.clone()],
         }
@@ -71,6 +82,6 @@ impl ComparisonDesign {
 
     /// Returns true when this design carries comparison evidence.
     pub fn has_comparison_evidence(&self) -> bool {
-        !self.comparison_refs().is_empty()
+        matches!(self, Self::PairedScopes { .. }) || !self.comparison_refs().is_empty()
     }
 }

@@ -21,10 +21,12 @@ impl ScriptedEvaluator {
 impl Evaluator for ScriptedEvaluator {
     fn evaluate(
         &self,
-        _request: &EvaluationRequest,
+        request: &EvaluationRequest,
         _evidence: &EvidenceBundle,
     ) -> Result<EvaluationReport, AgentError> {
-        self.report.validate_confidence_contract()?;
-        Ok(self.report.clone())
+        let mut report = self.report.clone();
+        report.metric_deltas = request.metric_deltas.clone();
+        report.validate_confidence_contract_for_request(request)?;
+        Ok(report)
     }
 }

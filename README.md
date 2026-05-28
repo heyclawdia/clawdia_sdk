@@ -7,7 +7,7 @@ This workspace is the authoritative planning and implementation packet for a new
 This is a monorepo with separable Rust crates:
 
 - `crates/agent-sdk-core`: the lightweight SDK kernel for users who only want agent primitives, records, runtime packages, ports, deterministic fakes, and conformance helpers.
-- `crates/agent-sdk-eval`: an optional evaluation framework crate for users who want post-hoc run, turn, session, expected-outcome, cited-support, and comparison evaluation primitives.
+- `crates/agent-sdk-eval`: an optional evaluation framework crate for users who want post-hoc run, turn, session, expected-outcome, cited-support, deterministic metrics, and comparison evaluation primitives.
 - `crates/agent-sdk-toolkit`: an optional add-on crate for users who want concrete workspace tools, shell/resource helpers, discovery, and ACP/MCP protocol conformance scaffolding.
 - `crates/agent-sdk-provider`: an optional aggregate crate for live OpenAI, Anthropic, and Gemini provider adapters layered over `ProviderAdapter`, plus deterministic transport hooks for tests.
 
@@ -54,6 +54,13 @@ Start from a live provider and keep the canonical runtime path visible:
 1. [Live provider quickstart](docs/examples/live-provider-quickstart.md): one text run through `AgentRuntime`, `RuntimePackage`, a real `ProviderAdapter`, event bus, and journal.
 2. [Typed-output quickstart](docs/examples/typed-output-quickstart.md): ergonomic typed output helper lowering into `RunRequest` plus `OutputContract`, with provider-native schema hints when the schema is inline and safe to project.
 3. [Tool-approval quickstart](docs/examples/tool-approval-quickstart.md): tool route, policy, journal intent/result, and effect records without direct callback execution.
+
+For run triage and evals, use `agent-sdk-eval::TraceMetrics` or
+`agent_sdk_toolkit::AgentTraceEvaluation::compare_sessions` to compute local
+started/ended/elapsed time, provider calls, token totals, tool calls, tool
+status counts, and per-tool elapsed time from supplied traces. Optional
+provider-backed evaluators are explicit post-hoc checks; normal agent runs do
+not spend extra evaluator tokens.
 
 The crate family intentionally does not publish a crate named `agent-sdk`.
 Consumers should depend on the split crates explicitly: `agent-sdk-core` for

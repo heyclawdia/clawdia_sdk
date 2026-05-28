@@ -11,8 +11,9 @@ use agent_sdk_core::{
 };
 use agent_sdk_eval::{
     ComparisonDesign, EvaluationBudget, EvaluationConfidence, EvaluationId, EvaluationReport,
-    EvaluationRequest, EvaluationUsage, EvaluationVerdict, Evaluator, EvaluatorJudgment,
-    EvidenceBundle, ExpectedOutcome,
+    EvaluationRequest, EvaluationSubject, EvaluationSubjectRole, EvaluationUsage,
+    EvaluationVerdict, Evaluator, EvaluatorJudgment, EvidenceBundle, EvidenceRole, ExpectedOutcome,
+    TraceMetrics, TraceMetricsComparison,
 };
 
 /// Builder for evaluating an agent trace with an arbitrary evaluator.
@@ -20,12 +21,15 @@ use agent_sdk_eval::{
 pub struct AgentTraceEvaluation {
     request: EvaluationRequest,
     evidence: EvidenceBundle,
+    metrics: TraceMetrics,
+    metrics_comparison: Option<TraceMetricsComparison>,
 }
 
 impl AgentTraceEvaluation {
     /// Builds an evaluation from a turn trace.
     pub fn turn(trace: &TurnTrace, expected_outcome: ExpectedOutcome) -> Result<Self, AgentError> {
         let evidence = EvidenceBundle::from_turn_trace(trace)?;
+        let metrics = TraceMetrics::from_turn_trace(trace)?;
         let turn_id = trace.turn_id.clone().ok_or_else(|| {
             AgentError::contract_violation("turn trace is missing turn id for evaluation")
         })?;
@@ -35,12 +39,18 @@ impl AgentTraceEvaluation {
             expected_outcome,
         )
         .with_subject(agent_trace_subject(&evidence)?);
-        Ok(Self { request, evidence })
+        Ok(Self {
+            request,
+            evidence,
+            metrics,
+            metrics_comparison: None,
+        })
     }
 
     /// Builds an evaluation from a run trace.
     pub fn run(trace: &RunTrace, expected_outcome: ExpectedOutcome) -> Result<Self, AgentError> {
         let evidence = EvidenceBundle::from_run_trace(trace)?;
+        let metrics = TraceMetrics::from_run_trace(trace)?;
         let run_id = trace.run_id.clone().ok_or_else(|| {
             AgentError::contract_violation("run trace is missing run id for evaluation")
         })?;
@@ -50,7 +60,12 @@ impl AgentTraceEvaluation {
             expected_outcome,
         )
         .with_subject(agent_trace_subject(&evidence)?);
-        Ok(Self { request, evidence })
+        Ok(Self {
+            request,
+            evidence,
+            metrics,
+            metrics_comparison: None,
+        })
     }
 
     /// Builds an evaluation from a session timeline.
@@ -59,6 +74,7 @@ impl AgentTraceEvaluation {
         expected_outcome: ExpectedOutcome,
     ) -> Result<Self, AgentError> {
         let evidence = EvidenceBundle::from_session_timeline(timeline)?;
+        let metrics = TraceMetrics::from_session_timeline(timeline);
         let request = EvaluationRequest::new(
             EvaluationId::new(format!(
                 "evaluation.session.{}",
@@ -68,7 +84,58 @@ impl AgentTraceEvaluation {
             expected_outcome,
         )
         .with_subject(agent_trace_subject(&evidence)?);
-        Ok(Self { request, evidence })
+        Ok(Self {
+            request,
+            evidence,
+            metrics,
+            metrics_comparison: None,
+        })
+    }
+
+    /// Builds a deterministic comparison between two session timelines.
+    pub fn compare_sessions(
+        observed: &SessionTimeline,
+        baseline: &SessionTimeline,
+        expected_outcome: ExpectedOutcome,
+    ) -> Result<Self, AgentError> {
+        let mut evidence = EvidenceBundle::from_session_timeline(observed)?;
+        let baseline_evidence = EvidenceBundle::from_session_timeline(baseline)?;
+        let baseline_outcome_ref = baseline_evidence.outcome_ref.clone();
+        let comparison_metrics = TraceMetricsComparison::sessions(observed, baseline);
+        for mut item in baseline_evidence.items {
+            item.role = EvidenceRole::Baseline;
+            evidence = evidence.with_item(item);
+        }
+        let mut request = EvaluationRequest::new(
+            EvaluationId::new(format!(
+                "evaluation.session.compare.{}.{}",
+                observed.session_id.as_str(),
+                baseline.session_id.as_str()
+            )),
+            evidence.scope.clone(),
+            expected_outcome,
+        )
+        .with_subject(agent_trace_subject(&evidence)?)
+        .with_comparison(ComparisonDesign::PairedScopes {
+            observed_scope: comparison_metrics.observed.scope.clone(),
+            comparison_scope: comparison_metrics.baseline.scope.clone(),
+        })
+        .with_metric_deltas(comparison_metrics.metric_deltas.clone());
+
+        if let Some(subject_ref) = baseline_outcome_ref {
+            request = request.with_subject(EvaluationSubject {
+                subject_ref,
+                role: EvaluationSubjectRole::Baseline,
+                redacted_summary: Some("baseline session outcome".to_string()),
+            });
+        }
+
+        Ok(Self {
+            request,
+            evidence,
+            metrics: comparison_metrics.observed.clone(),
+            metrics_comparison: Some(comparison_metrics),
+        })
     }
 
     /// Returns this evaluation with its comparison design replaced.
@@ -85,7 +152,9 @@ impl AgentTraceEvaluation {
 
     /// Evaluates this trace using the supplied evaluator.
     pub fn evaluate<E: Evaluator>(&self, evaluator: &E) -> Result<EvaluationReport, AgentError> {
-        evaluator.evaluate(&self.request, &self.evidence)
+        let report = evaluator.evaluate(&self.request, &self.evidence)?;
+        report.validate_confidence_contract_for_request(&self.request)?;
+        Ok(report)
     }
 
     /// Returns the request this builder will evaluate.
@@ -96,6 +165,16 @@ impl AgentTraceEvaluation {
     /// Returns the evidence bundle this builder will pass to the evaluator.
     pub fn evidence(&self) -> &EvidenceBundle {
         &self.evidence
+    }
+
+    /// Returns deterministic metrics for the observed trace.
+    pub fn metrics(&self) -> &TraceMetrics {
+        &self.metrics
+    }
+
+    /// Returns deterministic comparison metrics when this evaluation compares traces.
+    pub fn metrics_comparison(&self) -> Option<&TraceMetricsComparison> {
+        self.metrics_comparison.as_ref()
     }
 }
 
@@ -162,8 +241,6 @@ struct AiEvaluatorReply {
     #[serde(default)]
     support_refs: Vec<WireEntityRef>,
     #[serde(default)]
-    metric_deltas: Vec<agent_sdk_eval::EvaluationMetricDelta>,
-    #[serde(default)]
     limitations: Vec<String>,
 }
 
@@ -193,6 +270,7 @@ fn ai_evaluator_prompt(
         "scope": request.scope,
         "expected_outcome": request.expected_outcome,
         "comparison": request.comparison,
+        "deterministic_metric_deltas": request.metric_deltas,
         "subjects": request.subjects,
         "available_evidence": evidence.items,
         "evidence_summary": evidence.redacted_summary,
@@ -203,9 +281,10 @@ fn ai_evaluator_prompt(
     let prompt = format!(
         concat!(
             "Evaluate this recorded agent outcome using only the supplied redacted summaries and ids. ",
-            "Return compact JSON only with keys verdict, score, confidence, redacted_summary, support_refs, metric_deltas, and limitations. ",
+            "Return compact JSON only with keys verdict, score, confidence, redacted_summary, support_refs, and limitations. ",
             "Cite support_refs only from available_evidence. ",
-            "Use confidence=measured only when comparison evidence and metric_deltas support it. ",
+            "Use confidence=measured only when deterministic_metric_deltas and comparison evidence support it. ",
+            "Do not compute or return metric_deltas; deterministic_metric_deltas are the only metric authority. ",
             "Do not include raw private content.\n",
             "EVALUATION_PAYLOAD={payload}"
         ),
@@ -271,10 +350,19 @@ fn report_from_provider_response(
     .with_judgment(judgment);
     report.score = parsed.score;
     report.evidence_refs = support.accepted_refs;
-    report.metric_deltas = parsed.metric_deltas;
+    report.metric_deltas = request.metric_deltas.clone();
     report.limitations = limitations;
 
-    if report.validate_confidence_contract().is_err() && report.confidence.is_measured() {
+    let claims_measured = report.confidence.is_measured()
+        || report
+            .judgments
+            .iter()
+            .any(|judgment| judgment.confidence.is_measured());
+    if report
+        .validate_confidence_contract_for_request(request)
+        .is_err()
+        && claims_measured
+    {
         report.confidence = fallback_confidence.clone();
         for judgment in &mut report.judgments {
             if judgment.confidence.is_measured() {
@@ -286,7 +374,7 @@ fn report_from_provider_response(
                 .to_string(),
         );
     }
-    report.validate_confidence_contract()?;
+    report.validate_confidence_contract_for_request(request)?;
     Ok(report)
 }
 

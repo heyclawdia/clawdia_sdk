@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use agent_sdk_core::{AgentError, ProviderUsage};
 
-use crate::{ComparisonDesign, EvaluationId, EvaluationScope, EvaluationSubject, ExpectedOutcome};
+use crate::{
+    ComparisonDesign, EvaluationId, EvaluationMetricDelta, EvaluationScope, EvaluationSubject,
+    ExpectedOutcome,
+};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 /// Budget for evaluator work. Provider-backed evaluators should reject requests
@@ -62,6 +65,8 @@ pub struct EvaluationRequest {
     pub expected_outcome: ExpectedOutcome,
     /// Comparison design for the evaluation.
     pub comparison: ComparisonDesign,
+    /// Deterministic metric deltas supplied by local evaluators or tests.
+    pub metric_deltas: Vec<EvaluationMetricDelta>,
     /// Budget for evaluator work.
     pub budget: EvaluationBudget,
     /// Bounded request summary safe for logs and prompts.
@@ -82,6 +87,7 @@ impl EvaluationRequest {
             redacted_summary: expected_outcome.redacted_summary.clone(),
             expected_outcome,
             comparison: ComparisonDesign::ObservedOnly,
+            metric_deltas: Vec::new(),
             budget: EvaluationBudget::default(),
         }
     }
@@ -95,6 +101,21 @@ impl EvaluationRequest {
     /// Returns this request with its comparison design replaced.
     pub fn with_comparison(mut self, comparison: ComparisonDesign) -> Self {
         self.comparison = comparison;
+        self
+    }
+
+    /// Returns this request with one deterministic metric delta appended.
+    pub fn with_metric_delta(mut self, metric_delta: EvaluationMetricDelta) -> Self {
+        self.metric_deltas.push(metric_delta);
+        self
+    }
+
+    /// Returns this request with deterministic metric deltas appended.
+    pub fn with_metric_deltas(
+        mut self,
+        metric_deltas: impl IntoIterator<Item = EvaluationMetricDelta>,
+    ) -> Self {
+        self.metric_deltas.extend(metric_deltas);
         self
     }
 

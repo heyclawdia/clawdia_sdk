@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use agent_sdk_core::{AgentError, EntityRef};
 
-use crate::{ComparisonDesign, EvaluationId, EvaluationScope, EvaluationUsage};
+use crate::{ComparisonDesign, EvaluationId, EvaluationRequest, EvaluationScope, EvaluationUsage};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -200,6 +200,38 @@ impl EvaluationReport {
     /// Validates that measured confidence is backed by comparison evidence and
     /// metric deltas.
     pub fn validate_confidence_contract(&self) -> Result<(), AgentError> {
+        self.validate_measured_confidence(&self.comparison, &self.metric_deltas)
+    }
+
+    /// Validates measured confidence against request-owned metric deltas.
+    pub fn validate_confidence_contract_for_request(
+        &self,
+        request: &EvaluationRequest,
+    ) -> Result<(), AgentError> {
+        self.validate_measured_confidence(&request.comparison, &request.metric_deltas)?;
+        let claims_measured = self.confidence.is_measured()
+            || self
+                .judgments
+                .iter()
+                .any(|judgment| judgment.confidence.is_measured());
+        if claims_measured && self.comparison != request.comparison {
+            return Err(AgentError::contract_violation(
+                "measured evaluation comparison must match the evaluation request",
+            ));
+        }
+        if claims_measured && self.metric_deltas != request.metric_deltas {
+            return Err(AgentError::contract_violation(
+                "measured evaluation metric deltas must come from the evaluation request",
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_measured_confidence(
+        &self,
+        comparison: &ComparisonDesign,
+        metric_deltas: &[EvaluationMetricDelta],
+    ) -> Result<(), AgentError> {
         let claims_measured = self.confidence.is_measured()
             || self
                 .judgments
@@ -208,17 +240,17 @@ impl EvaluationReport {
         if !claims_measured {
             return Ok(());
         }
-        if !self.comparison.supports_measured_confidence() {
+        if !comparison.supports_measured_confidence() {
             return Err(AgentError::contract_violation(
                 "measured evaluation confidence requires a comparison design",
             ));
         }
-        if !self.comparison.has_comparison_evidence() {
+        if !comparison.has_comparison_evidence() {
             return Err(AgentError::contract_violation(
                 "measured evaluation confidence requires comparison evidence refs",
             ));
         }
-        if self.metric_deltas.is_empty() {
+        if metric_deltas.is_empty() {
             return Err(AgentError::contract_violation(
                 "measured evaluation confidence requires at least one metric delta",
             ));
