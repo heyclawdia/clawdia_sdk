@@ -9,6 +9,9 @@
 /// adapters layered over `agent-sdk-core` coordination ports.
 pub mod agent_pool;
 pub mod discovery;
+/// Public environment namespace. Use it for data-only helpers that lower
+/// portable environment policy into core isolation contracts.
+pub mod environment;
 /// Public evaluation namespace. Use it for optional post-hoc agent-run
 /// evaluation helpers layered over `agent-sdk-eval` and core traces.
 pub mod evaluation;
@@ -45,6 +48,10 @@ pub mod workspace;
 
 pub use agent_pool::SqliteAgentPoolStore;
 pub use discovery::{ToolDiscoveryExecutor, ToolDiscoveryIndex, ToolDiscoveryRequest};
+pub use environment::{
+    AgentWorkspaceEnvironment, AgentWorkspaceEnvironmentProfile, EgressAllowlist, EgressProtocol,
+    EgressTarget,
+};
 pub use evaluation::{AgentTraceEvaluation, AiTraceEvaluator};
 pub use packs::{
     AsyncTool, Tool, ToolBuilder, ToolPackBuilder, ToolkitPackBundle, ToolkitToolExecutionMode,
