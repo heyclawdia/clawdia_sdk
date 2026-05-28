@@ -37,6 +37,9 @@ Triggering the release without updating the workflow would leave the `0.1.0-alph
   3. `agent-sdk-provider`
   4. `agent-sdk-toolkit`
 - The workflow keeps idempotent "publish if missing" behavior for reruns.
+- The workflow can publish from a GitHub release, an explicit publish
+  dispatch, or a `v*` release-tag push so release execution is not blocked by a
+  local `gh` credential failure.
 - The workflow parses local `cargo pkgid` output that uses `#<version>` as well
   as registry-style output that uses `@<version>`, so crates.io lookups use the
   real version string.
@@ -64,7 +67,7 @@ Triggering the release without updating the workflow would leave the `0.1.0-alph
 - `cargo publish -p agent-sdk-core --dry-run`
 - `cargo publish -p agent-sdk-eval --dry-run` and `cargo publish -p agent-sdk-provider --dry-run` when the matching core version is already visible on crates.io; otherwise the real publish job validates them after core propagation.
 - `cargo publish -p agent-sdk-toolkit --dry-run` when core and eval are already visible on crates.io; otherwise the real publish job validates it after dependency propagation.
-- GitHub release/workflow evidence after the release is created.
+- GitHub release-tag/workflow evidence after the release is created.
 - crates.io confirmation for all four `0.1.0-alpha.3` crates.
 
 ## Workstreams
@@ -72,7 +75,7 @@ Triggering the release without updating the workflow would leave the `0.1.0-alph
 1. Documentation polish: improve rustdoc for `EnvironmentRuntime` and `AgentWorkspaceEnvironmentProfile::runtime`; add changelog coverage.
 2. Release workflow fix: update `.github/workflows/publish-crates.yml` to dry-run dependencies when their registry prerequisites are visible and publish core, eval, provider, and toolkit in dependency order with registry propagation retries where needed.
 3. Verification: run public audit, formatting, clippy, tests, docs, and dry-run packaging for each crate.
-4. Release execution: push the release-ready commit(s), create the `v0.1.0-alpha.3` prerelease, watch the publish workflow, and confirm crates.io availability.
+4. Release execution: push the release-ready commit(s), create the `v0.1.0-alpha.3` release tag or prerelease, watch the publish workflow, and confirm crates.io availability.
 
 ## Risk / Gotcha Carry-Forward
 
@@ -80,5 +83,8 @@ Triggering the release without updating the workflow would leave the `0.1.0-alph
 - Do not publish toolkit before both `agent-sdk-core` and `agent-sdk-eval` are visible on crates.io; toolkit has registry-pinned dependencies on both.
 - Do not assume `agent-sdk-provider` is transitively published by toolkit; it is an independent optional adapter crate.
 - Do not derive crates.io version checks with an `@`-only parser; local workspace package IDs use `#<version>`.
+- If local GitHub CLI credentials are unavailable, prefer the release-tag trigger
+  over manual local `cargo publish` so the repository secret remains the only
+  crates.io credential source.
 - Keep `EnvironmentRuntime` data-only. If a future runtime crate registers real adapters, route that through core isolation runtime ports and host policy, not this enum.
 - Keep release workflow rerunnable. Existing crates at the same version should be skipped rather than failing the entire publish job.

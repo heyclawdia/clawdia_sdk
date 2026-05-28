@@ -3,6 +3,9 @@ name: Publish crates
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       publish:
@@ -101,7 +104,7 @@ jobs:
       - name: Decide publish mode
         id: publish-mode
         run: |
-          if [[ "${{ github.event_name }}" == "release" || "${{ inputs.publish }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "release" || "${{ github.event_name }}" == "push" || "${{ inputs.publish }}" == "true" ]]; then
             echo "publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
