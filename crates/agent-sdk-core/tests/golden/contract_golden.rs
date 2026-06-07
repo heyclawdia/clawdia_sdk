@@ -519,6 +519,7 @@ fn package_with_tool() -> RuntimePackage {
             refs: vec![schema_ref("v1")],
             policy_refs: vec![approval_policy("policy.approval.workspace_read")],
             content_hash: "sha256:schema.v1".to_string(),
+            redacted_payload: None,
         })
         .capability(workspace_read_tool("v1", "executor.workspace_read.v1"))
         .policy(package_policy("policy.package.default"))

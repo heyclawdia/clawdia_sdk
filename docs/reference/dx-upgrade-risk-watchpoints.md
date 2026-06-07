@@ -10,32 +10,43 @@ they must be documented before release handoff.
   loop, provider registry authority, package registry authority, event stream,
   journal path, policy path, tool executor, telemetry truth store, workflow
   engine, approval UI, or product adapter.
-- If `AgentApp` or a similar builder is added, require lowering tests that
-  compare its output to direct `Agent`, `AgentRuntime`, `RunRequest`, and
-  `RuntimePackage` construction.
+- `AgentApp` now exists as a sync-first assembly wrapper over
+  `AgentRuntimeBuilder`. Future changes must keep its helpers lowering into
+  `RunRequest`, `RuntimePackage`, provider registry, journal, event bus,
+  content, policy, and tool ports instead of adding a second runtime path.
 - If the facade uses default features, audit the dependency tree. Default
   installs should not surprise users with provider, database, OTel, protocol,
   browser, workflow, async-runtime, or UI dependencies unless a release decision
   says so explicitly.
-- Current facade features are limited to real re-export groups: `providers`,
-  `workspace-tools`, `evals`, `test-support`, and `all-stable`. Do not add an
-  advertised feature for a future area until a concrete crate, namespace, and
-  test matrix exist.
+- Current facade features are limited to real re-export groups and optional
+  helper crates: `providers`, `workspace-tools`, `evals`, `reports`, `macros`,
+  `file-store`, `supabase-store`, `stores`, `test-support`, and `all-stable`.
+  Do not add an advertised feature for a future area until a concrete crate,
+  namespace, and test matrix exist.
 - If the facade is published later, release notes must state that direct split
   crates remain supported and that `agent_sdk_core::prelude` is core-only.
+- `AgentAppStores` exposes separate journal write and journal read ports. Keep
+  reporting and resume helpers reading from `RunJournalReader` instead of
+  downcasting a store bundle or adding facade-only report state.
 
 ## Tool Authoring Risks
 
-- If a tool macro is added, keep it outside `agent-sdk-core` and make it
-  optional.
+- Tool macros now live in optional `agent-sdk-macros` and are re-exported by
+  `clawdia-sdk` only behind the `macros` feature.
 - Generated tool schema must be deterministic and covered by fixtures or golden
   tests.
 - Generated tool identity, namespace, version, executor ref, schema ref, and
   policy refs must be stable enough for runtime package fingerprints.
 - Macro-generated execution must still go through `ToolExecutionCoordinator`,
   policy, approval, effect intent/result records, journals, and events.
+- Typed tools that call `require_approval()` now lower into routes with
+  `requires_approval = true`. Do not infer approval dispatch from high risk or
+  an approval policy ref alone; older toolkit routes may carry approval policy
+  metadata without requiring a host approval dispatch.
 - Structured tool errors must preserve typed error kinds; do not collapse them
   to strings for the provider-facing path.
+- Macro expansions must continue to resolve through either direct split-crate
+  dependencies or `clawdia_sdk::tools` facade-only imports.
 
 ## Install Feature Risks
 
@@ -57,11 +68,42 @@ they must be documented before release handoff.
 - Durable store examples need crash/replay, missing-content, redaction, cursor,
   and interrupted-effect fixtures before they are advertised as production
   ready.
+- File and Supabase stores now exist as optional crates. Keep raw provider
+  arguments out of journals/events/debug output and return content refs. Keep
+  Supabase byte storage binary-safe via base64 and schema-profile headers.
+- Provider argument stores must support by-ref JSON readback for typed tool
+  execution. Adding a store backend that can only write provider arguments is
+  incomplete for `AgentApp::typed_tool`.
+- Supabase stores include agent-pool state through explicit PostgREST/RPC
+  functions. Supabase project provisioning, RLS policy, service-role rotation,
+  and live-host migrations remain host-owned release work.
+
+## Phase 15 Alpha Breaking Changes
+
+- `ToolRoute` and `ToolPackToolSnapshot` now carry `requires_approval`.
+  Existing package snapshots that require host approval must set this flag
+  explicitly; approval policy refs alone remain policy metadata.
+- `PackageSidecarSnapshot` can carry a redacted package payload so provider
+  tool schemas can be projected without resolving raw sidecars. Future sidecar
+  payloads must stay redacted and fingerprint-stable.
+- `ProviderArgumentStore` now includes `load_provider_arguments_json` so typed
+  tools can resolve provider argument content refs. Backends must implement
+  readback, malformed-JSON errors, and no raw argument leakage in journals or
+  events.
+- `AgentAppStores` now includes `journal_reader` alongside the write journal so
+  facade reports can read durable evidence through a typed port.
 
 ## Example And Documentation Risks
 
 - Do not claim numbered examples are runnable until their directories, READMEs,
   commands, expected output, failure modes, and CI gates exist.
+- The Phase 15 numbered smoke examples now exist as workspace packages. Keep
+  their commands runnable without live credentials:
+  `clawdia-sdk-example-01-facade-complex-agent`,
+  `clawdia-sdk-example-02-typed-tool-macro`,
+  `clawdia-sdk-example-03-file-store`,
+  `clawdia-sdk-example-04-supabase-scripted-store`, and
+  `clawdia-sdk-example-05-reporting-and-eval`.
 - Live-provider examples need deterministic fake or transport-injected paths for
   CI. Live credentials remain user/host-owned and must not enter runtime package
   fingerprints, journals, events, logs, or docs output.
@@ -74,10 +116,10 @@ they must be documented before release handoff.
 - If later work extends `clawdia-sdk`, keep `agent-sdk-core` dependency-light and
   run `cargo tree` for core, facade default features, and each real facade
   feature group.
-- If later work adds `AgentApp::builder`, include a test that records the same
+- If later work expands `AgentApp::builder`, include tests that record the same
   event and journal vocabulary as direct runtime usage.
-- If later work adds macros, include schema-generation, async execution, sync
-  execution, structured error, and doc-example tests.
+- If later work expands macros, include schema-generation, async execution,
+  sync execution, structured error, facade-only import, and doc-example tests.
 - If later work adds persistence backends, map each backend to the persistence
   ownership map and avoid a state-store umbrella.
 - If later work breaks split-crate imports, document the alpha breaking change

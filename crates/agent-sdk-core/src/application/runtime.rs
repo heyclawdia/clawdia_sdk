@@ -12,6 +12,8 @@ use std::{
 };
 
 use crate::{
+    approval_ports::ApprovalDispatcher,
+    capability::ProjectionMode,
     content_ports::ContentResolver,
     domain::{
         AgentError, AgentErrorKind, AgentId, RetryClassification, RunId, RuntimePackageId,
@@ -29,6 +31,7 @@ use crate::{
         InMemoryRuntimePackageResolver, OutputSinkPort, OutputSinkRegistry, ProviderAdapter,
         ProviderRegistry, RuntimePackageResolver, RuntimePolicyPort,
     },
+    provider::ProviderToolSpec,
     run::{RunRequest, RunResult, RunStatus},
     run_handle::{InMemoryRunControlStore, RunControlStore, RunHandle},
     subscription::RunSubscriptionSource,
@@ -340,10 +343,72 @@ impl AgentRuntime {
             ToolRouter::new(snapshot),
             self.inner.tool_executors.clone(),
         );
-        Ok(match self.inner.tool_policy.clone() {
+        let coordinator = match self.inner.tool_policy.clone() {
             Some(policy) => coordinator.with_policy(policy),
             None => coordinator,
+        };
+        Ok(match self.inner.approval_dispatcher.clone() {
+            Some(dispatcher) => coordinator.with_approval_dispatcher(dispatcher),
+            None => coordinator,
         })
+    }
+
+    /// Builds provider-visible tool declarations for the effective package.
+    /// This projects package/tool-route metadata only; execution remains owned
+    /// by `ToolExecutionCoordinator` after the provider requests a tool call.
+    pub(crate) fn provider_tool_specs(
+        &self,
+        package: &RuntimePackage,
+        run_id: &RunId,
+    ) -> Result<Vec<ProviderToolSpec>, AgentError> {
+        let projected_tools = package.provider_tool_specs()?;
+        if projected_tools.is_empty() {
+            return Ok(Vec::new());
+        }
+        if self.inner.tool_routes.is_empty() {
+            return Err(missing_port_error("tool routes", run_id));
+        }
+        let snapshot =
+            ToolRegistrySnapshot::from_runtime_package(package, self.inner.tool_routes.clone())
+                .map_err(|error| {
+                    error.with_causal_ids(CausalIds {
+                        run_id: Some(run_id.clone()),
+                        ..CausalIds::default()
+                    })
+                })?;
+        let projected_schema_refs = projected_tools
+            .into_iter()
+            .filter_map(|projection| match projection.projection {
+                ProjectionMode::ProviderToolSchema { schema_ref } => {
+                    Some((projection.capability_id, schema_ref))
+                }
+                _ => None,
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut specs = Vec::new();
+        for route in snapshot.routes {
+            let Some(schema_ref) = projected_schema_refs.get(&route.capability_id).cloned() else {
+                return Err(
+                    AgentError::missing_required_field("provider_tool_spec.schema_ref")
+                        .with_causal_ids(CausalIds {
+                            run_id: Some(run_id.clone()),
+                            ..CausalIds::default()
+                        }),
+                );
+            };
+            let mut spec = ProviderToolSpec::new(
+                route.canonical_tool_name.as_str(),
+                route.capability_id,
+                route.namespace,
+                schema_ref.clone(),
+                route.policy_refs,
+            );
+            if let Some(schema) = provider_schema_from_sidecars(package, &schema_ref) {
+                spec = spec.with_redacted_schema(schema);
+            }
+            specs.push(spec);
+        }
+        Ok(specs)
     }
 
     /// Returns hook executor registry for application coordinators.
@@ -574,6 +639,7 @@ pub struct AgentRuntimeBuilder {
     tool_routes: Vec<ToolRoute>,
     tool_executors: ToolExecutorRegistry,
     tool_policy: Option<Arc<dyn ToolPolicyPort>>,
+    approval_dispatcher: Option<Arc<dyn ApprovalDispatcher>>,
 }
 
 impl AgentRuntimeBuilder {
@@ -725,6 +791,22 @@ impl AgentRuntimeBuilder {
         self
     }
 
+    /// Configures the host-owned approval dispatcher used by approval-gated
+    /// tool execution.
+    pub fn approval_dispatcher<D>(mut self, dispatcher: D) -> Self
+    where
+        D: ApprovalDispatcher + 'static,
+    {
+        self.approval_dispatcher = Some(Arc::new(dispatcher));
+        self
+    }
+
+    /// Configures a shared host-owned approval dispatcher.
+    pub fn shared_approval_dispatcher(mut self, dispatcher: Arc<dyn ApprovalDispatcher>) -> Self {
+        self.approval_dispatcher = Some(dispatcher);
+        self
+    }
+
     /// Returns hook executor registry for the current value.
     /// This stores the registry for future run starts and hook invocation; it does not invoke
     /// hook executors.
@@ -764,6 +846,7 @@ impl AgentRuntimeBuilder {
                 tool_routes: self.tool_routes,
                 tool_executors: self.tool_executors,
                 tool_policy: self.tool_policy,
+                approval_dispatcher: self.approval_dispatcher,
                 run_control: InMemoryRunControlStore::default(),
                 next_journal_seq: AtomicU64::new(0),
                 journal_sequence_lock: Mutex::new(()),
@@ -786,10 +869,31 @@ struct RuntimeInner {
     tool_routes: Vec<ToolRoute>,
     tool_executors: ToolExecutorRegistry,
     tool_policy: Option<Arc<dyn ToolPolicyPort>>,
+    approval_dispatcher: Option<Arc<dyn ApprovalDispatcher>>,
     run_control: InMemoryRunControlStore,
     next_journal_seq: AtomicU64,
     journal_sequence_lock: Mutex<()>,
     runs: Mutex<BTreeMap<RunId, RegisteredRun>>,
+}
+
+fn provider_schema_from_sidecars(
+    package: &RuntimePackage,
+    schema_ref: &crate::capability::PackageSidecarRef,
+) -> Option<serde_json::Value> {
+    package
+        .sidecars
+        .iter()
+        .filter_map(|sidecar| sidecar.redacted_payload.as_ref())
+        .find_map(|payload| {
+            payload.get("tools")?.as_array()?.iter().find_map(|tool| {
+                let tool_schema_ref = tool.get("schema_ref")?;
+                if tool_schema_ref.get("sidecar_id")?.as_str()? == schema_ref.sidecar_id {
+                    tool.get("redacted_schema").cloned()
+                } else {
+                    None
+                }
+            })
+        })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

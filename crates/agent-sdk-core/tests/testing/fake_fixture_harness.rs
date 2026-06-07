@@ -226,5 +226,6 @@ fn fake_provider_request(content: &str) -> ProviderRequest {
         }],
         projection_item_count: 1,
         structured_output_hint: None,
+        tools: Vec::new(),
     }
 }

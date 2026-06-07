@@ -123,7 +123,9 @@ pub struct ToolBuilder {
     tool_name: String,
     executor_ref: String,
     schema_id: String,
+    redacted_schema: Option<serde_json::Value>,
     policy_refs: Vec<PolicyRef>,
+    requires_approval: bool,
     capability_id: Option<CapabilityId>,
     namespace: Option<CapabilityNamespace>,
     required_permissions: Vec<CapabilityPermission>,
@@ -149,7 +151,9 @@ impl ToolBuilder {
             tool_name: tool_name.into(),
             executor_ref: executor_ref.into(),
             schema_id: schema_id.into(),
+            redacted_schema: None,
             policy_refs: vec![policy_ref],
+            requires_approval: false,
             capability_id: None,
             namespace: None,
             required_permissions: Vec::new(),
@@ -206,9 +210,26 @@ impl ToolBuilder {
         self
     }
 
+    /// Attaches a provider-safe JSON schema body to this tool declaration.
+    pub fn redacted_schema(mut self, schema: serde_json::Value) -> Self {
+        self.redacted_schema = Some(schema);
+        self
+    }
+
     /// Adds another policy ref that must travel with the tool declaration.
     pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.policy_refs.push(policy_ref);
+        self
+    }
+
+    /// Requires host approval before the core runtime releases the executor.
+    pub fn require_approval(mut self) -> Self {
+        self.requires_approval = true;
+        self.policy_refs.push(PolicyRef::with_kind(
+            PolicyKind::Approval,
+            format!("policy.approval.{}", self.tool_name),
+        ));
+        self.risk_class = Some(RiskClass::High);
         self
     }
 
@@ -287,8 +308,10 @@ impl ToolBuilder {
             canonical_tool_name: CanonicalToolName::new(self.tool_name),
             namespace,
             schema_ref: PackageSidecarRef::new(self.schema_id, "tool_schema", "v1"),
+            redacted_schema: self.redacted_schema,
             executor_ref: ExecutorRef::new(self.executor_ref),
             policy_refs: self.policy_refs,
+            requires_approval: self.requires_approval,
             required_permissions: self.required_permissions,
             effect_class,
             risk_class,

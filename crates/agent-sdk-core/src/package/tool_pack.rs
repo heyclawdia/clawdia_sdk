@@ -252,6 +252,13 @@ impl ToolPackSnapshot {
             refs,
             policy_refs,
             content_hash: self.content_hash()?,
+            redacted_payload: Some(crate::domain::json::normalize_json_value(
+                serde_json::to_value(self).map_err(|error| {
+                    AgentError::contract_violation(format!(
+                        "tool pack sidecar serialization failed: {error}"
+                    ))
+                })?,
+            )),
         })
     }
 
@@ -327,12 +334,20 @@ pub struct ToolPackToolSnapshot {
     /// Typed schema ref reference. Resolving or executing it is a separate
     /// policy-gated step.
     pub schema_ref: PackageSidecarRef,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Provider-safe JSON schema body for the tool arguments.
+    pub redacted_schema: Option<serde_json::Value>,
     /// Typed executor ref reference. Resolving or executing it is a separate
     /// policy-gated step.
     pub executor_ref: ExecutorRef,
     /// Policy references that govern admission, projection, execution, or
     /// delivery.
     pub policy_refs: Vec<PolicyRef>,
+    #[serde(default)]
+    /// Whether core must dispatch host approval before executor release.
+    /// Approval policy refs remain metadata unless this explicit package
+    /// contract flag is set.
+    pub requires_approval: bool,
     /// Collection of required permissions values.
     /// Ordering and membership should be treated as part of the serialized contract when
     /// relevant.

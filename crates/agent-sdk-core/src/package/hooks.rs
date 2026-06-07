@@ -811,6 +811,7 @@ impl HookSpec {
             refs: vec![sidecar_ref],
             policy_refs: vec![self.policy_ref.clone()],
             content_hash,
+            redacted_payload: None,
         })
     }
 }

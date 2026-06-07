@@ -25,6 +25,7 @@ Launch targets use short titles such as `typed-ids`, `event-frames`, or `text-ru
 | [12 Scenario Verification](12-scenario-verification/README.md) | all targets in parallel | Prove generic scenarios and public API readiness after hardening. |
 | [13 Release Readiness](13-release-readiness/README.md) | one target | Run final packaging, feature flag, docs, verification-matrix, and release-handoff checks. |
 | [14 Evaluation Metrics](14-evaluation-metrics/README.md) | one target | Add optional post-hoc evaluation metrics and comparison helpers over released trace/journal primitives. |
+| [15 DX Completion](15-dx-completion/README.md) | one target | Complete the facade-first SDK DX with typed tools, durable stores, Supabase, reports, and runnable examples. |
 
 Do not start a later phase until the previous phase README exit gate is checked and the phase exit report records reviewer PASS.
 
@@ -52,6 +53,9 @@ The phase graph is shaped around test seams:
 - Phase 12 runs scenario and API verification in parallel after the hardening phase has made the evidence stable.
 - Phase 13 is a final serialized release-readiness stitching phase that consumes all earlier verification evidence.
 - Phase 14 adds post-release evaluation metrics as an optional layer over the released trace and journal primitives.
+- Phase 15 completes the facade-first DX packet by adding convenience assembly,
+  typed tool authoring, durable adapters, report helpers, and runnable examples
+  over the already implemented primitive kernel.
 
 If a future implementer finds a hidden dependency between two sibling launch targets, do not coordinate through shared mutable work. Move the dependent work into the next numbered phase and update this launch map.
 
@@ -73,6 +77,7 @@ flowchart TD
   P11 --> P12["12 Scenario Verification<br/>parallel"]
   P12 --> P13["13 Release Readiness"]
   P13 --> P14["14 Evaluation Metrics"]
+  P14 --> P15["15 DX Completion"]
 ```
 
 ## Launch Protocol

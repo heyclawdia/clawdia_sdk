@@ -107,6 +107,12 @@ pub trait EventArchive: Send + Sync {
     ) -> Result<AgentEventStream, AgentError>;
 }
 
+/// Explicit read-side contract for archived event frames.
+pub trait EventArchiveReader: Send + Sync {
+    /// Returns archived frames after the optional archive cursor.
+    fn frames_after(&self, cursor: Option<ArchiveCursor>) -> Result<Vec<EventFrame>, AgentError>;
+}
+
 #[derive(Clone, Debug)]
 /// Carries agent event stream data across a host-port boundary.
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
@@ -282,6 +288,35 @@ impl AgentEventBus for InMemoryAgentEventBus {
         let queue = filter.queue.clone();
         self.filtered_stream(filter.cursor_scope(), filter, cursor, queue)
     }
+}
+
+impl EventArchiveReader for InMemoryAgentEventBus {
+    fn frames_after(&self, cursor: Option<ArchiveCursor>) -> Result<Vec<EventFrame>, AgentError> {
+        let start_after = cursor.as_ref().and_then(archive_position_seq);
+        Ok(self
+            .frames
+            .lock()
+            .map_err(|_| AgentError::contract_violation("event bus lock poisoned"))?
+            .iter()
+            .filter(|frame| {
+                frame
+                    .archive_cursor
+                    .as_ref()
+                    .and_then(archive_position_seq)
+                    .is_some_and(|position| start_after.is_none_or(|seq| position > seq))
+            })
+            .cloned()
+            .collect())
+    }
+}
+
+fn archive_position_seq(cursor: &ArchiveCursor) -> Option<u64> {
+    cursor
+        .position
+        .strip_prefix("archive.")
+        .unwrap_or(&cursor.position)
+        .parse()
+        .ok()
 }
 
 fn apply_queue_bounds(

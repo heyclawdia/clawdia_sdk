@@ -190,6 +190,7 @@ fn provider_debug_output_redacts_prompt_output_schema_and_tool_material() {
         }],
         projection_item_count: 1,
         structured_output_hint: None,
+        tools: Vec::new(),
     }
     .with_structured_output_hint(&contract);
     let response = ProviderResponse::text("provider-output-debug-secret");

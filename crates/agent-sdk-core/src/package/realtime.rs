@@ -157,6 +157,7 @@ impl RealtimeSessionSidecar {
             }],
             policy_refs: self.policy_refs(),
             content_hash: self.content_hash()?,
+            redacted_payload: None,
         })
     }
 }

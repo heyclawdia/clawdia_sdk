@@ -140,6 +140,7 @@ impl StreamRuleSidecar {
             refs,
             policy_refs,
             content_hash: self.content_hash()?,
+            redacted_payload: None,
         })
     }
 }

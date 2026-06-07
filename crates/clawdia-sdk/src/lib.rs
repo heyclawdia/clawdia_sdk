@@ -24,6 +24,10 @@
 //! # Ok::<(), clawdia_sdk::prelude::AgentError>(())
 //! ```
 
+pub mod app;
+
+pub use app::{AgentApp, AgentAppBuilder, AgentAppStores};
+
 /// Advanced core namespace.
 ///
 /// Use this when a facade consumer wants explicit access to the primitive
@@ -38,6 +42,8 @@ pub mod core {
 /// second execution path.
 pub mod prelude {
     pub use agent_sdk_core::prelude::*;
+
+    pub use crate::{AgentApp, AgentAppBuilder, AgentAppStores};
 }
 
 /// Provider adapter namespace.
@@ -58,6 +64,9 @@ pub mod providers {
 #[cfg(feature = "workspace-tools")]
 pub mod tools {
     pub use agent_sdk_toolkit::*;
+
+    #[cfg(feature = "macros")]
+    pub use agent_sdk_macros::*;
 }
 
 /// Evaluation namespace.
@@ -68,6 +77,34 @@ pub mod tools {
 #[cfg(feature = "evals")]
 pub mod eval {
     pub use agent_sdk_eval::*;
+}
+
+/// Durable store adapter namespace.
+#[cfg(any(feature = "file-store", feature = "supabase-store"))]
+pub mod stores {
+    #[cfg(feature = "file-store")]
+    pub mod file {
+        pub use agent_sdk_store_file::*;
+    }
+
+    #[cfg(feature = "supabase-store")]
+    pub mod supabase {
+        pub use agent_sdk_store_supabase::*;
+    }
+
+    #[cfg(feature = "file-store")]
+    pub use file::{
+        FileAgentPoolStore, FileCheckpointStore, FileContentStore, FileEventArchive,
+        FileProviderArgumentStore, FileRunJournal, FileStoreBundle,
+    };
+
+    #[cfg(feature = "supabase-store")]
+    pub use supabase::{
+        SupabaseAgentPoolStore, SupabaseAuth, SupabaseCheckpointStore, SupabaseClient,
+        SupabaseContentStore, SupabaseEventArchive, SupabaseHttpRequest, SupabaseHttpResponse,
+        SupabaseHttpTransport, SupabaseProviderArgumentStore, SupabaseRunJournal,
+        SupabaseStoreBundle, SupabaseStoreConfig,
+    };
 }
 
 /// Deterministic test-support namespace.

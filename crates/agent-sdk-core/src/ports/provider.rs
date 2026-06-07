@@ -8,10 +8,11 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    capability::{CapabilityId, CapabilityNamespace, PackageSidecarRef},
     context::ContextProjection,
     domain::{
-        AgentError, AgentErrorKind, ContentRef, DestinationKind, OutputSchemaId, PrivacyClass,
-        RetryClassification, SourceKind, ToolCallId,
+        AgentError, AgentErrorKind, ContentRef, DestinationKind, OutputSchemaId, PolicyRef,
+        PrivacyClass, RetryClassification, SourceKind, ToolCallId,
     },
     output::{ContentHash, OutputContract, OutputSchemaRef, ProviderHintPolicy, SchemaVersion},
     projection::project_context_projection,
@@ -80,6 +81,29 @@ pub trait ProviderAdapter: Send + Sync {
     fn extract_usage(&self, response: &ProviderResponse) -> ProviderUsage {
         response.usage.clone().unwrap_or_default()
     }
+}
+
+/// Read/write store contract for raw provider tool-call arguments.
+///
+/// Implementations must keep raw arguments out of journals, events, summaries,
+/// and debug output, returning content refs for later policy-checked access.
+pub trait ProviderArgumentStore: Send + Sync {
+    /// Stores raw provider tool arguments and returns a content ref when the
+    /// host wants executors to resolve arguments through normal content policy.
+    fn store_provider_arguments(
+        &self,
+        provider_ref: &str,
+        call_id: &str,
+        canonical_tool_name: &CanonicalToolName,
+        raw_arguments: &str,
+    ) -> Result<Option<ContentRef>, AgentError>;
+
+    /// Loads stored provider tool arguments as JSON through the same content
+    /// ref returned by `store_provider_arguments`.
+    fn load_provider_arguments_json(
+        &self,
+        content_ref: &ContentRef,
+    ) -> Result<serde_json::Value, AgentError>;
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -186,6 +210,12 @@ pub struct ProviderRequest {
     /// Optional structured output hint value.
     /// When absent, callers should use the documented default or skip that optional behavior.
     pub structured_output_hint: Option<ProviderStructuredOutputHint>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Provider-visible tool declarations projected from the effective runtime package.
+    /// These are declarations only: provider adapters may render them into native
+    /// function/tool shapes, but core remains authoritative for routing, approval,
+    /// execution, journaling, and redaction.
+    pub tools: Vec<ProviderToolSpec>,
 }
 
 impl ProviderRequest {
@@ -200,6 +230,13 @@ impl ProviderRequest {
         self.structured_output_hint = Some(ProviderStructuredOutputHint::from(contract));
         self
     }
+
+    /// Returns this value with provider-visible tool declarations attached.
+    /// This is data-only projection; it does not execute tools or resolve schema refs.
+    pub fn with_tools(mut self, tools: impl IntoIterator<Item = ProviderToolSpec>) -> Self {
+        self.tools = tools.into_iter().collect();
+        self
+    }
 }
 
 impl fmt::Debug for ProviderRequest {
@@ -212,6 +249,90 @@ impl fmt::Debug for ProviderRequest {
             .field("messages", &"<redacted>")
             .field("projection_item_count", &self.projection_item_count)
             .field("structured_output_hint", &self.structured_output_hint)
+            .field("tool_count", &self.tools.len())
+            .field("tools", &"<redacted>")
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
+/// Provider-visible tool declaration projected from runtime-package state.
+///
+/// This DTO is safe for provider adapters because it carries only stable names,
+/// refs, policy identifiers, and optional redacted schema bodies. Raw tool
+/// arguments and executable handles never appear here.
+pub struct ProviderToolSpec {
+    /// Provider-visible canonical function/tool name.
+    pub name: String,
+    /// Stable capability id that owns this provider-visible declaration.
+    pub capability_id: CapabilityId,
+    /// Capability namespace carried for lineage and collision debugging.
+    pub namespace: CapabilityNamespace,
+    /// Tool input schema ref. Resolving it is separate from constructing a
+    /// provider request.
+    pub schema_ref: PackageSidecarRef,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Policy refs that must still be evaluated by core before execution.
+    pub policy_refs: Vec<PolicyRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Redacted inline schema body, when a package helper has made one safe for
+    /// provider projection. Adapters must use a bounded fallback when absent.
+    pub redacted_schema: Option<serde_json::Value>,
+}
+
+impl ProviderToolSpec {
+    /// Builds a provider tool declaration from package and runtime routing data.
+    /// This is projection only and performs no provider call or tool execution.
+    pub fn new(
+        name: impl Into<String>,
+        capability_id: CapabilityId,
+        namespace: CapabilityNamespace,
+        schema_ref: PackageSidecarRef,
+        policy_refs: Vec<PolicyRef>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            capability_id,
+            namespace,
+            schema_ref,
+            policy_refs,
+            redacted_schema: None,
+        }
+    }
+
+    /// Returns this declaration with an inline redacted schema attached.
+    /// The caller is responsible for supplying only provider-safe schema data.
+    pub fn with_redacted_schema(mut self, schema: serde_json::Value) -> Self {
+        self.redacted_schema = Some(schema);
+        self
+    }
+
+    /// Returns a provider-safe JSON schema body. If no inline schema body is
+    /// present, the fallback is an object schema with SDK schema-ref metadata.
+    pub fn provider_schema(&self) -> serde_json::Value {
+        self.redacted_schema.clone().unwrap_or_else(|| {
+            serde_json::json!({
+                "type": "object",
+                "additionalProperties": true,
+                "x-agent-sdk-schema-ref": self.schema_ref.sidecar_id,
+                "x-agent-sdk-schema-kind": self.schema_ref.kind,
+                "x-agent-sdk-schema-version": self.schema_ref.version,
+                "x-agent-sdk-schema-content-hash": self.schema_ref.content_hash,
+            })
+        })
+    }
+}
+
+impl fmt::Debug for ProviderToolSpec {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderToolSpec")
+            .field("name", &self.name)
+            .field("capability_id", &self.capability_id)
+            .field("namespace", &self.namespace)
+            .field("schema_ref", &self.schema_ref)
+            .field("policy_ref_count", &self.policy_refs.len())
+            .field("redacted_schema_present", &self.redacted_schema.is_some())
             .finish()
     }
 }

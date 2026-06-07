@@ -201,6 +201,9 @@ fn openai_responses_body(request: OpenAiResponsesRequest) -> Value {
     if let Some(text) = request.text.and_then(openai_text_format) {
         body["text"] = text;
     }
+    if !request.tools.is_empty() {
+        body["tools"] = serde_json::to_value(request.tools).expect("tool declarations serialize");
+    }
     body
 }
 

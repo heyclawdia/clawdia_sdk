@@ -17,10 +17,36 @@ examples only where they preserve `Agent`, `AgentRuntime`, `RunRequest`,
 journals, events, telemetry, redaction, output contracts, and checkpoints as the
 source of truth.
 
-This report describes the DX direction and the current first implementation
-slice. The repository now has an unpublished `clawdia-sdk` facade crate for
-imports and examples. It still does not add an app builder, tool macro,
-persistence backend, runnable example workspace, or release metadata.
+This report describes the DX direction and the current implementation slice.
+Phase 15 now implements the previously deferred first-user DX surfaces:
+`AgentApp`, typed tool helpers and optional macros, file and Supabase store
+adapters, usage/cost/run reports, provider-visible tool projection, and five
+runnable checkout examples. Release metadata remains a separate readiness task.
+
+## Phase 15 Implementation Update
+
+Implemented in this checkout:
+
+- `clawdia-sdk::AgentApp` assembles canonical `AgentRuntimeBuilder` ports and
+  lowers `run_text`/`run_typed` into normal `RunRequest` execution.
+- `agent-sdk-toolkit::typed_tool` provides typed argument/output traits,
+  deterministic schema snapshots, typed executor glue, and package bundle
+  lowering.
+- `agent-sdk-macros` provides optional derives and `#[agent_tool]`, including
+  facade-only path resolution through `clawdia_sdk::tools`.
+- Provider adapters project provider-visible tool declarations for
+  OpenAI-compatible, OpenAI Responses, Anthropic Messages, and Gemini
+  generateContent request shapes, using inline redacted schemas when toolkit
+  packages provide them and a schema-ref fallback otherwise.
+- `agent-sdk-store-file` implements file-backed journal, checkpoint, content,
+  event archive, provider-argument, and agent-pool store adapters.
+- `agent-sdk-store-supabase` implements Supabase REST-backed journal,
+  checkpoint, content, event archive, provider-argument, and agent-pool
+  adapters through an injectable HTTP transport plus checked migrations.
+- `agent-sdk-eval` now exposes `UsageReport`, `CostPolicy`, `StaticRateTable`,
+  `CostReport`, `RunReport`, and `RunReportLimitations`.
+- Runnable smoke examples now live under `examples/01_*` through
+  `examples/05_*`.
 
 ## Current Local Grounding
 
@@ -30,10 +56,10 @@ persistence backend, runnable example workspace, or release metadata.
 | Core common imports | `agent_sdk_core::prelude::*` exists as a facade-only re-export namespace. It adds no behavior. | Good core import path, but not a whole-SDK facade. |
 | Agent/run helpers | `Agent::builder`, `Agent::run_text`, `Agent::run_typed`, `Agent::typed_text_request`, `AgentRuntime::run_text`, and `AgentRuntime::run_typed` already lower into canonical requests. | Good foundation, but users still configure runtime packages/providers/journals explicitly. |
 | Provider adapters | `agent-sdk-provider` exposes live-provider adapters over `ProviderAdapter`. | Useful, but model catalog, streaming profile, and provider quickstarts are still thin. |
-| Tool ergonomics | `agent-sdk-toolkit` exposes data-only `Tool`, `AsyncTool`, and `ToolPackBuilder`; execution still goes through core tool routes, policy, journal, events, and effects. | Correct boundary, but no typed function macro/builder that generates schema and executor glue. |
-| Persistence | Core has journal/checkpoint/content/event/agent-pool/tool/provider-argument boundaries. Toolkit has SQLite agent-pool support. | No one-command durable session/checkpoint setup yet; persistence must stay split by responsibility. |
-| Token/cost | Core telemetry records and eval trace metrics can carry token totals and usage-derived counts. | No user-facing cost estimator/rate table policy layer yet. |
-| Examples | Repo has docs quickstarts and scenario notes, but not the numbered runnable example directories requested by the launch prompt. | Good conceptual coverage; copy-run onboarding still needs a curated example suite. |
+| Tool ergonomics | `agent-sdk-toolkit` exposes data-only `Tool`, `AsyncTool`, `ToolPackBuilder`, and typed tool helpers; `agent-sdk-macros` adds optional derives/attribute helpers. | Correct boundary; continue adding helper coverage without bypassing core tool coordination. |
+| Persistence | Core has journal/checkpoint/content/event/agent-pool/tool/provider-argument boundaries. File and Supabase store crates implement concrete adapters over those boundaries. | Durable stores remain split by responsibility; no global state store. |
+| Token/cost | Core telemetry records and eval trace metrics can carry token totals and usage-derived counts. Eval now adds usage, cost, and run-report helpers. | Keep rates host-provided and disabled unless a caller supplies a policy. |
+| Examples | The checkout has five runnable Phase 15 smoke examples. | Keep examples deterministic and credential-free unless a live gate is explicit. |
 
 ## DX Target Shape
 
@@ -41,25 +67,25 @@ persistence backend, runnable example workspace, or release metadata.
 | --- | --- | --- |
 | First app builder | A small `AgentApp`-style builder for the everyday path. | The builder wires canonical components and then calls the normal runtime path. |
 | Optional facade | A convenience crate for onboarding and examples. | Split crates stay supported and core stays dependency-light. |
-| Tool authoring | Typed function-tool builder first; optional macro later. | Generated or builder-created tools register schema/executor refs and execute only through core coordination. |
+| Tool authoring | Typed function-tool builders plus optional macro helpers. | Generated or builder-created tools register schema/executor refs and execute only through core coordination. |
 | Install clarity | Feature docs organized by user task and real current crates: core kernel, provider adapters, workspace tools, evaluation helpers, and deterministic test support. | Feature groups map to real crates and must not pull hidden dependencies into core. |
-| Local persistence | Start with file/SQLite-oriented local stores where they match the persistence map; leave hosted stores as future adapter options. | No global state store; journals remain durable truth and sessions are projections. |
+| Persistence adapters | File and Supabase stores implemented where they match the persistence map; future backends must follow the same per-port ownership. | No global state store; journals remain durable truth and sessions are projections. |
 | Provider onboarding | Provider adapters should be swappable, testable, and shown with deterministic mock paths. | Credentials, endpoint policy, routing decisions, and host product choices stay outside adapters. |
 | Observability | Events, journals, usage, cost estimates, and trace metrics should appear in examples from the first plan. | Telemetry is a projection from durable evidence, not a separate truth store. |
 | HITL approvals | Tool-level interrupts produce durable requests and auditable decisions. | Core never calls product UI directly. |
 
-## Missing Public API Pieces
+## Implemented And Remaining Public API Pieces
 
 | Gap | Proper scope | Required proof before implementation is complete |
 | --- | --- | --- |
-| `AgentApp` or equivalent first-run builder | Facade crate or small optional app-builder crate | Tests showing the builder lowers into `Agent`, `AgentRuntime`, `RunRequest`, `RuntimePackage`, provider registry, journal, event bus, policy, and output contracts. |
-| Convenience facade crate | New optional `crates/clawdia-sdk`, initially `publish = false` | Feature-gated dependency tests, rustdoc examples, package list audit, public API/SemVer review. |
-| Tool function builder/macro | `agent-sdk-toolkit` feature or `agent-sdk-macros` | Deterministic schema tests, sync/async execution tests, structured error conversion, durable tool records, docs examples. |
-| Provider install groups | Facade plus provider crate features or namespaces | `cargo tree` evidence that unused providers are not pulled in; mocked provider request tests. |
-| `run_stream` onboarding | Core runtime plus provider adapter streaming support | Event/journal cursor tests, terminal event preservation, redaction and backpressure tests. |
-| Durable session/checkpoint quickstart | Optional store/session crates over existing persistence map | Append/replay/checkpoint/content/ref fixtures and crash recovery tests. |
-| Token/cost summaries | Core telemetry projection plus optional cost policy/rate crate | Cost disabled-by-default tests, host-rate policy injection tests, redacted telemetry fixtures. |
-| MCP/browser/web adapters | Optional adapter crates | Protocol conformance, SSRF/resource policy, timeout/cancellation, redaction, and effect-journal tests. |
+| `AgentApp` first-run builder | Implemented in `clawdia-sdk` | Public API tests show the builder lowers into `Agent`, `AgentRuntime`, `RunRequest`, `RuntimePackage`, provider registry, journal, event bus, policy, and output contracts; the complex facade example exercises file stores, typed tools, approval dispatch, events, and run reports. |
+| Convenience facade crate | Implemented as optional `crates/clawdia-sdk`, initially `publish = false` | Feature-gated dependency tests, rustdoc examples, cargo-tree audits, and public API review are Phase 15 validation gates. |
+| Tool function builder/macro | Implemented in `agent-sdk-toolkit` and `agent-sdk-macros` | Deterministic schema tests, sync execution tests, structured error conversion, durable tool records, macro compile tests, and runnable examples cover the path. |
+| Provider install groups | Implemented through facade features plus provider crate namespaces | `cargo tree` evidence shows core stays dependency-light; provider request tests cover mocked wire shapes. |
+| `run_stream` onboarding | Remaining core/provider documentation and example work | Event/journal cursor tests, terminal event preservation, redaction, and backpressure tests must be named before adding a facade quickstart. |
+| Durable session/checkpoint quickstart | File and Supabase adapters over the existing persistence map | Append/replay/checkpoint/content/ref fixtures, provider-argument readback, recovery tests, agent-pool store tests, and scripted Supabase request tests cover current stores. |
+| Token/cost summaries | Implemented in optional `agent-sdk-eval` reports | Cost disabled-by-default behavior, host-rate policy injection, and redacted evidence limitations are covered by eval tests. |
+| MCP/browser/web adapters | Future optional adapter crates | Protocol conformance, SSRF/resource policy, timeout/cancellation, redaction, and effect-journal tests are required before feature exposure. |
 
 ## Recommended Crate And Feature Layout
 
@@ -74,8 +100,9 @@ still prove canonical lowering before they are added.
 | `agent-sdk-toolkit` | Existing | Concrete tool packs, workspace/shell/resource helpers, protocol test helpers, toolkit fakes. |
 | `agent-sdk-eval` | Existing | Optional post-hoc evaluation records and deterministic trace metrics. |
 | `clawdia-sdk` | Existing, unpublished | Convenience facade over split crates, initially unpublished. |
-| `agent-sdk-macros` | Proposed | Optional proc macros for tools and typed schema helpers if the builder layer is not enough. |
-| `agent-sdk-store-file` | Proposed | File-backed journals, checkpoints, content blobs, and event archive adapters. |
+| `agent-sdk-macros` | Existing | Optional proc macros for typed tool schema and builder helpers. |
+| `agent-sdk-store-file` | Existing | File-backed journals, checkpoints, content blobs, event archive, provider argument, and agent-pool adapters. |
+| `agent-sdk-store-supabase` | Existing | Supabase REST-backed store adapters with injectable transport and SQL migration. |
 | `agent-sdk-store-sqlite` | Proposed | SQLite-backed local store adapters with explicit tables and migration fixtures. |
 | `agent-sdk-mcp` | Proposed | MCP adapter lowering remote tools/resources/prompts into SDK capabilities and effect records. |
 | `agent-sdk-otel` | Proposed | OTel export projection over events/journals, not telemetry truth. |
@@ -89,37 +116,35 @@ Implemented facade features:
 | `workspace-tools` | Enables workspace read/search/edit/write, shell/resource helpers, and toolkit pack builders. | Existing toolkit crate. |
 | `evals` | Enables evaluation crate re-exports. | Existing crate. |
 | `test-support` | Enables deterministic core testing helpers. Toolkit/eval testing helpers are re-exported when their features are also enabled. | Existing test-support surfaces. |
-| `all-stable` | Enables current stable optional facade groups, excluding test support and future adapters. | Existing grouping over real current features only. |
+| `macros` | Enables optional typed-tool proc macros through `clawdia_sdk::tools`. | Existing macro crate and facade re-export. |
+| `file-store` | Enables file-backed durable store adapters. | Existing adapter crate and tests. |
+| `supabase-store` | Enables Supabase REST-backed durable store adapters. | Existing adapter crate, scripted transport tests, and migration. |
+| `stores` | Enables all current store backends. | Existing grouping over file and Supabase stores. |
+| `all-stable` | Enables current stable optional facade groups, excluding test support. | Existing grouping over real current features only. |
 
-Future install areas:
+Future optional adapter areas:
 
 | Area | Boundary | Required readiness before feature exposure |
 | --- | --- | --- |
-| Typed tool helpers | Function-tool builder and, later, optional macros. | Builder/macro layer with deterministic schema, execution, error, and docs tests. |
-| Local stores | File/SQLite-oriented journal, checkpoint, content, event, tool, and provider-argument adapters. | Backends mapped to the persistence ownership map with crash/replay fixtures. |
-| Observability helpers | Usage/cost summaries and exporter setup. | Projections from durable evidence with privacy/redaction fixtures. |
-| Approval helpers | HITL ergonomics over core broker and durable decision records. | Host-owned UI boundary tests and journal/event evidence tests. |
+| Additional local stores | SQLite or other local journal, checkpoint, content, event, tool, and provider-argument adapters. | Backends mapped to the persistence ownership map with crash/replay fixtures. |
+| OTel/exporter helpers | Export projections over events and journals. | Projections from durable evidence with privacy/redaction fixtures and no telemetry truth store. |
+| Approval ergonomics | HITL helpers over core broker and durable decision records. | Host-owned UI boundary tests and journal/event evidence tests. |
+| Protocol adapters | MCP, ACP, browser, web, or remote providers. | Protocol conformance, resource policy, timeout/cancellation, redaction, and journaled effect tests. |
 
 ## Recommended Quickstarts And Examples
 
-Add examples in a later implementation phase only after their dependencies and
-CI gates are defined:
+Phase 15 adds deterministic checkout examples:
 
-1. `examples/01_live_provider_text_run`
-2. `examples/02_typed_tool_builder`
-3. `examples/03_typed_output`
-4. `examples/04_tool_approval_hitl`
-5. `examples/05_streaming_events`
-6. `examples/06_checkpoint_resume`
-7. `examples/07_token_tracking_costs`
-8. `examples/08_subagent_handoff`
-9. `examples/09_trace_eval`
-10. `examples/10_facade_quickstart`
+1. `examples/01_facade_complex_agent`
+2. `examples/02_typed_tool_macro`
+3. `examples/03_file_store`
+4. `examples/04_supabase_scripted_store`
+5. `examples/05_reporting_and_eval`
 
-Each example should include a `README.md`, run command, environment variables,
-expected output shape, failure modes, the SDK primitive it demonstrates, and an
-SDK-owned/host-owned boundary block. Live-provider examples need mocked CI paths
-or explicit live-test gates.
+Future richer examples should keep the same discipline: include a run command,
+expected output shape, failure modes, the SDK primitive demonstrated, and an
+SDK-owned/host-owned boundary block. Live-provider examples need mocked CI
+paths or explicit live-test gates.
 
 ## Risks And Migration Concerns
 
@@ -145,20 +170,22 @@ Accepted for this packet:
 - Recommend a `clawdia-sdk` convenience facade as the safest first proposal.
 - Add an unpublished, behavior-free `clawdia-sdk` facade as the first code
   slice.
+- Implement `AgentApp`, typed tool helpers/macros, provider-visible tool
+  projection, file and Supabase stores, deterministic reports, and runnable
+  examples as Phase 15 DX completion surfaces.
 
 Rejected for this packet:
 
 - Renaming existing crates.
 - Publishing a facade crate now.
-- Adding app builders, macros, stores, runnable examples, or release metadata.
+- Adding release metadata or live hosted infrastructure requirements.
 
 Deferred:
 
-- Macro implementation details.
-- Runnable example workspaces.
 - Provider streaming/model catalog support.
-- Concrete persistence backend crates beyond current toolkit SQLite agent-pool
-  support.
+- Concrete persistence backend crates beyond file, Supabase, and the current
+  toolkit SQLite agent-pool support.
+- OTel/exporter, MCP/browser/web, and workflow adapter crates.
 
 ## Source Material Note
 

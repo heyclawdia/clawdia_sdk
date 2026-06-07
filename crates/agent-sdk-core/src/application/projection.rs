@@ -33,6 +33,7 @@ pub fn project_context_projection(
         projection_policy_ref: policy.projection_policy_ref.clone(),
         projection_item_count: projection.items.len(),
         structured_output_hint: None,
+        tools: Vec::new(),
         messages: projection
             .items
             .iter()

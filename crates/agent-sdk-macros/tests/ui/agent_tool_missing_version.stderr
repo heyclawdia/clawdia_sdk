@@ -1,0 +1,5 @@
+error: agent_tool requires version = "..."
+  --> tests/ui/agent_tool_missing_version.rs:18:4
+   |
+18 | fn lookup_docs(_args: Args) -> ToolResult<Output> {
+   |    ^^^^^^^^^^^

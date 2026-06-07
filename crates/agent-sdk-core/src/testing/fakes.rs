@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    domain::{AgentError, ContentId},
+    domain::{AgentError, ContentId, RunId},
     error::{AgentErrorKind, RetryClassification},
     events::EventFrame,
     journal::{JOURNAL_SCHEMA_VERSION, JournalCursor, JournalRecord},
-    journal_ports::RunJournal,
+    journal_ports::{RunJournal, RunJournalReader},
     provider::{
         ProviderAdapter, ProviderCapabilities, ProviderRequest, ProviderResponse,
         ProviderStopReason, ProviderUsage,
@@ -275,6 +275,16 @@ impl RunJournal for FakeJournalStore {
         }
         records.push(record);
         Ok(JournalCursor::new(format!("journal.{}", records.len())))
+    }
+}
+
+impl RunJournalReader for FakeJournalStore {
+    fn records_for_run(&self, run_id: &RunId) -> Result<Vec<JournalRecord>, AgentError> {
+        Ok(self
+            .records()
+            .into_iter()
+            .filter(|record| &record.run_id == run_id)
+            .collect())
     }
 }
 

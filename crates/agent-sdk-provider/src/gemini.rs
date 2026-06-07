@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use agent_sdk_core::{
     AgentError, ProviderAdapter, ProviderCapabilities, ProviderMessageRole,
     ProviderProjectionPolicy, ProviderRequest, ProviderResponse, ProviderStopReason,
-    ProviderToolCall, ProviderUsage, RetryClassification, ToolCallId,
+    ProviderToolCall, ProviderToolSpec, ProviderUsage, RetryClassification, ToolCallId,
     tool_records::CanonicalToolName,
 };
 use serde::{Deserialize, Serialize};
@@ -144,6 +144,15 @@ impl GeminiGenerateContentAdapter {
         if let Some(generation_config) = gemini_generation_config(request) {
             body["generationConfig"] = generation_config;
         }
+        if !request.tools.is_empty() {
+            body["tools"] = Value::Array(vec![json!({
+                "functionDeclarations": request
+                    .tools
+                    .iter()
+                    .map(gemini_function_declaration)
+                    .collect::<Vec<_>>()
+            })]);
+        }
         body
     }
 
@@ -263,6 +272,14 @@ fn gemini_generation_config(request: &ProviderRequest) -> Option<Value> {
         "responseMimeType": "application/json",
         "responseJsonSchema": schema,
     }))
+}
+
+fn gemini_function_declaration(tool: &ProviderToolSpec) -> Value {
+    json!({
+        "name": tool.name,
+        "description": format!("SDK tool {} governed by package policy refs", tool.name),
+        "parameters": tool.provider_schema(),
+    })
 }
 
 #[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]

@@ -134,6 +134,11 @@ pub struct ToolRoute {
     /// Policy references that govern admission, projection, execution, or
     /// delivery.
     pub policy_refs: Vec<PolicyRef>,
+    #[serde(default)]
+    /// Whether core must dispatch host approval before executor release.
+    /// Approval policy refs remain metadata unless this explicit routing flag
+    /// is set by the package/toolkit layer.
+    pub requires_approval: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// References to typed package sidecars needed by this capability.
     pub sidecar_refs: Vec<PackageSidecarRef>,

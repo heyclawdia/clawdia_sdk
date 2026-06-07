@@ -3,7 +3,7 @@
 //! storage and should be idempotent where replay requires it.
 //!
 use crate::{
-    domain::{AgentError, AgentErrorKind, EntityKind, EntityRef, RetryClassification},
+    domain::{AgentError, AgentErrorKind, EntityKind, EntityRef, RetryClassification, RunId},
     journal::{JournalCursor, JournalRecord},
 };
 
@@ -17,6 +17,34 @@ pub trait RunJournal: Send + Sync {
     /// execute the effect described by the record.
     fn append(&self, record: JournalRecord) -> Result<JournalCursor, AgentError>;
 }
+
+/// Explicit read-side contract for durable run journals.
+///
+/// This is intentionally separate from `RunJournal` so append-only behavior
+/// remains clear at execution seams while reports, resume helpers, and store
+/// adapters can consume durable evidence.
+pub trait RunJournalReader: Send + Sync {
+    /// Returns records for one run ordered by journal sequence.
+    fn records_for_run(&self, run_id: &RunId) -> Result<Vec<JournalRecord>, AgentError>;
+
+    /// Returns records for one run after a journal sequence.
+    fn records_after(
+        &self,
+        run_id: &RunId,
+        after_journal_seq: u64,
+    ) -> Result<Vec<JournalRecord>, AgentError> {
+        Ok(self
+            .records_for_run(run_id)?
+            .into_iter()
+            .filter(|record| record.journal_seq > after_journal_seq)
+            .collect())
+    }
+}
+
+/// Convenience trait for stores that support both append and read contracts.
+pub trait RunJournalStore: RunJournal + RunJournalReader {}
+
+impl<T> RunJournalStore for T where T: RunJournal + RunJournalReader {}
 
 /// Appends an intent record before executing the supplied closure.
 /// If the append fails, the closure is not called; if it succeeds, the

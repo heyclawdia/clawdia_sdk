@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use agent_sdk_core::{
-    AgentError, AgentErrorKind, PrivacyClass, ProviderAdapter, ProviderMessage,
-    ProviderMessageRole, ProviderRequest, ProviderStopReason, ProviderStreamDelta,
+    AgentError, AgentErrorKind, CapabilityId, CapabilityNamespace, PackageSidecarRef, PolicyKind,
+    PolicyRef, PrivacyClass, ProviderAdapter, ProviderMessage, ProviderMessageRole,
+    ProviderRequest, ProviderStopReason, ProviderStreamDelta, ProviderToolSpec,
     RetryClassification, SchemaVersion, domain::ContentRef as ContentRefId, domain::OutputSchemaId,
     output::OutputContract,
 };
@@ -81,6 +82,24 @@ fn responses_adapter_projects_structured_output_hint() {
         contract.schema_fingerprint().as_str()
     );
     assert!(text.include_schema_ref);
+}
+
+#[test]
+fn responses_adapter_projects_provider_tool_specs() {
+    let request = provider_request().with_tools([workspace_read_tool_spec()]);
+
+    let wire = OpenAiResponsesRequest::from_provider_request(
+        &OpenAiResponsesConfig::new("provider.openai_compatible.responses", "gpt-test"),
+        &request,
+    );
+
+    assert_eq!(wire.tools.len(), 1);
+    assert_eq!(wire.tools[0].kind, "function");
+    assert_eq!(wire.tools[0].name, "workspace_read");
+    assert_eq!(
+        wire.tools[0].parameters["x-agent-sdk-schema-ref"],
+        "schema.workspace_read"
+    );
 }
 
 #[test]
@@ -326,5 +345,19 @@ fn provider_request() -> ProviderRequest {
         ],
         projection_item_count: 3,
         structured_output_hint: None,
+        tools: Vec::new(),
     }
+}
+
+fn workspace_read_tool_spec() -> ProviderToolSpec {
+    ProviderToolSpec::new(
+        "workspace_read",
+        CapabilityId::new("cap.tool.workspace_read"),
+        CapabilityNamespace::new("tool.workspace_read"),
+        PackageSidecarRef::new("schema.workspace_read", "json_schema", "v1"),
+        vec![PolicyRef::with_kind(
+            PolicyKind::Approval,
+            "policy.approval.workspace_read",
+        )],
+    )
 }

@@ -7,8 +7,8 @@ use std::{fmt, sync::Arc};
 
 use agent_sdk_core::{
     AgentError, AgentErrorKind, ProviderAdapter, ProviderCapabilities, ProviderMessageRole,
-    ProviderRequest, ProviderResponse, ProviderStopReason, ProviderToolCall, ProviderUsage,
-    RetryClassification, ToolCallId, domain::ContentRef as ContentRefId,
+    ProviderRequest, ProviderResponse, ProviderStopReason, ProviderToolCall, ProviderToolSpec,
+    ProviderUsage, RetryClassification, ToolCallId, domain::ContentRef as ContentRefId,
     tool_records::CanonicalToolName,
 };
 use serde::{Deserialize, Serialize};
@@ -199,6 +199,9 @@ pub struct OpenAiResponsesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Optional structured-output text format hint.
     pub text: Option<OpenAiTextFormatHint>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Provider-native function tool declarations.
+    pub tools: Vec<OpenAiToolDeclaration>,
     /// Host endpoint/profile label, not a credential or raw client.
     pub endpoint_ref: String,
 }
@@ -220,6 +223,11 @@ impl OpenAiResponsesRequest {
                 .structured_output_hint
                 .as_ref()
                 .map(OpenAiTextFormatHint::from_provider_hint),
+            tools: request
+                .tools
+                .iter()
+                .map(OpenAiToolDeclaration::from_provider_tool)
+                .collect(),
             endpoint_ref: config.endpoint_ref.clone(),
         }
     }
@@ -233,6 +241,8 @@ impl fmt::Debug for OpenAiResponsesRequest {
             .field("input_count", &self.input.len())
             .field("input", &"<redacted>")
             .field("text", &self.text)
+            .field("tool_count", &self.tools.len())
+            .field("tools", &"<redacted>")
             .field("endpoint_ref", &self.endpoint_ref)
             .finish()
     }
@@ -313,6 +323,43 @@ impl fmt::Debug for OpenAiTextFormatHint {
             .field("schema_fingerprint", &self.schema_fingerprint)
             .field("include_schema_ref", &self.include_schema_ref)
             .field("schema_present", &self.schema.is_some())
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
+/// OpenAI-compatible Responses function declaration.
+pub struct OpenAiToolDeclaration {
+    #[serde(rename = "type")]
+    /// Provider tool type.
+    pub kind: String,
+    /// Provider-visible function name.
+    pub name: String,
+    /// Bounded provider-visible description.
+    pub description: String,
+    /// Provider-visible JSON schema for function arguments.
+    pub parameters: Value,
+}
+
+impl OpenAiToolDeclaration {
+    fn from_provider_tool(tool: &ProviderToolSpec) -> Self {
+        Self {
+            kind: "function".to_string(),
+            name: tool.name.clone(),
+            description: format!("SDK tool {} governed by package policy refs", tool.name),
+            parameters: tool.provider_schema(),
+        }
+    }
+}
+
+impl fmt::Debug for OpenAiToolDeclaration {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OpenAiToolDeclaration")
+            .field("kind", &self.kind)
+            .field("name", &self.name)
+            .field("description", &self.description)
+            .field("parameters", &"<redacted>")
             .finish()
     }
 }

@@ -218,6 +218,7 @@ impl Evaluator for AiTraceEvaluator {
             }],
             projection_item_count: evidence.items.len(),
             structured_output_hint: None,
+            tools: Vec::new(),
         };
         let response = self.provider.complete(&provider_request)?;
         let usage = EvaluationUsage {

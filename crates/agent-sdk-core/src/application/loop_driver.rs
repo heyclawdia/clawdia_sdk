@@ -229,6 +229,8 @@ pub fn run_p0_text(
     if let Some(output_contract) = request.output_contract.as_ref() {
         provider_request = provider_request.with_structured_output_hint(output_contract);
     }
+    provider_request = provider_request
+        .with_tools(runtime.provider_tool_specs(&effective.package, &request.run_id)?);
     let provider_effect_intent = journal_record(
         &request,
         Some(ids.turn_id.clone()),
@@ -1027,7 +1029,7 @@ fn drive_p2_tool_continuations(
 }
 
 fn tool_outcome_journal_record_count(outcome: &crate::tool_execution::ToolExecutionOutcome) -> u64 {
-    u64::from(outcome.intent_cursor.is_some()) + u64::from(outcome.terminal_cursor.is_some())
+    outcome.journal_records_appended
 }
 
 fn tool_terminal_event_kind(status: &ToolCallRecordStatus) -> EventKind {

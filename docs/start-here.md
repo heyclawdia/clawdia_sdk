@@ -7,7 +7,7 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 ## Current Packet
 
 - The authoritative Agent SDK packet lives in `<repo-root>`.
-- The current checkout includes Rust crates under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, the optional `crates/agent-sdk-provider`, and the unpublished convenience facade `crates/clawdia-sdk`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
+- The current checkout includes Rust crates under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, `crates/agent-sdk-provider`, `crates/agent-sdk-macros`, `crates/agent-sdk-store-file`, `crates/agent-sdk-store-supabase`, and the unpublished convenience facade `crates/clawdia-sdk`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
@@ -21,7 +21,7 @@ the old contract packet:
 1. Read `<repo-root>/AGENTS.md`, `<repo-root>/README.md`, this file, and `<repo-root>/coding_standards.md`.
 2. Confirm the current phase or task owner in [implementation-workstreams](implementation-workstreams/README.md).
 3. For user-facing API ergonomics, read [API Review](implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](reference/simplicity-audit.md), `../crates/agent-sdk-core/README.md`, `../crates/agent-sdk-core/tests/domain/public_api.rs`, and `../crates/clawdia-sdk/README.md`.
-4. For checkout-based app construction, prefer `clawdia_sdk::prelude::*` when using the unpublished facade. Split-crate users should use `agent_sdk_core::prelude::*` for common core types, explicit crate-root imports for advanced surfaces, `agent_sdk_core::ports` for host adapters, and `agent_sdk_core::testing` for deterministic conformance checks.
+4. For checkout-based app construction, prefer `clawdia_sdk::prelude::*` and `AgentApp` when using the unpublished facade. Split-crate users should use `agent_sdk_core::prelude::*` for common core types, explicit crate-root imports for advanced surfaces, `agent_sdk_core::ports` for host adapters, and `agent_sdk_core::testing` for deterministic conformance checks.
 5. Before handoff, run the commands named by the launch target plus `scripts/public-release-audit.sh` for any release or broad documentation handoff.
 
 ## Navigation
@@ -45,7 +45,7 @@ the old contract packet:
 | [reference/persistence-ownership-map.md](reference/persistence-ownership-map.md) | Concrete store boundary map for journals, checkpoints, content, event cursors, agent pools, tool execution, and provider arguments. |
 | [reference/dx-gap-report-agents-sdk.md](reference/dx-gap-report-agents-sdk.md) | SDK DX direction report for first-user ergonomics, install packaging, tool authoring, examples, and optional facade work. |
 | [reference/facade-crate-proposal.md](reference/facade-crate-proposal.md) | Current `clawdia-sdk` convenience facade shape and carry-forward proposal boundaries. |
-| [reference/dx-upgrade-risk-watchpoints.md](reference/dx-upgrade-risk-watchpoints.md) | Carry-forward risks for future facade, tool macro, install packaging, persistence, and example work. |
+| [reference/dx-upgrade-risk-watchpoints.md](reference/dx-upgrade-risk-watchpoints.md) | Current risks for the facade, tool macros, install packaging, persistence adapters, examples, and future expansion work. |
 | [reference/sdk-review-checklist.md](reference/sdk-review-checklist.md) | SDK review rubric for simplicity, product-neutrality, observability, durability, privacy, and API quality. |
 | [reference/simplicity-audit.md](reference/simplicity-audit.md) | Simplicity audit identifying what to default, merge, keep advanced-only, or preserve as essential complexity. |
 | [reference/open-questions-and-ambiguities.md](reference/open-questions-and-ambiguities.md) | Decision register for first Rust-slice resolved decisions, deferred details, and non-questions. |

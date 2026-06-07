@@ -693,6 +693,7 @@ impl ResolvedExtensionActionSidecar {
                 .collect(),
             policy_refs,
             content_hash: hash_json(self)?,
+            redacted_payload: None,
         })
     }
 }

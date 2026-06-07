@@ -11,6 +11,9 @@ This is a monorepo with separable Rust crates:
 - `crates/agent-sdk-toolkit`: an optional add-on crate for users who want concrete workspace tools, shell/resource helpers, discovery, and ACP/MCP protocol conformance scaffolding.
 - `crates/agent-sdk-provider`: an optional aggregate crate for live OpenAI, Anthropic, and Gemini provider adapters layered over `ProviderAdapter`, plus deterministic transport hooks for tests.
 - `crates/clawdia-sdk`: an unpublished local convenience facade that re-exports the split crates through one import path for checkout-based examples and onboarding.
+- `crates/agent-sdk-macros`: optional proc macros for typed tool schemas and builder helpers.
+- `crates/agent-sdk-store-file`: optional file-backed durable store adapters.
+- `crates/agent-sdk-store-supabase`: optional Supabase REST-backed durable store adapters with injectable transport tests.
 
 Keep this package boundary deliberate. New capabilities with heavy parser/runtime/provider dependencies should live in optional crates layered over `agent-sdk-core`, not as default core dependencies. Core must remain usable by hosts that only need the primitive SDK contracts.
 
@@ -39,6 +42,16 @@ Checkout-based examples can use the unpublished facade for import convenience:
 ```toml
 [dependencies]
 clawdia-sdk = { path = "crates/clawdia-sdk", default-features = false }
+```
+
+Runnable checkout smoke examples:
+
+```sh
+cargo run -p clawdia-sdk-example-01-facade-complex-agent
+cargo run -p clawdia-sdk-example-02-typed-tool-macro
+cargo run -p clawdia-sdk-example-03-file-store
+cargo run -p clawdia-sdk-example-04-supabase-scripted-store
+cargo run -p clawdia-sdk-example-05-reporting-and-eval
 ```
 
 The repository checkout can be ahead of the latest published alpha. Treat
@@ -146,4 +159,10 @@ For contract-packet review, use [docs/workstreams](docs/workstreams/README.md). 
 
 The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, `crates/agent-sdk-provider`, and the unpublished `crates/clawdia-sdk` facade. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
 
-This checkout includes deterministic fake/test-kit support, optional toolkit helpers, and live provider adapters for OpenAI Responses, Anthropic Messages, and Gemini generateContent in the aggregate `agent-sdk-provider` crate. It does not claim concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or product-specific host-adapter support.
+This checkout includes deterministic fake/test-kit support, optional toolkit
+helpers, typed tool macros, file and Supabase store adapters, eval usage/cost
+reports, and live provider adapters for OpenAI Responses, Anthropic Messages,
+and Gemini generateContent in the aggregate `agent-sdk-provider` crate. It does
+not claim concrete container/runtime, product UI, remote channel, network
+telemetry exporter, marketplace, workflow-engine, or product-specific
+host-adapter support.

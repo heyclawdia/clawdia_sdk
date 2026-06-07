@@ -189,6 +189,13 @@ fn provider_tool_use_executes_tool_and_continues_with_tool_result() {
 
     let requests = provider.requests();
     assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].tools.len(), 1);
+    assert_eq!(requests[0].tools[0].name, "workspace_read");
+    assert_eq!(
+        requests[0].tools[0].schema_ref.sidecar_id,
+        "sidecar.schema.read"
+    );
+    assert_eq!(requests[1].tools.len(), 1);
     let tool_message = requests[1]
         .messages
         .last()
@@ -1301,6 +1308,7 @@ fn p0_read_tool_route() -> ToolRoute {
             PolicyKind::Approval,
             "policy.approval.read",
         )],
+        requires_approval: false,
         sidecar_refs: vec![PackageSidecarRef::new(
             "sidecar.schema.read",
             "json_schema",

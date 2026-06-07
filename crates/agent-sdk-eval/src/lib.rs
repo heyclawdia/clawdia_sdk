@@ -5,16 +5,20 @@
 //! models, or define product-specific success rubrics.
 
 pub mod comparison;
+pub mod cost;
 pub mod evaluator;
 pub mod evidence;
 pub mod identity;
 pub mod metrics;
 pub mod report;
 pub mod request;
+pub mod run_report;
 pub mod scope;
 pub mod testing;
+pub mod usage;
 
 pub use comparison::ComparisonDesign;
+pub use cost::{CostPolicy, CostReport, StaticRateTable};
 pub use evaluator::Evaluator;
 pub use evidence::{EvidenceBundle, EvidenceItem, EvidenceRole, SupportRefValidation};
 pub use identity::EvaluationId;
@@ -24,6 +28,8 @@ pub use report::{
     EvaluatorJudgment,
 };
 pub use request::{EvaluationBudget, EvaluationRequest, EvaluationUsage};
+pub use run_report::{RunReport, RunReportLimitations};
 pub use scope::{
     EvaluationCriterion, EvaluationScope, EvaluationSubject, EvaluationSubjectRole, ExpectedOutcome,
 };
+pub use usage::UsageReport;

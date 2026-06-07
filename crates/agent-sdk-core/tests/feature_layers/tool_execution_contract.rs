@@ -1,19 +1,21 @@
 use std::sync::{Arc, Mutex};
 
 use agent_sdk_core::{
-    AgentError, AgentErrorKind, AgentId, AllowToolPolicy, CapabilityId, CapabilitySpec,
-    DestinationKind, DestinationRef, ExecutorRef, IdempotencyKey, JournalRecord,
-    JournalRecordPayload, PolicyDecision, PolicyKind, PolicyOutcome, PolicyRef, PolicyStage,
-    PrivacyClass, ProviderRouteSnapshot, RetentionClass, RetryClassification, RunId,
-    RuntimePackage, RuntimePackageId, SourceKind, SourceRef, ToolCallId, ToolExecutionContext,
-    ToolExecutionCoordinator,
+    AgentError, AgentErrorKind, AgentId, AllowToolPolicy, ApprovalDecision,
+    ApprovalDispatchResponse, CapabilityId, CapabilitySpec, DestinationKind, DestinationRef,
+    ExecutorRef, IdempotencyKey, JournalRecord, JournalRecordPayload, PolicyDecision, PolicyKind,
+    PolicyOutcome, PolicyRef, PolicyStage, PrivacyClass, ProviderRouteSnapshot, RetentionClass,
+    RetryClassification, RunId, RuntimePackage, RuntimePackageId, SourceKind, SourceRef,
+    ToolCallId, ToolExecutionContext, ToolExecutionCoordinator,
     domain::ContentRef as ContentRefId,
     hook_ports::InMemoryHookExecutorRegistry,
     package_hooks::{
         DenyReason, HookMutationRight, HookMutationRights, HookPoint, HookResponse,
         HookResponseClass, HookSource, HookSpec, ToolRequestPatch, ToolResultPatch,
     },
-    testing::{ScriptedHookExecutor, ScriptedToolExecutor, read_fixture},
+    testing::{
+        ScriptedApprovalDispatcher, ScriptedHookExecutor, ScriptedToolExecutor, read_fixture,
+    },
     tool_ports::{
         ToolCallRequest, ToolExecutionOutput, ToolExecutionStrategy, ToolExecutorRegistry,
         ToolPolicyPort, ToolRegistrySnapshot, ToolRoute, ToolRouter,
@@ -32,6 +34,95 @@ fn tool_registry_snapshot_lowers_runtime_package_routes_to_fixture() {
         registry_summary(&snapshot),
         read_fixture("tests/fixtures/tools/tool-registry-snapshot.json").expect("registry fixture")
     );
+}
+
+#[test]
+fn approval_required_tool_denies_without_dispatcher_before_executor_release() {
+    let package = package_with_tools();
+    let snapshot = approval_registry_snapshot(&package);
+    let executor = Arc::new(ScriptedToolExecutor::new(
+        ExecutorRef::new("executor.workspace_write.v1"),
+        ToolExecutionOutput::completed("write complete"),
+    ));
+    let mut executors = ToolExecutorRegistry::new();
+    executors
+        .register(executor.clone())
+        .expect("executor registers");
+    let journal = agent_sdk_core::testing::FakeJournalStore::default();
+    let coordinator = ToolExecutionCoordinator::new(ToolRouter::new(snapshot), executors)
+        .with_policy(Arc::new(AllowToolPolicy));
+
+    let outcome = coordinator
+        .execute(
+            &journal,
+            write_request("tool.call.write.missing"),
+            execution_context(&package),
+        )
+        .expect("missing dispatcher fails closed as recorded denial");
+
+    assert_eq!(executor.call_count(), 0);
+    assert_eq!(
+        outcome.record.status,
+        ToolCallRecordStatus::DeniedBeforeExecution
+    );
+    assert_eq!(outcome.journal_records_appended, 2);
+    assert_eq!(approval_record_count(&journal.records()), 2);
+    assert_eq!(tool_record_count(&journal.records()), 0);
+}
+
+#[test]
+fn approval_required_tool_dispatches_and_journals_before_executor_release() {
+    let package = package_with_tools();
+    let snapshot = approval_registry_snapshot(&package);
+    let executor = Arc::new(ScriptedToolExecutor::new(
+        ExecutorRef::new("executor.workspace_write.v1"),
+        ToolExecutionOutput::completed("write complete"),
+    ));
+    let mut executors = ToolExecutorRegistry::new();
+    executors
+        .register(executor.clone())
+        .expect("executor registers");
+    let journal = agent_sdk_core::testing::FakeJournalStore::default();
+    let dispatcher = Arc::new(ScriptedApprovalDispatcher::new(
+        ApprovalDispatchResponse::decision(ApprovalDecision::approved("actor.host.user")),
+    ));
+    let coordinator = ToolExecutionCoordinator::new(ToolRouter::new(snapshot), executors)
+        .with_policy(Arc::new(AllowToolPolicy))
+        .with_approval_dispatcher(dispatcher.clone());
+
+    let outcome = coordinator
+        .execute(
+            &journal,
+            write_request("tool.call.write.approved"),
+            execution_context(&package),
+        )
+        .expect("approval releases tool execution");
+
+    assert_eq!(dispatcher.requests().len(), 1);
+    assert_eq!(executor.call_count(), 1);
+    assert_eq!(outcome.record.status, ToolCallRecordStatus::Completed);
+    assert_eq!(
+        outcome.intent_cursor.as_ref().unwrap().as_str(),
+        "journal.3"
+    );
+    assert_eq!(
+        outcome.terminal_cursor.as_ref().unwrap().as_str(),
+        "journal.4"
+    );
+    assert_eq!(outcome.journal_records_appended, 4);
+    let records = journal.records();
+    assert_eq!(approval_record_count(&records), 2);
+    assert_eq!(tool_record_count(&records), 2);
+    assert!(matches!(
+        records[0].payload,
+        JournalRecordPayload::Approval(_)
+    ));
+    assert!(matches!(
+        records[1].payload,
+        JournalRecordPayload::Approval(_)
+    ));
+    assert!(matches!(records[2].payload, JournalRecordPayload::Tool(_)));
+    assert!(matches!(records[3].payload, JournalRecordPayload::Tool(_)));
 }
 
 #[test]
@@ -1012,6 +1103,11 @@ fn registry_snapshot(package: &RuntimePackage) -> ToolRegistrySnapshot {
         .expect("registry snapshot")
 }
 
+fn approval_registry_snapshot(package: &RuntimePackage) -> ToolRegistrySnapshot {
+    ToolRegistrySnapshot::from_runtime_package(package, [read_route(), approval_write_route()])
+        .expect("registry snapshot")
+}
+
 fn read_route() -> ToolRoute {
     ToolRoute {
         capability_id: CapabilityId::new("cap.tool.read"),
@@ -1021,6 +1117,7 @@ fn read_route() -> ToolRoute {
         destination: DestinationRef::with_kind(DestinationKind::Tool, "destination.tool.read"),
         executor_ref: Some(ExecutorRef::new("executor.workspace_read.v1")),
         policy_refs: vec![approval_policy("policy.approval.read")],
+        requires_approval: false,
         sidecar_refs: vec![schema_ref("sidecar.schema.read")],
         effect_class: agent_sdk_core::policy::EffectClass::Read,
         risk_class: agent_sdk_core::policy::RiskClass::Low,
@@ -1038,12 +1135,19 @@ fn write_route() -> ToolRoute {
         destination: DestinationRef::with_kind(DestinationKind::Tool, "destination.tool.write"),
         executor_ref: Some(ExecutorRef::new("executor.workspace_write.v1")),
         policy_refs: vec![approval_policy("policy.approval.write")],
+        requires_approval: false,
         sidecar_refs: vec![schema_ref("sidecar.schema.write")],
         effect_class: agent_sdk_core::policy::EffectClass::Write,
         risk_class: agent_sdk_core::policy::RiskClass::High,
         privacy: PrivacyClass::ContentRefsOnly,
         retention: RetentionClass::RunScoped,
     }
+}
+
+fn approval_write_route() -> ToolRoute {
+    let mut route = write_route();
+    route.requires_approval = true;
+    route
 }
 
 fn execution_context(package: &RuntimePackage) -> ToolExecutionContext {
@@ -1068,6 +1172,32 @@ fn read_request(tool_call_id: &str) -> ToolCallRequest {
         idempotency_key: Some(IdempotencyKey::new("idem.read.1")),
         dedupe_key: None,
     }
+}
+
+fn write_request(tool_call_id: &str) -> ToolCallRequest {
+    ToolCallRequest {
+        tool_call_id: ToolCallId::new(tool_call_id),
+        canonical_tool_name: CanonicalToolName::new("workspace_write"),
+        source: source("source.model.tool_call"),
+        requested_args_refs: vec![ContentRefId::new("content.args.write.1")],
+        redacted_args_summary: "write docs/start-here.md".to_string(),
+        idempotency_key: Some(IdempotencyKey::new("idem.write.1")),
+        dedupe_key: None,
+    }
+}
+
+fn approval_record_count(records: &[JournalRecord]) -> usize {
+    records
+        .iter()
+        .filter(|record| matches!(record.payload, JournalRecordPayload::Approval(_)))
+        .count()
+}
+
+fn tool_record_count(records: &[JournalRecord]) -> usize {
+    records
+        .iter()
+        .filter(|record| matches!(record.payload, JournalRecordPayload::Tool(_)))
+        .count()
 }
 
 fn source(id: &str) -> SourceRef {

@@ -5,8 +5,8 @@
 //! providers portion of that contract.
 //!
 pub use crate::provider::{
-    ProviderAdapter, ProviderCapabilities, ProviderConformanceCase, ProviderMessage,
-    ProviderMessageRole, ProviderModality, ProviderProjectedMetadata, ProviderProjectionPolicy,
-    ProviderRequest, ProviderResponse, ProviderStopReason, ProviderStreamChunk,
-    ProviderStreamDelta, ProviderToolCall, ProviderUsage,
+    ProviderAdapter, ProviderArgumentStore, ProviderCapabilities, ProviderConformanceCase,
+    ProviderMessage, ProviderMessageRole, ProviderModality, ProviderProjectedMetadata,
+    ProviderProjectionPolicy, ProviderRequest, ProviderResponse, ProviderStopReason,
+    ProviderStreamChunk, ProviderStreamDelta, ProviderToolCall, ProviderToolSpec, ProviderUsage,
 };

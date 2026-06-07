@@ -1,5 +1,6 @@
 use agent_sdk_core::{
-    AgentError, domain::ContentRef as ContentRefId, tool_records::CanonicalToolName,
+    AgentError, ProviderArgumentStore, domain::ContentRef as ContentRefId,
+    tool_records::CanonicalToolName,
 };
 
 /// Optional host-owned sink for raw provider tool-call arguments.
@@ -17,4 +18,19 @@ pub trait ProviderToolArgumentSink: Send + Sync {
         canonical_tool_name: &CanonicalToolName,
         raw_arguments: &str,
     ) -> Result<Option<ContentRefId>, AgentError>;
+}
+
+impl<T> ProviderToolArgumentSink for T
+where
+    T: ProviderArgumentStore,
+{
+    fn store_tool_arguments(
+        &self,
+        provider_ref: &str,
+        call_id: &str,
+        canonical_tool_name: &CanonicalToolName,
+        raw_arguments: &str,
+    ) -> Result<Option<ContentRefId>, AgentError> {
+        self.store_provider_arguments(provider_ref, call_id, canonical_tool_name, raw_arguments)
+    }
 }

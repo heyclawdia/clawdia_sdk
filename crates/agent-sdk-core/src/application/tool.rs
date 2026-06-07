@@ -6,9 +6,13 @@
 use std::sync::Arc;
 
 use crate::{
+    approval::ApprovalBroker,
+    approval_ports::ApprovalDispatcher,
+    approval_records::ApprovalRequest,
     domain::{
-        AgentError, AgentErrorKind, AgentId, EffectId, EntityKind, EntityRef, JournalCursor,
-        PolicyRef, PrivacyClass, RetryClassification, RunId, SessionId, SourceRef, TurnId,
+        AgentError, AgentErrorKind, AgentId, ApprovalRequestId, EffectId, EntityKind, EntityRef,
+        JournalCursor, PolicyKind, PolicyRef, PrivacyClass, RetryClassification, RunId, SessionId,
+        SourceRef, TurnId,
     },
     effect::{EffectIntent, EffectKind, EffectResult, EffectTerminalStatus},
     hook_ports::HookExecutorRegistry,
@@ -21,7 +25,9 @@ use crate::{
     package_hooks::{
         HookMutationRight, HookPoint, HookResponse, HookResponseClass, HookSpec, HookView,
     },
-    policy::{MissingDependency, PolicyOutcome, PolicyStage},
+    policy::{
+        ApprovalDecisionKind, DispatcherScope, MissingDependency, PolicyOutcome, PolicyStage,
+    },
     tool_ports::{
         ResolvedToolCall, ToolCallRequest, ToolExecutionOutput, ToolExecutionRequest,
         ToolExecutionStrategy, ToolExecutorRegistry, ToolPolicyPort, ToolRouter,
@@ -36,6 +42,7 @@ pub struct ToolExecutionCoordinator {
     router: ToolRouter,
     executors: ToolExecutorRegistry,
     policy: Option<Arc<dyn ToolPolicyPort>>,
+    approval_dispatcher: Option<Arc<dyn ApprovalDispatcher>>,
     strategy: ToolExecutionStrategy,
     hooks: Vec<HookSpec>,
     hook_registry: Option<Arc<dyn HookExecutorRegistry>>,
@@ -50,6 +57,7 @@ impl ToolExecutionCoordinator {
             router,
             executors,
             policy: None,
+            approval_dispatcher: None,
             strategy: ToolExecutionStrategy::default(),
             hooks: Vec::new(),
             hook_registry: None,
@@ -61,6 +69,13 @@ impl ToolExecutionCoordinator {
     /// external work.
     pub fn with_policy(mut self, policy: Arc<dyn ToolPolicyPort>) -> Self {
         self.policy = Some(policy);
+        self
+    }
+
+    /// Returns this coordinator with a host-owned approval dispatcher
+    /// configured for high-risk approval-gated tools.
+    pub fn with_approval_dispatcher(mut self, dispatcher: Arc<dyn ApprovalDispatcher>) -> Self {
+        self.approval_dispatcher = Some(dispatcher);
         self
     }
 
@@ -131,6 +146,33 @@ impl ToolExecutionCoordinator {
             return Ok(ToolExecutionOutcome::denied(
                 active_record.with_denial(pre_tool),
             ));
+        }
+
+        let mut journal_records_appended = 0_u64;
+        if requires_approval_dispatch(&resolved) {
+            let approval_request =
+                approval_request_for_tool(&resolved, &context, next_journal_seq)?;
+            let approval_outcome = ApprovalBroker::with_next_journal_seq(next_journal_seq)
+                .request_approval(
+                    approval_request,
+                    self.approval_dispatcher.as_deref(),
+                    journal,
+                )?;
+            journal_records_appended += 2;
+            next_journal_seq = next_journal_seq.saturating_add(2);
+            if !approval_outcome.releases_tool_execution() {
+                return Ok(ToolExecutionOutcome {
+                    record: active_record.with_denial(PolicyOutcome::fail_closed(
+                        PolicyStage::PreTool,
+                        MissingDependency::ApprovalDispatcher,
+                    )),
+                    intent_cursor: None,
+                    terminal_cursor: None,
+                    post_tool_policy: None,
+                    recovery_required: false,
+                    journal_records_appended,
+                });
+            }
         }
 
         let Some(executor_ref) = &resolved.route.executor_ref else {
@@ -221,6 +263,7 @@ impl ToolExecutionCoordinator {
                     terminal_cursor: Some(terminal_cursor),
                     post_tool_policy: Some(post_tool),
                     recovery_required: false,
+                    journal_records_appended: journal_records_appended + 2,
                 })
             }
             Err(result_error) => {
@@ -267,6 +310,7 @@ impl ToolExecutionCoordinator {
                     terminal_cursor: Some(cursor),
                     post_tool_policy: None,
                     recovery_required: true,
+                    journal_records_appended: journal_records_appended + 2,
                 })
             }
         }
@@ -340,6 +384,7 @@ impl ToolExecutionCoordinator {
                         terminal_cursor: Some(cursor),
                         post_tool_policy: None,
                         recovery_required: false,
+                        journal_records_appended: 1,
                     }));
                 }
                 Some(HookResponse::ModifyToolRequest(patch)) => {
@@ -937,6 +982,8 @@ pub struct ToolExecutionOutcome {
     /// Whether recovery required is enabled.
     /// Policy, validation, or routing code uses this flag to choose the explicit behavior.
     pub recovery_required: bool,
+    /// Count of journal records appended by the coordinator for this outcome.
+    pub journal_records_appended: u64,
 }
 
 impl ToolExecutionOutcome {
@@ -947,8 +994,67 @@ impl ToolExecutionOutcome {
             terminal_cursor: None,
             post_tool_policy: None,
             recovery_required: false,
+            journal_records_appended: 0,
         }
     }
+}
+
+fn requires_approval_dispatch(resolved: &ResolvedToolCall) -> bool {
+    resolved.route.requires_approval
+        && matches!(
+            resolved.route.risk_class,
+            crate::policy::RiskClass::High | crate::policy::RiskClass::Critical
+        )
+        && resolved
+            .route
+            .policy_refs
+            .iter()
+            .any(|policy| policy.kind == PolicyKind::Approval)
+}
+
+fn approval_request_for_tool(
+    resolved: &ResolvedToolCall,
+    context: &ToolExecutionContext,
+    next_journal_seq: u64,
+) -> Result<ApprovalRequest, AgentError> {
+    let requested_args_ref = resolved
+        .request
+        .requested_args_refs
+        .first()
+        .cloned()
+        .ok_or_else(|| AgentError::missing_required_field("approval_request.requested_args_ref"))?;
+    let turn_id = context
+        .turn_id
+        .clone()
+        .unwrap_or_else(|| TurnId::new(format!("turn.{}", context.run_id.as_str())));
+    Ok(ApprovalRequest {
+        approval_request_id: ApprovalRequestId::new(format!(
+            "approval.request.{}",
+            resolved.request.tool_call_id.as_str()
+        )),
+        approval_dispatch_effect_id: context.effect_id(resolved, Some("approval")),
+        run_id: context.run_id.clone(),
+        session_id: context.session_id.clone(),
+        agent_id: context.agent_id.clone(),
+        turn_id,
+        tool_call_id: resolved.request.tool_call_id.clone(),
+        source: resolved.request.source.clone(),
+        destination: resolved.route.destination.clone(),
+        canonical_tool_name: resolved.request.canonical_tool_name.as_str().to_string(),
+        tool_source: resolved.route.source.clone(),
+        effect_class: resolved.route.effect_class.clone(),
+        risk_class: resolved.route.risk_class.clone(),
+        requested_args_ref,
+        redacted_args_summary: resolved.request.redacted_args_summary.clone(),
+        policy_refs: resolved.route.policy_refs.clone(),
+        dispatcher_scope: DispatcherScope::SourceScoped,
+        timeout_ms: 120_000,
+        allowed_decisions: vec![ApprovalDecisionKind::Approved, ApprovalDecisionKind::Denied],
+        created_at_millis: context.timestamp_millis + next_journal_seq.saturating_sub(1),
+        runtime_package_fingerprint: RuntimePackageFingerprint(
+            context.runtime_package_fingerprint.clone(),
+        ),
+    })
 }
 
 fn unsafe_pending_reason(

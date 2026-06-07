@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use agent_sdk_core::{
     AgentError, ProviderAdapter, ProviderCapabilities, ProviderMessageRole,
     ProviderProjectionPolicy, ProviderRequest, ProviderResponse, ProviderStopReason,
-    ProviderToolCall, ProviderUsage, RetryClassification, ToolCallId,
+    ProviderToolCall, ProviderToolSpec, ProviderUsage, RetryClassification, ToolCallId,
     tool_records::CanonicalToolName,
 };
 use serde::{Deserialize, Serialize};
@@ -156,6 +156,15 @@ impl AnthropicMessagesAdapter {
         if let Some(output_config) = anthropic_output_config(request) {
             body["output_config"] = output_config;
         }
+        if !request.tools.is_empty() {
+            body["tools"] = Value::Array(
+                request
+                    .tools
+                    .iter()
+                    .map(anthropic_tool_declaration)
+                    .collect(),
+            );
+        }
         body
     }
 
@@ -261,6 +270,14 @@ fn anthropic_output_config(request: &ProviderRequest) -> Option<Value> {
             "schema": schema,
         }
     }))
+}
+
+fn anthropic_tool_declaration(tool: &ProviderToolSpec) -> Value {
+    json!({
+        "name": tool.name,
+        "description": format!("SDK tool {} governed by package policy refs", tool.name),
+        "input_schema": tool.provider_schema(),
+    })
 }
 
 #[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]

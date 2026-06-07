@@ -2,9 +2,17 @@
 members = [
     "crates/agent-sdk-core",
     "crates/agent-sdk-eval",
+    "crates/agent-sdk-macros",
     "crates/agent-sdk-provider",
+    "crates/agent-sdk-store-file",
+    "crates/agent-sdk-store-supabase",
     "crates/agent-sdk-toolkit",
     "crates/clawdia-sdk",
+    "examples/01_facade_complex_agent",
+    "examples/02_typed_tool_macro",
+    "examples/03_file_store",
+    "examples/04_supabase_scripted_store",
+    "examples/05_reporting_and_eval",
 ]
 resolver = "3"
 

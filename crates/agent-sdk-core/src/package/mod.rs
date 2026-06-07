@@ -4,6 +4,7 @@
 //! rather than mutating ambient state.
 //!
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -778,6 +779,10 @@ pub struct PackageSidecarSnapshot {
     /// Stable hash for the bytes or canonical payload used for stale checks
     /// and fingerprints.
     pub content_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional redacted package sidecar payload used for provider-safe
+    /// projection. Raw tool arguments or host secrets must never appear here.
+    pub redacted_payload: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -1102,6 +1107,9 @@ fn canonical_projection(
 fn canonical_sidecar(mut sidecar: PackageSidecarSnapshot) -> PackageSidecarSnapshot {
     sidecar.refs = sorted_sidecar_refs(sidecar.refs);
     sidecar.policy_refs = sorted_policy_refs(sidecar.policy_refs);
+    if let Some(payload) = sidecar.redacted_payload.take() {
+        sidecar.redacted_payload = Some(crate::domain::json::normalize_json_value(payload));
+    }
     sidecar
 }
 

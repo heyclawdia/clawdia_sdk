@@ -473,6 +473,7 @@ pub fn build_child_runtime_package(
             child_policy.redaction_policy_ref.clone(),
         ],
         content_hash: manifest.content_hash()?,
+        redacted_payload: None,
     });
     child
         .policies

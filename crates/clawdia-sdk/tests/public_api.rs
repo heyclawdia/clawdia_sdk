@@ -70,6 +70,60 @@ fn workspace_tools_feature_exports_toolkit_helpers() {
 fn evals_feature_exports_eval_helpers() {
     assert!(type_name::<clawdia_sdk::eval::TraceMetrics>().contains("agent_sdk_eval"));
     assert!(type_name::<clawdia_sdk::eval::EvaluationReport>().contains("agent_sdk_eval"));
+    assert!(type_name::<clawdia_sdk::eval::UsageReport>().contains("agent_sdk_eval"));
+    assert!(type_name::<clawdia_sdk::eval::RunReport>().contains("agent_sdk_eval"));
+}
+
+#[cfg(feature = "file-store")]
+#[test]
+fn file_store_feature_exports_file_store_adapters() {
+    assert!(type_name::<clawdia_sdk::stores::FileStoreBundle>().contains("agent_sdk_store_file"));
+    assert!(type_name::<clawdia_sdk::stores::FileRunJournal>().contains("agent_sdk_store_file"));
+    let root = std::env::temp_dir().join(format!(
+        "clawdia-sdk-public-api-file-store-{}",
+        std::process::id()
+    ));
+    let stores = AgentAppStores::file(&root);
+    assert!(
+        stores
+            .journal_reader
+            .records_for_run(&RunId::new("run.facade.public_api.file_store"))
+            .expect("file store journal reader is available")
+            .is_empty()
+    );
+    drop(std::fs::remove_dir_all(root));
+}
+
+#[cfg(feature = "supabase-store")]
+#[test]
+fn supabase_store_feature_exports_supabase_store_adapters() {
+    assert!(
+        type_name::<clawdia_sdk::stores::SupabaseStoreConfig>()
+            .contains("agent_sdk_store_supabase")
+    );
+    assert!(
+        type_name::<clawdia_sdk::stores::SupabaseRunJournal>().contains("agent_sdk_store_supabase")
+    );
+}
+
+#[cfg(feature = "macros")]
+#[test]
+fn macros_feature_exports_tool_macros_through_tools_namespace() {
+    #[derive(
+        serde::Serialize,
+        serde::Deserialize,
+        clawdia_sdk::tools::ToolArgs,
+        clawdia_sdk::tools::ToolOutput,
+    )]
+    struct FacadeMacroArgs {
+        value: String,
+    }
+
+    fn assert_tool_args<T: clawdia_sdk::tools::ToolArgs>() {}
+    fn assert_tool_output<T: clawdia_sdk::tools::ToolOutput>() {}
+
+    assert_tool_args::<FacadeMacroArgs>();
+    assert_tool_output::<FacadeMacroArgs>();
 }
 
 #[cfg(feature = "test-support")]
@@ -78,4 +132,69 @@ fn test_support_feature_exports_core_testing_helpers() {
     let journal = clawdia_sdk::testing::FakeJournalStore::default();
 
     assert!(journal.records().is_empty());
+}
+
+#[cfg(feature = "test-support")]
+#[test]
+fn agent_app_runs_text_through_canonical_runtime() {
+    let agent = Agent::builder()
+        .id(AgentId::new("agent.facade.app"))
+        .name("facade app")
+        .build()
+        .expect("agent builds");
+    let event_bus = clawdia_sdk::core::InMemoryAgentEventBus::default();
+    let app = AgentApp::builder(agent)
+        .provider(
+            "provider.fake",
+            clawdia_sdk::testing::FakeProvider::with_responses(["hello from AgentApp"]),
+        )
+        .expect("provider registers")
+        .journal(clawdia_sdk::testing::FakeJournalStore::default())
+        .event_bus(event_bus.clone())
+        .content(clawdia_sdk::testing::FakeContentResolver::default())
+        .policy(AllowFacadePolicy)
+        .build()
+        .expect("app builds");
+
+    let result = app
+        .run_text(RunId::new("run.facade.app"), "say hello")
+        .expect("run succeeds");
+
+    assert_eq!(result.output, "hello from AgentApp");
+    assert_eq!(result.status, RunStatus::Completed);
+    let frames = app
+        .subscribe_run(RunId::new("run.facade.app"), None)
+        .expect("subscribe run")
+        .collect::<Vec<_>>();
+    assert!(!frames.is_empty());
+    assert!(
+        event_bus
+            .subscribe_run(RunId::new("run.facade.app"), None)
+            .expect("event bus has same events")
+            .next()
+            .is_some()
+    );
+}
+
+#[cfg(feature = "test-support")]
+struct AllowFacadePolicy;
+
+#[cfg(feature = "test-support")]
+impl RuntimePolicyPort for AllowFacadePolicy {
+    fn evaluate_run_start(
+        &self,
+        _request: &RunRequest,
+        _package: &RuntimePackage,
+    ) -> Result<PolicyOutcome, AgentError> {
+        Ok(PolicyOutcome {
+            stage: PolicyStage::Input,
+            decision: PolicyDecision::allow("policy.facade.allow"),
+            subject: None,
+            source: None,
+            destination: None,
+            policy_refs: Vec::new(),
+            privacy: PrivacyClass::ContentRefsOnly,
+            retention: RetentionClass::RunScoped,
+        })
+    }
 }

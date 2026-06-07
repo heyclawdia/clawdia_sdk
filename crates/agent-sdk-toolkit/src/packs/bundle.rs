@@ -47,6 +47,7 @@ impl ToolkitPackBundle {
                 ),
                 executor_ref: Some(tool.executor_ref.clone()),
                 policy_refs: tool.policy_refs.clone(),
+                requires_approval: tool.requires_approval,
                 sidecar_refs: vec![sidecar_ref.clone()],
                 effect_class: tool.effect_class.clone(),
                 risk_class: tool.risk_class.clone(),

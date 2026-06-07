@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use agent_sdk_core::{
-    AgentError, PrivacyClass, ProviderAdapter, ProviderMessage, ProviderMessageRole,
-    ProviderRequest, ProviderStopReason, SchemaVersion, domain::ContentRef as ContentRefId,
+    AgentError, CapabilityId, CapabilityNamespace, PackageSidecarRef, PolicyKind, PolicyRef,
+    PrivacyClass, ProviderAdapter, ProviderMessage, ProviderMessageRole, ProviderRequest,
+    ProviderStopReason, ProviderToolSpec, SchemaVersion, domain::ContentRef as ContentRefId,
     domain::OutputSchemaId, output::OutputContract, tool_records::CanonicalToolName,
 };
 use agent_sdk_provider::{
@@ -63,6 +64,7 @@ fn provider_wire_debug_redacts_prompt_output_schema_and_tool_arguments() {
             include_schema_ref: true,
             schema: Some(json!({"secret": "openai-schema-secret"})),
         }),
+        tools: Vec::new(),
         endpoint_ref: "endpoint.debug".to_string(),
     };
     let openai_response = OpenAiResponsesResponse {
@@ -150,6 +152,12 @@ fn openai_responses_adapter_calls_live_responses_shape() {
         requests[0].body["text"]["format"]["schema"]["required"][0],
         "title"
     );
+    assert_eq!(requests[0].body["tools"][0]["type"], "function");
+    assert_eq!(requests[0].body["tools"][0]["name"], "workspace_read");
+    assert_eq!(
+        requests[0].body["tools"][0]["parameters"]["x-agent-sdk-schema-ref"],
+        "schema.workspace_read"
+    );
 }
 
 #[test]
@@ -201,6 +209,11 @@ fn anthropic_messages_adapter_calls_live_messages_shape_and_maps_tool_use() {
     assert_eq!(
         requests[0].body["output_config"]["format"]["type"],
         "json_schema"
+    );
+    assert_eq!(requests[0].body["tools"][0]["name"], "workspace_read");
+    assert_eq!(
+        requests[0].body["tools"][0]["input_schema"]["x-agent-sdk-schema-ref"],
+        "schema.workspace_read"
     );
     assert_eq!(
         sink.calls(),
@@ -258,6 +271,14 @@ fn gemini_generate_content_adapter_calls_live_shape_and_maps_function_call() {
     assert_eq!(
         requests[0].body["generationConfig"]["responseMimeType"],
         "application/json"
+    );
+    assert_eq!(
+        requests[0].body["tools"][0]["functionDeclarations"][0]["name"],
+        "workspace_read"
+    );
+    assert_eq!(
+        requests[0].body["tools"][0]["functionDeclarations"][0]["parameters"]["x-agent-sdk-schema-ref"],
+        "schema.workspace_read"
     );
     assert_eq!(
         requests[0].body["generationConfig"]["responseJsonSchema"]["required"][0],
@@ -356,7 +377,9 @@ fn structured_provider_request() -> ProviderRequest {
             "additionalProperties": false
         }),
     );
-    provider_request().with_structured_output_hint(&contract)
+    provider_request()
+        .with_structured_output_hint(&contract)
+        .with_tools([workspace_read_tool_spec()])
 }
 
 fn provider_request() -> ProviderRequest {
@@ -379,5 +402,19 @@ fn provider_request() -> ProviderRequest {
         ],
         projection_item_count: 2,
         structured_output_hint: None,
+        tools: Vec::new(),
     }
+}
+
+fn workspace_read_tool_spec() -> ProviderToolSpec {
+    ProviderToolSpec::new(
+        "workspace_read",
+        CapabilityId::new("cap.tool.workspace_read"),
+        CapabilityNamespace::new("tool.workspace_read"),
+        PackageSidecarRef::new("schema.workspace_read", "json_schema", "v1"),
+        vec![PolicyRef::with_kind(
+            PolicyKind::Approval,
+            "policy.approval.workspace_read",
+        )],
+    )
 }

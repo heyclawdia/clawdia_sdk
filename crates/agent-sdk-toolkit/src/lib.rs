@@ -5,6 +5,9 @@
 //! product-neutral and only sees runtime-package capabilities, tool executor
 //! refs, policy refs, content refs, and effect lineage.
 
+pub use agent_sdk_core;
+pub use serde_json;
+
 /// Public agent-pool toolkit namespace. Use it for concrete pool-store
 /// adapters layered over `agent-sdk-core` coordination ports.
 pub mod agent_pool;
@@ -40,6 +43,9 @@ pub mod shell;
 /// items must preserve the toolkit ownership and side-effect boundaries
 /// described in this file.
 pub mod testing;
+/// Public typed tool namespace. Use it for typed arguments, schemas, handlers,
+/// and executor adapters that lower into core tool execution.
+pub mod typed_tool;
 /// Public workspace namespace. Use it for the documented workspace API
 /// surface; prefer crate-root re-exports for common imports. Module
 /// items must preserve the toolkit ownership and side-effect boundaries
@@ -64,6 +70,11 @@ pub use protocol::{
 pub use resources::{InMemoryResourceResolver, ResourceReaderExecutor, ResourceReaderRequest};
 pub use shell::{ShellExecutionPolicy, ShellExecutor, ShellRequest, ShellResult};
 pub use testing::{InMemoryJsonArgumentStore, InMemoryToolkitContentStore};
+pub use typed_tool::{
+    AsyncToolRunner, JsonToolArgumentStore, JsonToolContentStore, ToolArgs, ToolError,
+    ToolErrorKind, ToolIdentity, ToolOutput, ToolResult, ToolSchemaSnapshot, TypedTool,
+    TypedToolBuilder, TypedToolContext,
+};
 pub use workspace::{
     BoundedWorkspace, HashLineAnchor, SearchMatch, WorkspaceApplePhotosMetadata,
     WorkspaceArchiveEntry, WorkspaceArchiveMetadata, WorkspaceDocumentMetadata,

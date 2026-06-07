@@ -10,7 +10,8 @@ use agent_sdk_core::{
 use agent_sdk_eval::{
     ComparisonDesign, EvaluationConfidence, EvaluationId, EvaluationMetricDelta, EvaluationReport,
     EvaluationRequest, EvaluationScope, EvaluationVerdict, Evaluator, EvidenceBundle,
-    ExpectedOutcome, TraceMetrics, TraceMetricsComparison, testing::ScriptedEvaluator,
+    ExpectedOutcome, RunReport, StaticRateTable, TraceMetrics, TraceMetricsComparison, UsageReport,
+    testing::ScriptedEvaluator,
 };
 
 #[test]
@@ -435,6 +436,91 @@ fn request_validation_rejects_mismatched_measured_comparison() {
             .context()
             .message
             .contains("comparison must match the evaluation request")
+    );
+}
+
+#[test]
+fn usage_cost_and_run_report_derive_from_run_trace() {
+    let session_id = SessionId::new("session.report.observed");
+    let turn_id = TurnId::new("turn.report.observed");
+    let run_id = RunId::new("run.report.observed");
+    let tool_call_id = ToolCallId::new("tool.call.report.observed");
+    let effect_id = EffectId::new("effect.tool.report.observed");
+    let records = [
+        model_attempt_record(
+            1,
+            100,
+            &session_id,
+            &turn_id,
+            &run_id,
+            "attempt.report.observed",
+            usage(20, 10, 30),
+        ),
+        tool_intent_record(
+            2,
+            120,
+            &session_id,
+            &turn_id,
+            &run_id,
+            &tool_call_id,
+            &effect_id,
+        ),
+        tool_result_record(
+            3,
+            180,
+            &session_id,
+            &turn_id,
+            &run_id,
+            &tool_call_id,
+            &effect_id,
+        ),
+    ];
+    let trace = agent_sdk_core::RunTrace::from_records(&run_id, records.iter());
+    let usage_report = UsageReport::from_run_trace(&trace).expect("usage report");
+
+    assert_eq!(usage_report.provider_call_count, 1);
+    assert_eq!(usage_report.provider_input_tokens, 20);
+    assert_eq!(usage_report.provider_output_tokens, 10);
+    assert_eq!(usage_report.tool_call_count, 1);
+    assert_eq!(usage_report.elapsed_ms, Some(80));
+    assert_eq!(usage_report.limitations, Vec::<String>::new());
+
+    let rate_table = StaticRateTable::new("USD", 1_000_000, 2_000_000, 100);
+    let report = RunReport::from_run_trace(&trace, Some(&rate_table)).expect("run report");
+
+    assert_eq!(report.run_id, run_id);
+    let cost = report.cost.expect("cost report");
+    assert_eq!(cost.input_cost_micros, 20);
+    assert_eq!(cost.output_cost_micros, 20);
+    assert_eq!(cost.tool_cost_micros, 100);
+    assert_eq!(cost.total_cost_micros, 140);
+    assert_eq!(report.limitations.items, Vec::<String>::new());
+}
+
+#[test]
+fn run_report_surfaces_missing_evidence_and_absent_cost_policy() {
+    let run_id = RunId::new("run.report.empty");
+    let trace = agent_sdk_core::RunTrace {
+        run_id: Some(run_id),
+        session_id: None,
+        turn_traces: Vec::new(),
+        records: Vec::new(),
+    };
+
+    let report = RunReport::from_run_trace(&trace, None).expect("empty report");
+
+    assert!(report.cost.is_none());
+    assert!(
+        report
+            .limitations
+            .items
+            .contains(&"usage report has no journal records".to_string())
+    );
+    assert!(
+        report
+            .limitations
+            .items
+            .contains(&"cost report was not requested".to_string())
     );
 }
 

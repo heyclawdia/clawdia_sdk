@@ -597,7 +597,7 @@ pub use content::{
     ContentResolveRequest, ContentScope, ContentVersion, MissingContentPolicy, ResolvedContent,
     RetentionUse,
 };
-pub use content_ports::ContentResolver;
+pub use content_ports::{ContentResolver, ContentStore};
 pub use context::{
     AgentMessage, AgentMessagePart, AgentMessageRole, ContextBudgetHint, ContextBudgetSummary,
     ContextContribution, ContextContributionId, ContextContributionKind, ContextItem,
@@ -619,7 +619,9 @@ pub use event::{
     AgentEvent, ArchiveCursor, CompiledEventFilter, EventCursor, EventEnvelope, EventFamily,
     EventFilter, EventFrame, EventKind, EventOverflowNotice,
 };
-pub use event_bus::{AgentEventBus, AgentEventStream, EventArchive, InMemoryAgentEventBus};
+pub use event_bus::{
+    AgentEventBus, AgentEventStream, EventArchive, EventArchiveReader, InMemoryAgentEventBus,
+};
 pub use extension::{
     ExtensionActionContext, ExtensionActionCoordinator, ExtensionActionOutcome,
     ExtensionActionOutcomeStatus, ExtensionProtocolRecoveryContext,
@@ -652,7 +654,9 @@ pub use journal::{
     StructuredOutputRecord, TerminalResultMarker, TurnLifecycleRecord, TurnLifecycleStatus,
     WakeRecord, WakeResumeInputPolicyRecord, WakeTriggerStatus,
 };
-pub use journal_ports::{RunJournal, append_before_effect, append_result_or_recovery};
+pub use journal_ports::{
+    RunJournal, RunJournalReader, RunJournalStore, append_before_effect, append_result_or_recovery,
+};
 pub use loop_state::{
     AgentStateMachine, CheckpointPolicy, LoopEventKind, LoopState, LoopStopReason,
     LoopTerminalResult, LoopTerminalStatus, LoopTrigger, MaxIterationOutcome, SideEffectPolicy,
@@ -773,10 +777,11 @@ pub use ports_isolation::{
 };
 pub use projection::project_context_projection;
 pub use provider::{
-    ProviderAdapter, ProviderCapabilities, ProviderConformanceCase, ProviderMessage,
-    ProviderMessageRole, ProviderModality, ProviderProjectedMetadata, ProviderProjectionPolicy,
-    ProviderRequest, ProviderResponse, ProviderStopReason, ProviderStreamChunk,
-    ProviderStreamDelta, ProviderStructuredOutputHint, ProviderToolCall, ProviderUsage,
+    ProviderAdapter, ProviderArgumentStore, ProviderCapabilities, ProviderConformanceCase,
+    ProviderMessage, ProviderMessageRole, ProviderModality, ProviderProjectedMetadata,
+    ProviderProjectionPolicy, ProviderRequest, ProviderResponse, ProviderStopReason,
+    ProviderStreamChunk, ProviderStreamDelta, ProviderStructuredOutputHint, ProviderToolCall,
+    ProviderToolSpec, ProviderUsage,
 };
 pub use realtime::{RealtimeCompletionGate, RealtimeSessionController};
 pub use realtime_records::{

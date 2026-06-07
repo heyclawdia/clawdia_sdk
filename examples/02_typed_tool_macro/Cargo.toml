@@ -1,0 +1,10 @@
+[package]
+name = "clawdia-sdk-example-02-typed-tool-macro"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+clawdia-sdk = { path = "../../crates/clawdia-sdk", features = ["macros"] }
+serde.workspace = true

@@ -39,3 +39,14 @@ pub trait ContentResolver {
         })
     }
 }
+
+/// Explicit content store contract for durable adapters.
+pub trait ContentStore: ContentResolver + Send + Sync {
+    /// Stores raw bytes for a content ref. Resolution still goes through
+    /// `ContentResolver` and its policy checks.
+    fn put_content(
+        &self,
+        content_ref: &ContentRef,
+        bytes: Vec<u8>,
+    ) -> Result<(), ContentResolutionError>;
+}

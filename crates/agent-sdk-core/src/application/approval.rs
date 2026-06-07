@@ -37,6 +37,17 @@ impl Default for ApprovalBroker {
 }
 
 impl ApprovalBroker {
+    /// Creates a broker with an explicit starting journal sequence.
+    ///
+    /// This is used when approval dispatch is embedded in a larger coordinator
+    /// that already owns the surrounding journal sequence allocation.
+    pub fn with_next_journal_seq(next_journal_seq: u64) -> Self {
+        Self {
+            next_journal_seq: AtomicU64::new(next_journal_seq),
+            cancelled_before_dispatch: Mutex::new(Vec::new()),
+        }
+    }
+
     /// Coordinates cancel before dispatch for the application::approval
     /// contract. This may call configured ports and update
     /// runtime/journal/event state according to the surrounding module,
@@ -56,12 +67,15 @@ impl ApprovalBroker {
     /// This may call configured ports and update runtime/journal/event state
     /// according to the surrounding module, without introducing a parallel
     /// behavior path.
-    pub fn request_approval(
+    pub fn request_approval<J>(
         &self,
         request: ApprovalRequest,
         dispatcher: Option<&dyn ApprovalDispatcher>,
-        journal: &dyn RunJournal,
-    ) -> Result<ApprovalBrokerOutcome, AgentError> {
+        journal: &J,
+    ) -> Result<ApprovalBrokerOutcome, AgentError>
+    where
+        J: RunJournal + ?Sized,
+    {
         request.validate()?;
 
         let intent_record =
@@ -145,12 +159,15 @@ impl ApprovalBroker {
         }
     }
 
-    fn handle_decision(
+    fn handle_decision<J>(
         &self,
         request: ApprovalRequest,
         decision: ApprovalDecision,
-        journal: &dyn RunJournal,
-    ) -> Result<ApprovalBrokerOutcome, AgentError> {
+        journal: &J,
+    ) -> Result<ApprovalBrokerOutcome, AgentError>
+    where
+        J: RunJournal + ?Sized,
+    {
         if is_extension_self_response(&request, &decision) {
             return self.append_terminal_result(
                 &request,
@@ -221,17 +238,20 @@ impl ApprovalBroker {
         clippy::too_many_arguments,
         reason = "approval terminal journaling needs explicit status, decision, and summary fields until this becomes a terminal-result command object"
     )]
-    fn append_terminal_result(
+    fn append_terminal_result<J>(
         &self,
         request: &ApprovalRequest,
-        journal: &dyn RunJournal,
+        journal: &J,
         effect_status: EffectTerminalStatus,
         terminal_status: ApprovalTerminalStatus,
         dispatcher_contacted: bool,
         decision: Option<ApprovalDecision>,
         reason_code: impl Into<String>,
         redacted_summary: impl Into<String>,
-    ) -> Result<ApprovalBrokerOutcome, AgentError> {
+    ) -> Result<ApprovalBrokerOutcome, AgentError>
+    where
+        J: RunJournal + ?Sized,
+    {
         let result_base = self.base_for_request(request, "result");
         let result_record = approval_dispatch_result_record(
             result_base.clone(),
@@ -284,13 +304,16 @@ impl ApprovalBroker {
         base
     }
 
-    fn append_recovery_after_result_failure(
+    fn append_recovery_after_result_failure<J>(
         &self,
         request: &ApprovalRequest,
-        journal: &dyn RunJournal,
+        journal: &J,
         mut base: JournalRecordBase,
         result_error: AgentError,
-    ) -> Result<(), AgentError> {
+    ) -> Result<(), AgentError>
+    where
+        J: RunJournal + ?Sized,
+    {
         base.record_id = format!(
             "journal.record.approval.{}.recovery",
             request.approval_request_id.as_str()
