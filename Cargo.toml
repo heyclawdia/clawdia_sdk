@@ -4,6 +4,7 @@ members = [
     "crates/agent-sdk-eval",
     "crates/agent-sdk-provider",
     "crates/agent-sdk-toolkit",
+    "crates/clawdia-sdk",
 ]
 resolver = "3"
 

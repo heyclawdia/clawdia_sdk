@@ -1,0 +1,25 @@
+[package]
+name = "clawdia-sdk"
+version = "0.1.0-alpha.3"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Convenience facade over the split Rust-first Agent SDK crates."
+documentation = "https://docs.rs/clawdia-sdk"
+readme = "README.md"
+publish = false
+
+[features]
+default = []
+providers = ["dep:agent-sdk-provider"]
+workspace-tools = ["dep:agent-sdk-toolkit"]
+evals = ["dep:agent-sdk-eval"]
+test-support = ["agent-sdk-core/test-support"]
+all-stable = ["providers", "workspace-tools", "evals"]
+
+[dependencies]
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3", default-features = false }
+agent-sdk-eval = { path = "../agent-sdk-eval", version = "=0.1.0-alpha.3", optional = true, default-features = false }
+agent-sdk-provider = { path = "../agent-sdk-provider", version = "=0.1.0-alpha.3", optional = true, default-features = false }
+agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.3", optional = true, default-features = false }

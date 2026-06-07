@@ -196,6 +196,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "clawdia-sdk"
+version = "0.1.0-alpha.3"
+dependencies = [
+ "agent-sdk-core",
+ "agent-sdk-eval",
+ "agent-sdk-provider",
+ "agent-sdk-toolkit",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

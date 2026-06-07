@@ -10,6 +10,7 @@ This is a monorepo with separable Rust crates:
 - `crates/agent-sdk-eval`: an optional evaluation framework crate for users who want post-hoc run, turn, session, expected-outcome, cited-support, deterministic metrics, and comparison evaluation primitives.
 - `crates/agent-sdk-toolkit`: an optional add-on crate for users who want concrete workspace tools, shell/resource helpers, discovery, and ACP/MCP protocol conformance scaffolding.
 - `crates/agent-sdk-provider`: an optional aggregate crate for live OpenAI, Anthropic, and Gemini provider adapters layered over `ProviderAdapter`, plus deterministic transport hooks for tests.
+- `crates/clawdia-sdk`: an unpublished local convenience facade that re-exports the split crates through one import path for checkout-based examples and onboarding.
 
 Keep this package boundary deliberate. New capabilities with heavy parser/runtime/provider dependencies should live in optional crates layered over `agent-sdk-core`, not as default core dependencies. Core must remain usable by hosts that only need the primitive SDK contracts.
 
@@ -33,6 +34,13 @@ agent-sdk-toolkit = { git = "https://github.com/heyclawdia/clawdia_sdk.git", pac
 agent-sdk-provider = { git = "https://github.com/heyclawdia/clawdia_sdk.git", package = "agent-sdk-provider", optional = true }
 ```
 
+Checkout-based examples can use the unpublished facade for import convenience:
+
+```toml
+[dependencies]
+clawdia-sdk = { path = "crates/clawdia-sdk", default-features = false }
+```
+
 The repository checkout can be ahead of the latest published alpha. Treat
 crate-level READMEs and tests as the source of truth for current local API
 surfaces, then publish only after the release-readiness gates pass.
@@ -53,11 +61,13 @@ provider-backed evaluators are explicit post-hoc checks; normal agent runs do
 not spend extra evaluator tokens.
 
 The crate family intentionally does not publish a crate named `agent-sdk`.
-Consumers should depend on the split crates explicitly: `agent-sdk-core` for
-the primitive kernel, `agent-sdk-eval` for optional post-hoc evaluation
-framework primitives, `agent-sdk-toolkit` for optional concrete helpers, and
-`agent-sdk-provider` for provider adapters. Future adapter families should use
-clear optional crates such as `agent-sdk-mcp`, `agent-sdk-browser-toolkit`,
+Public crates.io consumers should depend on the split crates explicitly:
+`agent-sdk-core` for the primitive kernel, `agent-sdk-eval` for optional
+post-hoc evaluation framework primitives, `agent-sdk-toolkit` for optional
+concrete helpers, and `agent-sdk-provider` for provider adapters. Local
+checkout users can depend on unpublished `clawdia-sdk` for one import path while
+the split crates remain authoritative. Future adapter families should use clear
+optional crates such as `agent-sdk-mcp`, `agent-sdk-browser-toolkit`,
 `agent-sdk-isolation`, `agent-sdk-otel`, and `agent-sdk-workflow`, with
 backend-specific crates added only when dependency weight, platform constraints,
 release cadence, licensing, or SemVer pressure justify the split.
@@ -100,13 +110,15 @@ path before reading historical phase evidence:
 
 1. Read `AGENTS.md`, this README, [Start Here](docs/start-here.md), and [Coding Standards](coding_standards.md).
 2. For current Rust work, use [Implementation Workstreams](docs/implementation-workstreams/README.md), the matching phase exit report, and the exact launch target that owns the files being edited.
-3. For API/user ergonomics, start from [API Review](docs/implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](docs/reference/simplicity-audit.md), `crates/agent-sdk-core/src/lib.rs`, and `crates/agent-sdk-core/tests/domain/public_api.rs`.
+3. For API/user ergonomics, start from [API Review](docs/implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](docs/reference/simplicity-audit.md), `crates/agent-sdk-core/src/lib.rs`, `crates/agent-sdk-core/tests/domain/public_api.rs`, and the unpublished facade in `crates/clawdia-sdk`.
 4. For release or broad handoff checks, use [Release Readiness](docs/implementation-workstreams/13-release-readiness/13a-release-readiness.md), the feature flag matrix, the contract-to-code traceability matrix, and `scripts/public-release-audit.sh`.
 5. Treat [Contract Workstreams](docs/workstreams/README.md) as historical contract-packet evidence unless a task explicitly asks to reopen contract planning.
 
-The common core import path for apps is `agent_sdk_core::prelude::*`. Advanced
-users should still import explicit crate-root items, `agent_sdk_core::ports`, or
-`agent_sdk_core::testing` when implementing host ports or conformance tests.
+The checkout facade import path for first examples is
+`clawdia_sdk::prelude::*`. Split-crate users should use
+`agent_sdk_core::prelude::*` for common core types and explicit crate-root
+items, `agent_sdk_core::ports`, or `agent_sdk_core::testing` when implementing
+host ports or conformance tests.
 
 ## What Is Normative
 
@@ -132,6 +144,6 @@ For contract-packet review, use [docs/workstreams](docs/workstreams/README.md). 
 
 ## Current Implementation Posture
 
-The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-toolkit`, and `crates/agent-sdk-provider`. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
+The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, `crates/agent-sdk-provider`, and the unpublished `crates/clawdia-sdk` facade. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
 
 This checkout includes deterministic fake/test-kit support, optional toolkit helpers, and live provider adapters for OpenAI Responses, Anthropic Messages, and Gemini generateContent in the aggregate `agent-sdk-provider` crate. It does not claim concrete container/runtime, product UI, remote channel, network telemetry exporter, marketplace, workflow-engine, or product-specific host-adapter support.
