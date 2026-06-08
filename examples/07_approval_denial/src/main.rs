@@ -151,8 +151,8 @@ fn main() -> Result<(), AgentError> {
 
     let run_id = RunId::new("run.example.approval_denial");
     let run_result = app.run_text(run_id.clone(), "attempt the gated write");
-    let events = app.event_frames_for_run(run_id.clone(), None)?;
-    let records = app.journal_records_for_run(&run_id)?;
+    let evidence = app.run_evidence(&run_id)?;
+    let records = &evidence.journal_records;
     let approval_denials = records
         .iter()
         .filter(|record| {
@@ -170,7 +170,7 @@ fn main() -> Result<(), AgentError> {
         .iter()
         .filter(|record| matches!(&record.payload, JournalRecordPayload::Tool(_)))
         .count();
-    let report = app.run_report_from_stores(&run_id, None)?;
+    let report = app.run_report_from_evidence(&evidence, None)?;
     let outcome = match &run_result {
         Ok(result) => format!("completed:{:?}", result.status),
         Err(error) => format!("closed:{:?}", error.kind()),
@@ -186,7 +186,7 @@ fn main() -> Result<(), AgentError> {
         message,
         approval_denials,
         tool_records,
-        events.len(),
+        evidence.live_event_frames.len(),
         report.usage.record_count
     );
 

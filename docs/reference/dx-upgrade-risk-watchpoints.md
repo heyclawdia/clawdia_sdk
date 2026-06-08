@@ -29,12 +29,14 @@ they must be documented before release handoff.
   reporting and resume helpers reading from `RunJournalReader` instead of
   downcasting a store bundle or adding facade-only report state.
 - Phase 16 read helpers are evidence projections only:
+  `run_evidence` is a convenience snapshot with separate fields,
   `event_frames_for_run` is live buffered observation,
   `archived_event_frames` is an event archive read,
   `journal_records_for_run` is durable journal truth,
   `latest_checkpoint` is an accelerator read, and
-  `run_report_from_stores` is a report projection from journal records. Do not
-  let future helpers merge those surfaces into a facade-owned trace store.
+  `run_report_from_stores` and `run_report_from_evidence` are report
+  projections from journal records. Do not let future helpers merge those
+  surfaces into a facade-owned trace store.
 
 ## Tool Authoring Risks
 
@@ -108,6 +110,10 @@ they must be documented before release handoff.
 - `AgentApp` now stores the optional `AgentAppStores` bundle so read-side
   helpers can return typed host-configuration diagnostics when durable evidence
   ports are missing.
+- `AgentAppRunEvidence` now snapshots common read-side evidence for one run.
+  Archive and checkpoint ports remain optional inside that snapshot, but
+  missing `AgentAppStores` is still a host-configuration error because journal
+  truth is required.
 - Checkpoint examples now claim resume-readiness evidence only. They do not
   claim run continuation or a facade resume API.
 

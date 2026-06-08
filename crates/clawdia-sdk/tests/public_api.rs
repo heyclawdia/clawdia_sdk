@@ -210,6 +210,66 @@ fn agent_app_read_helpers_require_configured_stores() {
             .message
             .contains("AgentApp journal_records_for_run requires AgentAppStores")
     );
+
+    let error = app
+        .run_evidence(&RunId::new("run.facade.no_stores"))
+        .expect_err("run evidence must require durable stores");
+
+    assert_eq!(
+        error.kind(),
+        clawdia_sdk::core::AgentErrorKind::HostConfigurationNeeded
+    );
+    assert!(
+        error
+            .context()
+            .message
+            .contains("AgentApp run_evidence requires AgentAppStores")
+    );
+}
+
+#[cfg(all(feature = "file-store", feature = "test-support"))]
+#[test]
+fn agent_app_run_evidence_tolerates_missing_optional_archive_and_checkpoint_ports() {
+    let root = temp_file_store_root("run-evidence-optional-ports");
+    let mut stores = AgentAppStores::file(&root);
+    stores.event_archive = None;
+    stores.checkpoint = None;
+    let agent = Agent::builder()
+        .id(AgentId::new("agent.facade.optional_evidence"))
+        .name("facade optional evidence")
+        .build()
+        .expect("agent builds");
+    let app = AgentApp::builder(agent)
+        .provider(
+            "provider.fake",
+            clawdia_sdk::testing::FakeProvider::with_responses(["optional evidence ready"]),
+        )
+        .expect("provider registers")
+        .stores(stores)
+        .policy(AllowFacadePolicy)
+        .build()
+        .expect("app builds");
+
+    let run_id = RunId::new("run.facade.optional_evidence");
+    let result = app
+        .run_text(run_id.clone(), "collect optional evidence")
+        .expect("run succeeds");
+    assert_eq!(result.status, RunStatus::Completed);
+
+    let evidence = app.run_evidence(&run_id).expect("run evidence");
+
+    assert!(!evidence.live_event_frames.is_empty());
+    assert!(!evidence.journal_records.is_empty());
+    assert!(
+        evidence.archived_event_frames.is_empty(),
+        "missing optional archive reader should not fail run evidence"
+    );
+    assert!(
+        evidence.latest_checkpoint.is_none(),
+        "missing optional checkpoint store should not fail run evidence"
+    );
+
+    drop(std::fs::remove_dir_all(root));
 }
 
 #[cfg(all(feature = "evals", feature = "file-store", feature = "test-support"))]
@@ -225,7 +285,10 @@ fn agent_app_read_helpers_keep_observation_archive_journal_report_and_checkpoint
     let app = AgentApp::builder(agent)
         .provider(
             "provider.fake",
-            clawdia_sdk::testing::FakeProvider::with_responses(["evidence ready"]),
+            clawdia_sdk::testing::FakeProvider::with_responses([
+                "evidence ready",
+                "other evidence ready",
+            ]),
         )
         .expect("provider registers")
         .stores(stores.clone())
@@ -238,11 +301,21 @@ fn agent_app_read_helpers_keep_observation_archive_journal_report_and_checkpoint
         .run_text(run_id.clone(), "collect evidence")
         .expect("run succeeds");
     assert_eq!(result.status, RunStatus::Completed);
+    let other_run_id = RunId::new("run.facade.other_evidence");
+    app.run_text(other_run_id.clone(), "collect other evidence")
+        .expect("second run succeeds");
 
     let live_frames = app
         .event_frames_for_run(run_id.clone(), None)
         .expect("live event frames");
     assert!(!live_frames.is_empty(), "run should publish live frames");
+    let other_live_frames = app
+        .event_frames_for_run(other_run_id.clone(), None)
+        .expect("other live event frames");
+    assert!(
+        !other_live_frames.is_empty(),
+        "second run should publish live frames"
+    );
 
     assert!(
         app.archived_event_frames(None)
@@ -250,25 +323,55 @@ fn agent_app_read_helpers_keep_observation_archive_journal_report_and_checkpoint
             .is_empty(),
         "live event frames must not imply archived event frames"
     );
+    let initial_evidence = app.run_evidence(&run_id).expect("initial run evidence");
+    assert_eq!(initial_evidence.run_id, run_id);
+    assert_eq!(initial_evidence.live_event_frames, live_frames);
+    assert!(
+        initial_evidence.archived_event_frames.is_empty(),
+        "run evidence must not treat live frames as archived frames"
+    );
+    assert!(
+        initial_evidence.latest_checkpoint.is_none(),
+        "journal records do not create checkpoint accelerator entries"
+    );
 
     let archive = clawdia_sdk::stores::FileEventArchive::new(&root);
-    for frame in live_frames.clone() {
+    for frame in live_frames
+        .clone()
+        .into_iter()
+        .chain(other_live_frames.clone())
+    {
         archive.append_frame(frame).expect("archive append");
     }
     let archived_frames = app
         .archived_event_frames(None)
         .expect("archived frames are read through archive reader");
-    assert_eq!(archived_frames.len(), live_frames.len());
+    assert_eq!(
+        archived_frames.len(),
+        live_frames.len() + other_live_frames.len()
+    );
 
-    let records = app
-        .journal_records_for_run(&run_id)
-        .expect("journal records");
+    let evidence = app.run_evidence(&run_id).expect("run evidence");
+    assert_eq!(evidence.archived_event_frames.len(), live_frames.len());
+    assert!(
+        evidence
+            .archived_event_frames
+            .iter()
+            .all(|frame| frame.event.envelope.run_id == run_id),
+        "run evidence must filter the global archive to the requested run"
+    );
+
+    let records = &evidence.journal_records;
     assert!(!records.is_empty(), "run should append journal records");
 
     let report = app
         .run_report_from_stores(&run_id, None)
         .expect("report from journal records");
     assert_eq!(report.usage.record_count, records.len());
+    let evidence_report = app
+        .run_report_from_evidence(&evidence, None)
+        .expect("report from run evidence");
+    assert_eq!(evidence_report.usage.record_count, records.len());
 
     assert!(
         app.latest_checkpoint(&run_id)
@@ -310,6 +413,14 @@ fn agent_app_read_helpers_keep_observation_archive_journal_report_and_checkpoint
         .expect("latest checkpoint")
         .expect("checkpoint saved");
     assert_eq!(latest_checkpoint.checkpoint_id, checkpoint.checkpoint_id);
+    let checkpoint_evidence = app.run_evidence(&run_id).expect("checkpoint evidence");
+    assert_eq!(
+        checkpoint_evidence
+            .latest_checkpoint
+            .expect("checkpoint is present in run evidence")
+            .checkpoint_id,
+        checkpoint.checkpoint_id
+    );
 
     drop(std::fs::remove_dir_all(root));
 }

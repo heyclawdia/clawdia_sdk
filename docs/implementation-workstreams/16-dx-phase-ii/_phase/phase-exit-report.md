@@ -29,8 +29,14 @@ without adding a second runtime or moving optional dependencies into core:
 PASS.
 
 - Facade evidence helpers are read-only projections over configured ports.
+- `AgentAppRunEvidence` now gives developers one compact run evidence snapshot
+  while keeping live events, archived events, journal records, and checkpoints
+  in separate fields.
 - Missing durable-evidence stores return typed
   `HostConfigurationNeeded` diagnostics instead of panics or silent success.
+- Missing optional archive/checkpoint ports return empty archive frames or no
+  checkpoint in `run_evidence`; missing `AgentAppStores` still fails with a
+  typed host-configuration diagnostic.
 - New examples run without live credentials and use fake providers, file
   stores, scripted approval dispatch, and replay reducer validation.
 - Docs now present one first-developer path and an explicit facade feature
@@ -116,6 +122,11 @@ Mandatory layout audit passed.
 - `archived_event_frames` reads through `EventArchiveReader` when configured.
 - `latest_checkpoint` reads through `CheckpointStore`.
 - `run_report_from_stores` derives `RunReport` from durable journal records.
+- `run_evidence` collects live frames through `subscribe_run`, durable records
+  through `RunJournalReader`, run-filtered archive frames through the optional
+  `EventArchiveReader`, and optional checkpoints through `CheckpointStore`.
+- `run_report_from_evidence` derives `RunReport` from the evidence snapshot's
+  durable journal records only.
 - Approval denial in example 07 goes through the toolkit typed tool route,
   approval dispatcher, core approval records, journal/event evidence, and
   fail-closed policy behavior before executor release.
@@ -145,10 +156,23 @@ Mandatory layout audit passed.
 - First-developer simulation agent `019ea586-504d-7872-b3e8-7d12e2f975e7`:
   initial BLOCK on the same checkpoint durable replay evidence; fixed and
   focused re-review PASS.
+- Second-pass DX E2E follow-up plan review:
+  developer-experience initial BLOCK on a validation-command typo, fixed and
+  re-reviewed PASS; architecture/testability initial BLOCK on shortened
+  validation scope, missing optional-port tests, and broad docs scope, fixed and
+  re-reviewed PASS.
+- Second-pass implementation review:
+  developer-experience reviewer `019ea667-db9d-7a61-b851-7164ce89d619`
+  returned PASS with no blocking findings; architecture/testability reviewer
+  `019ea667-bd32-7a90-9915-3e0c02eef5d2` returned PASS with no blocking
+  findings. The non-blocking public API note was addressed by marking
+  `AgentAppRunEvidence` `#[non_exhaustive]`.
 
 ## Accepted Proposals
 
 - Add read-side facade helpers over existing evidence ports.
+- Add `AgentAppRunEvidence` and `run_report_from_evidence` so examples and e2e
+  tests can collect common evidence without hand-stitching every read helper.
 - Add credential-free examples 06-08 with per-example README evidence.
 - Document local checkout facade usage separately from published split-crate
   usage.
@@ -178,6 +202,9 @@ Mandatory layout audit passed.
 - `AgentApp` now stores its optional `AgentAppStores` bundle so read-side
   helpers can access configured evidence ports and return host-configuration
   diagnostics when missing.
+- `AgentAppRunEvidence` is now re-exported from `clawdia_sdk` and the prelude
+  as a `#[non_exhaustive]` facade DTO. It is a read-side convenience type, not
+  a new primitive or durable trace store.
 - The first-developer docs now treat `clawdia-sdk` as a local checkout facade
   while split crates remain the published-alpha install path.
 

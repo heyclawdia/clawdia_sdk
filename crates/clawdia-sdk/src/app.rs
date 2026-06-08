@@ -80,6 +80,29 @@ impl AgentAppStores {
     }
 }
 
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+/// Read-only evidence snapshot for one run assembled through existing
+/// `AgentApp` ports.
+///
+/// Fields stay separated by source on purpose: live event frames are buffered
+/// observation, archived frames are an optional event projection, journal
+/// records are durable run truth, and checkpoints are resume accelerators.
+/// Constructing this value does not publish events, append journals, or write
+/// checkpoints.
+pub struct AgentAppRunEvidence {
+    /// Run this evidence snapshot was collected for.
+    pub run_id: RunId,
+    /// Buffered live frames collected from the canonical runtime event bus.
+    pub live_event_frames: Vec<EventFrame>,
+    /// Archived frames for this run from the optional event archive reader.
+    pub archived_event_frames: Vec<EventFrame>,
+    /// Durable records read through `RunJournalReader`.
+    pub journal_records: Vec<JournalRecord>,
+    /// Latest checkpoint accelerator from the optional checkpoint store.
+    pub latest_checkpoint: Option<RunCheckpoint>,
+}
+
 impl AgentApp {
     /// Starts an app builder for one agent.
     pub fn builder(agent: Agent) -> AgentAppBuilder {
@@ -211,6 +234,46 @@ impl AgentApp {
         archive.frames_after(cursor)
     }
 
+    /// Collects the common read-only evidence needed for e2e tests and
+    /// diagnostics for one run.
+    ///
+    /// This helper keeps each evidence source in a separate field. Missing
+    /// optional archive or checkpoint ports produce empty archive evidence or
+    /// no checkpoint respectively, while missing `AgentAppStores` remains a
+    /// host-configuration error because durable journal truth is required.
+    pub fn run_evidence(&self, run_id: &RunId) -> Result<AgentAppRunEvidence, AgentError> {
+        let stores = self.required_stores("run_evidence")?;
+        let live_event_frames = self.event_frames_for_run(run_id.clone(), None)?;
+        let journal_records = stores.journal_reader.records_for_run(run_id)?;
+        let archived_event_frames = stores
+            .event_archive
+            .as_ref()
+            .map(|archive| {
+                archive.frames_after(None).map(|frames| {
+                    frames
+                        .into_iter()
+                        .filter(|frame| &frame.event.envelope.run_id == run_id)
+                        .collect()
+                })
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let latest_checkpoint = stores
+            .checkpoint
+            .as_ref()
+            .map(|checkpoint| checkpoint.load_latest(run_id))
+            .transpose()?
+            .flatten();
+
+        Ok(AgentAppRunEvidence {
+            run_id: run_id.clone(),
+            live_event_frames,
+            archived_event_frames,
+            journal_records,
+            latest_checkpoint,
+        })
+    }
+
     /// Loads the latest checkpoint accelerator for a run when one is
     /// configured.
     ///
@@ -247,6 +310,23 @@ impl AgentApp {
     ) -> Result<RunReport, AgentError> {
         let records = self.journal_records_for_run(run_id)?;
         self.run_report(run_id, records.iter(), cost_policy)
+    }
+
+    /// Builds a run report from an already collected evidence snapshot.
+    ///
+    /// Reports are derived from durable journal records only. Live and
+    /// archived event frames stay observable projections, not report truth.
+    #[cfg(feature = "evals")]
+    pub fn run_report_from_evidence(
+        &self,
+        evidence: &AgentAppRunEvidence,
+        cost_policy: Option<&dyn CostPolicy>,
+    ) -> Result<RunReport, AgentError> {
+        self.run_report(
+            &evidence.run_id,
+            evidence.journal_records.iter(),
+            cost_policy,
+        )
     }
 
     fn required_stores(&self, helper: &str) -> Result<&AgentAppStores, AgentError> {

@@ -112,6 +112,9 @@ fn main() -> Result<(), AgentError> {
 
 `AgentApp` evidence helpers also remain projections over canonical ports:
 
+- `run_evidence` collects the common per-run evidence snapshot while keeping
+  live events, archived events, journal records, and checkpoints in separate
+  fields.
 - `event_frames_for_run` reads buffered live frames from the runtime event bus.
 - `journal_records_for_run` reads durable evidence through `RunJournalReader`.
 - `archived_event_frames` reads configured event archives without replacing
@@ -120,3 +123,5 @@ fn main() -> Result<(), AgentError> {
   execution.
 - `run_report_from_stores` derives reports from journal records when `evals`
   is enabled.
+- `run_report_from_evidence` derives reports from the snapshot's journal
+  records when `evals` is enabled.

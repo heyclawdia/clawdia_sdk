@@ -16,8 +16,8 @@ typed_title=Review Phase 16; priority=high; validation_reports=1; events=11; rec
 
 This example runs `AgentApp::run_typed::<TodoExtraction>` through the
 canonical runtime with a deterministic fake provider and file-backed stores. It
-then reads the same run through the live event helper, durable journal reader,
-and report projection helper.
+then reads the same run through `run_evidence`, preserving separate live event,
+journal, archive, checkpoint, and report projections.
 
 ## Under The Hood
 
@@ -41,7 +41,7 @@ raw output retention decisions, UI rendering, and any production trace store.
 
 - Invalid provider JSON fails local typed-output validation before typed
   publication.
-- Missing stores make `journal_records_for_run` and `run_report_from_stores`
+- Missing stores make `run_evidence` and report helpers
   return host-configuration diagnostics.
 - Live event frames are observation only. Durable evidence still comes from the
   journal reader.

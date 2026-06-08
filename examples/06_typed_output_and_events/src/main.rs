@@ -69,9 +69,8 @@ fn main() -> Result<(), AgentError> {
     let typed = serde_json::from_str::<TodoExtraction>(&result.output).map_err(|error| {
         AgentError::contract_violation(format!("example typed output decode failed: {error}"))
     })?;
-    let events = app.event_frames_for_run(run_id.clone(), None)?;
-    let records = app.journal_records_for_run(&run_id)?;
-    let report = app.run_report_from_stores(&run_id, None)?;
+    let evidence = app.run_evidence(&run_id)?;
+    let report = app.run_report_from_evidence(&evidence, None)?;
     let validation_reports = result
         .structured_output
         .as_ref()
@@ -82,8 +81,8 @@ fn main() -> Result<(), AgentError> {
         typed.title,
         typed.priority,
         validation_reports,
-        events.len(),
-        records.len(),
+        evidence.live_event_frames.len(),
+        evidence.journal_records.len(),
         report.usage.record_count
     );
 

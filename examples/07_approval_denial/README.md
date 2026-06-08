@@ -23,7 +23,9 @@ the successful example proves that denial closes before executor release.
 The provider requests a `write_note` tool call by content ref. `AgentApp`
 resolves the typed tool route, dispatches approval through the host-owned
 approval dispatcher, records the denial in the journal, publishes live event
-frames, and returns a closed policy denial instead of executing the tool.
+frames, and returns a closed policy denial instead of executing the tool. The
+example then reads `run_evidence` so approval records, live frames, and report
+projection remain observable without merging their source boundaries.
 
 ## SDK-Owned Boundary
 

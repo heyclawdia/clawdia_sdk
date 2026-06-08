@@ -44,8 +44,9 @@ fn main() -> Result<(), AgentError> {
 
     let run_id = RunId::new("run.example.checkpoint_replay");
     let result = app.run_text(run_id.clone(), "produce checkpoint evidence")?;
-    let records_before_checkpoint = app.journal_records_for_run(&run_id)?;
-    let latest_journal_seq = records_before_checkpoint
+    let evidence_before_checkpoint = app.run_evidence(&run_id)?;
+    let latest_journal_seq = evidence_before_checkpoint
+        .journal_records
         .iter()
         .map(|record| record.journal_seq)
         .max()

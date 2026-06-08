@@ -26,7 +26,7 @@
 
 pub mod app;
 
-pub use app::{AgentApp, AgentAppBuilder, AgentAppStores};
+pub use app::{AgentApp, AgentAppBuilder, AgentAppRunEvidence, AgentAppStores};
 
 /// Advanced core namespace.
 ///
@@ -43,7 +43,7 @@ pub mod core {
 pub mod prelude {
     pub use agent_sdk_core::prelude::*;
 
-    pub use crate::{AgentApp, AgentAppBuilder, AgentAppStores};
+    pub use crate::{AgentApp, AgentAppBuilder, AgentAppRunEvidence, AgentAppStores};
 }
 
 /// Provider adapter namespace.
