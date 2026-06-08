@@ -19,12 +19,16 @@ workflow orchestration, or persistence backends.
 
 ## Install Shape
 
-From the repository root:
+Use this unpublished facade from a repository checkout:
 
 ```toml
 [dependencies]
 clawdia-sdk = { path = "crates/clawdia-sdk", default-features = false }
 ```
+
+Published-alpha consumers should use the split crates directly. The facade is
+for checkout-based onboarding and examples until a release decision changes
+`publish = false`.
 
 Optional groups map only to crates that exist today:
 
@@ -35,6 +39,50 @@ clawdia-sdk = {
   features = ["providers", "workspace-tools", "evals"]
 }
 ```
+
+## Feature Matrix
+
+| Feature | Use When | Pulls In |
+| --- | --- | --- |
+| `default = []` | You want only the core facade imports and `AgentApp`. | `agent-sdk-core` |
+| `providers` | You need live provider adapter types. | `agent-sdk-provider` |
+| `workspace-tools` | You need typed tools or workspace/toolkit helpers. | `agent-sdk-toolkit` |
+| `macros` | You want derive/attribute helpers for typed tools. | `workspace-tools`, `agent-sdk-macros` |
+| `evals` | You need post-hoc trace, usage, cost, or run reports. | `agent-sdk-eval` |
+| `reports` | Alias for report-focused users. | `evals` |
+| `file-store` | You need local file-backed journal/content/provider-argument/checkpoint/event store adapters. | `agent-sdk-store-file` |
+| `supabase-store` | You need the Supabase store adapter types. | `agent-sdk-store-supabase` |
+| `stores` | You need both current store adapter families. | `file-store`, `supabase-store` |
+| `test-support` | You need deterministic fakes or scripted dispatchers in examples/tests. | `agent-sdk-core/test-support` |
+| `all-stable` | You are testing every current facade surface. | Current provider, toolkit, eval, macro, and store features |
+
+Example feature sets:
+
+```toml
+# Typed output, events, reports, and local durable evidence.
+clawdia-sdk = { path = "crates/clawdia-sdk", features = ["evals", "file-store", "test-support"] }
+
+# Approval-gated typed tools with deterministic dispatch.
+clawdia-sdk = { path = "crates/clawdia-sdk", features = ["evals", "file-store", "test-support", "workspace-tools"] }
+
+# Macro-authored typed tool schemas.
+clawdia-sdk = { path = "crates/clawdia-sdk", features = ["macros"] }
+```
+
+## Runnable Checkout Path
+
+From the repository root:
+
+```sh
+cargo run -p clawdia-sdk-example-01-facade-complex-agent
+cargo run -p clawdia-sdk-example-06-typed-output-and-events
+cargo run -p clawdia-sdk-example-07-approval-denial
+cargo run -p clawdia-sdk-example-08-checkpoint-replay
+```
+
+These commands require no live credentials. They use fake providers, local file
+stores, and scripted approval dispatchers so tests and examples stay
+deterministic.
 
 ## Canonical Lowering
 
@@ -61,3 +109,14 @@ fn main() -> Result<(), AgentError> {
     Ok(())
 }
 ```
+
+`AgentApp` evidence helpers also remain projections over canonical ports:
+
+- `event_frames_for_run` reads buffered live frames from the runtime event bus.
+- `journal_records_for_run` reads durable evidence through `RunJournalReader`.
+- `archived_event_frames` reads configured event archives without replacing
+  journal truth.
+- `latest_checkpoint` reads checkpoint accelerators without creating resume
+  execution.
+- `run_report_from_stores` derives reports from journal records when `evals`
+  is enabled.

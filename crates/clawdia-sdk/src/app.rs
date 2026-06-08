@@ -2,13 +2,14 @@
 
 use agent_sdk_core::{
     Agent, AgentError, AgentEventStream, AgentId, AgentPoolStore, AgentRuntime,
-    AgentRuntimeBuilder, ApprovalDispatcher, CheckpointStore, CompiledEventFilter,
+    AgentRuntimeBuilder, ApprovalDispatcher, ArchiveCursor, CheckpointStore, CompiledEventFilter,
     ContentResolutionError, ContentResolutionPolicy, ContentResolveRequest, ContentResolver,
-    EventArchiveReader, EventCursor, InMemoryAgentEventBus, ProviderAdapter, ProviderArgumentStore,
-    ProviderCapabilities, ProviderRequest, ProviderResponse, ProviderRouteSnapshot,
-    ProviderStreamChunk, ProviderUsage, ResolvedContent, RunId, RunJournal, RunJournalReader,
-    RunRequest, RunResult, RuntimePackage, RuntimePackageId, RuntimePolicyPort, SourceKind,
-    SourceRef, ToolExecutor, ToolPolicyPort, ToolRoute, TypedOutputModel,
+    EventArchiveReader, EventCursor, EventFrame, InMemoryAgentEventBus, JournalRecord,
+    ProviderAdapter, ProviderArgumentStore, ProviderCapabilities, ProviderRequest,
+    ProviderResponse, ProviderRouteSnapshot, ProviderStreamChunk, ProviderUsage, ResolvedContent,
+    RunCheckpoint, RunId, RunJournal, RunJournalReader, RunRequest, RunResult, RuntimePackage,
+    RuntimePackageId, RuntimePolicyPort, SourceKind, SourceRef, ToolExecutor, ToolPolicyPort,
+    ToolRoute, TypedOutputModel,
 };
 use std::sync::Arc;
 
@@ -19,7 +20,7 @@ use agent_sdk_toolkit::{
 };
 
 #[cfg(feature = "evals")]
-use agent_sdk_core::{JournalRecord, RunTrace};
+use agent_sdk_core::RunTrace;
 #[cfg(feature = "evals")]
 use agent_sdk_eval::{CostPolicy, RunReport};
 
@@ -33,6 +34,7 @@ pub struct AgentApp {
     agent: Agent,
     runtime: AgentRuntime,
     default_source: SourceRef,
+    stores: Option<AgentAppStores>,
 }
 
 #[derive(Clone)]
@@ -107,6 +109,15 @@ impl AgentApp {
         &self.runtime
     }
 
+    /// Returns the store bundle supplied to the facade, if one was configured.
+    ///
+    /// The bundle is exposed as typed ports only. It is not facade-owned
+    /// session state, and helpers that need durable evidence still read through
+    /// the specific reader port for that evidence.
+    pub fn stores(&self) -> Option<&AgentAppStores> {
+        self.stores.as_ref()
+    }
+
     /// Runs a text request through the canonical runtime.
     pub fn run_text(
         &self,
@@ -158,6 +169,63 @@ impl AgentApp {
         self.runtime.subscribe_events(filter, cursor)
     }
 
+    /// Collects currently buffered live frames for one run through the
+    /// canonical runtime event bus.
+    ///
+    /// This is live observation, not durable truth. Use
+    /// `journal_records_for_run` for durable replay/report evidence and
+    /// `archived_event_frames` for configured archive reads.
+    pub fn event_frames_for_run(
+        &self,
+        run_id: RunId,
+        cursor: Option<EventCursor>,
+    ) -> Result<Vec<EventFrame>, AgentError> {
+        Ok(self.subscribe_run(run_id, cursor)?.collect())
+    }
+
+    /// Reads durable journal records for one run through `RunJournalReader`.
+    pub fn journal_records_for_run(
+        &self,
+        run_id: &RunId,
+    ) -> Result<Vec<JournalRecord>, AgentError> {
+        self.required_stores("journal_records_for_run")?
+            .journal_reader
+            .records_for_run(run_id)
+    }
+
+    /// Reads archived event frames through `EventArchiveReader` when the
+    /// configured store bundle supplies one.
+    ///
+    /// Archived frames are still an event projection. They do not replace the
+    /// run journal as durable truth.
+    pub fn archived_event_frames(
+        &self,
+        cursor: Option<ArchiveCursor>,
+    ) -> Result<Vec<EventFrame>, AgentError> {
+        let stores = self.required_stores("archived_event_frames")?;
+        let archive = stores.event_archive.as_ref().ok_or_else(|| {
+            AgentError::host_configuration_needed(
+                "AgentApp archived_event_frames requires AgentAppStores event archive",
+            )
+        })?;
+        archive.frames_after(cursor)
+    }
+
+    /// Loads the latest checkpoint accelerator for a run when one is
+    /// configured.
+    ///
+    /// Checkpoints are resume accelerators. They do not create or replace
+    /// journal truth.
+    pub fn latest_checkpoint(&self, run_id: &RunId) -> Result<Option<RunCheckpoint>, AgentError> {
+        let stores = self.required_stores("latest_checkpoint")?;
+        let checkpoint = stores.checkpoint.as_ref().ok_or_else(|| {
+            AgentError::host_configuration_needed(
+                "AgentApp latest_checkpoint requires AgentAppStores checkpoint store",
+            )
+        })?;
+        checkpoint.load_latest(run_id)
+    }
+
     /// Builds a run report from durable journal records.
     #[cfg(feature = "evals")]
     pub fn run_report<'a>(
@@ -168,6 +236,25 @@ impl AgentApp {
     ) -> Result<RunReport, AgentError> {
         let trace = RunTrace::from_records(run_id, records);
         RunReport::from_run_trace(&trace, cost_policy)
+    }
+
+    /// Builds a run report from the configured durable journal reader.
+    #[cfg(feature = "evals")]
+    pub fn run_report_from_stores(
+        &self,
+        run_id: &RunId,
+        cost_policy: Option<&dyn CostPolicy>,
+    ) -> Result<RunReport, AgentError> {
+        let records = self.journal_records_for_run(run_id)?;
+        self.run_report(run_id, records.iter(), cost_policy)
+    }
+
+    fn required_stores(&self, helper: &str) -> Result<&AgentAppStores, AgentError> {
+        self.stores.as_ref().ok_or_else(|| {
+            AgentError::host_configuration_needed(format!(
+                "AgentApp {helper} requires AgentAppStores"
+            ))
+        })
     }
 }
 
@@ -373,6 +460,7 @@ impl AgentAppBuilder {
                 "AgentApp package agent must match the app agent",
             ));
         }
+        let stores = self.stores.clone();
         let runtime = self.runtime.default_package(package).build()?;
         let default_source = self.default_source.unwrap_or_else(|| {
             SourceRef::with_kind(
@@ -384,6 +472,7 @@ impl AgentAppBuilder {
             agent: self.agent,
             runtime,
             default_source,
+            stores,
         })
     }
 }

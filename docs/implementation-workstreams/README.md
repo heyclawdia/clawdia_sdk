@@ -25,7 +25,8 @@ Launch targets use short titles such as `typed-ids`, `event-frames`, or `text-ru
 | [12 Scenario Verification](12-scenario-verification/README.md) | all targets in parallel | Prove generic scenarios and public API readiness after hardening. |
 | [13 Release Readiness](13-release-readiness/README.md) | one target | Run final packaging, feature flag, docs, verification-matrix, and release-handoff checks. |
 | [14 Evaluation Metrics](14-evaluation-metrics/README.md) | one target | Add optional post-hoc evaluation metrics and comparison helpers over released trace/journal primitives. |
-| [15 DX Completion](15-dx-completion/README.md) | one target | Complete the facade-first SDK DX with typed tools, durable stores, Supabase, reports, and runnable examples. |
+| [15 DX Completion](15-dx-completion/README.md) | one target | Complete the facade-first SDK DX with typed tools, durable stores, reports, and runnable examples. |
+| [16 DX Phase II](16-dx-phase-ii/README.md) | one target | Polish the first-developer path with deterministic onboarding, examples, diagnostics, event observation, checkpoint/replay guidance, and review evidence. |
 
 Do not start a later phase until the previous phase README exit gate is checked and the phase exit report records reviewer PASS.
 
@@ -56,6 +57,9 @@ The phase graph is shaped around test seams:
 - Phase 15 completes the facade-first DX packet by adding convenience assembly,
   typed tool authoring, durable adapters, report helpers, and runnable examples
   over the already implemented primitive kernel.
+- Phase 16 turns the completed DX surfaces into a coherent first-developer
+  path with better onboarding, deterministic examples, diagnostics, event
+  observation, checkpoint/replay guidance, and simulation evidence.
 
 If a future implementer finds a hidden dependency between two sibling launch targets, do not coordinate through shared mutable work. Move the dependent work into the next numbered phase and update this launch map.
 
@@ -78,6 +82,7 @@ flowchart TD
   P12 --> P13["13 Release Readiness"]
   P13 --> P14["14 Evaluation Metrics"]
   P14 --> P15["15 DX Completion"]
+  P15 --> P16["16 DX Phase II"]
 ```
 
 ## Launch Protocol

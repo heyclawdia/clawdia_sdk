@@ -28,6 +28,13 @@ they must be documented before release handoff.
 - `AgentAppStores` exposes separate journal write and journal read ports. Keep
   reporting and resume helpers reading from `RunJournalReader` instead of
   downcasting a store bundle or adding facade-only report state.
+- Phase 16 read helpers are evidence projections only:
+  `event_frames_for_run` is live buffered observation,
+  `archived_event_frames` is an event archive read,
+  `journal_records_for_run` is durable journal truth,
+  `latest_checkpoint` is an accelerator read, and
+  `run_report_from_stores` is a report projection from journal records. Do not
+  let future helpers merge those surfaces into a facade-owned trace store.
 
 ## Tool Authoring Risks
 
@@ -93,6 +100,17 @@ they must be documented before release handoff.
 - `AgentAppStores` now includes `journal_reader` alongside the write journal so
   facade reports can read durable evidence through a typed port.
 
+## Phase 16 Alpha Breaking Changes
+
+- The first-developer path now treats `clawdia-sdk` as a local checkout facade
+  only. Published-alpha docs should keep using the split crates unless the
+  facade publish policy changes.
+- `AgentApp` now stores the optional `AgentAppStores` bundle so read-side
+  helpers can return typed host-configuration diagnostics when durable evidence
+  ports are missing.
+- Checkpoint examples now claim resume-readiness evidence only. They do not
+  claim run continuation or a facade resume API.
+
 ## Example And Documentation Risks
 
 - Do not claim numbered examples are runnable until their directories, READMEs,
@@ -104,6 +122,11 @@ they must be documented before release handoff.
   `clawdia-sdk-example-03-file-store`,
   `clawdia-sdk-example-04-supabase-scripted-store`, and
   `clawdia-sdk-example-05-reporting-and-eval`.
+- The Phase 16 numbered examples now exist as workspace packages. Keep their
+  commands runnable without live credentials:
+  `clawdia-sdk-example-06-typed-output-and-events`,
+  `clawdia-sdk-example-07-approval-denial`, and
+  `clawdia-sdk-example-08-checkpoint-replay`.
 - Live-provider examples need deterministic fake or transport-injected paths for
   CI. Live credentials remain user/host-owned and must not enter runtime package
   fingerprints, journals, events, logs, or docs output.

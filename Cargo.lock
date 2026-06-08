@@ -285,6 +285,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "clawdia-sdk-example-06-typed-output-and-events"
+version = "0.1.0"
+dependencies = [
+ "clawdia-sdk",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "clawdia-sdk-example-07-approval-denial"
+version = "0.1.0"
+dependencies = [
+ "clawdia-sdk",
+ "serde",
+]
+
+[[package]]
+name = "clawdia-sdk-example-08-checkpoint-replay"
+version = "0.1.0"
+dependencies = [
+ "clawdia-sdk",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

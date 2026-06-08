@@ -13,6 +13,9 @@ members = [
     "examples/03_file_store",
     "examples/04_supabase_scripted_store",
     "examples/05_reporting_and_eval",
+    "examples/06_typed_output_and_events",
+    "examples/07_approval_denial",
+    "examples/08_checkpoint_replay",
 ]
 resolver = "3"
 

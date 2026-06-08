@@ -13,6 +13,24 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
 - Rust implementation launch sequencing and phase exit evidence live in [implementation-workstreams](implementation-workstreams/README.md).
 
+## First Developer Path
+
+Use the local facade path when you are inside this repository:
+
+1. Read `../crates/clawdia-sdk/README.md` for the facade feature matrix.
+2. Run `cargo run -p clawdia-sdk-example-01-facade-complex-agent`.
+3. Run `cargo run -p clawdia-sdk-example-06-typed-output-and-events` for typed
+   output, live event frames, journal evidence, and report projection.
+4. Run `cargo run -p clawdia-sdk-example-07-approval-denial` for fail-closed
+   approval evidence.
+5. Run `cargo run -p clawdia-sdk-example-08-checkpoint-replay` for checkpoint
+   accelerator and replay reducer resume-readiness evidence.
+
+Use the published split-crate path when you are outside this checkout. Start
+from `agent_sdk_core::prelude::*`, then add optional crates only for provider
+adapters, toolkit helpers, eval reports, macros, or stores that your host
+actually needs.
+
 ## Agent Crawl Order
 
 Use this order when an agent needs to build on the SDK instead of only reviewing
@@ -20,7 +38,7 @@ the old contract packet:
 
 1. Read `<repo-root>/AGENTS.md`, `<repo-root>/README.md`, this file, and `<repo-root>/coding_standards.md`.
 2. Confirm the current phase or task owner in [implementation-workstreams](implementation-workstreams/README.md).
-3. For user-facing API ergonomics, read [API Review](implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](reference/simplicity-audit.md), `../crates/agent-sdk-core/README.md`, `../crates/agent-sdk-core/tests/domain/public_api.rs`, and `../crates/clawdia-sdk/README.md`.
+3. For user-facing API ergonomics, read [API Review](implementation-workstreams/12-scenario-verification/12b-api-review.md), [Simplicity Audit](reference/simplicity-audit.md), `../crates/agent-sdk-core/README.md`, `../crates/agent-sdk-core/tests/domain/public_api.rs`, `../crates/clawdia-sdk/README.md`, and the runnable example READMEs under `../examples`.
 4. For checkout-based app construction, prefer `clawdia_sdk::prelude::*` and `AgentApp` when using the unpublished facade. Split-crate users should use `agent_sdk_core::prelude::*` for common core types, explicit crate-root imports for advanced surfaces, `agent_sdk_core::ports` for host adapters, and `agent_sdk_core::testing` for deterministic conformance checks.
 5. Before handoff, run the commands named by the launch target plus `scripts/public-release-audit.sh` for any release or broad documentation handoff.
 

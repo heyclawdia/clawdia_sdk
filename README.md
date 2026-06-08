@@ -17,7 +17,8 @@ This is a monorepo with separable Rust crates:
 
 Keep this package boundary deliberate. New capabilities with heavy parser/runtime/provider dependencies should live in optional crates layered over `agent-sdk-core`, not as default core dependencies. Core must remain usable by hosts that only need the primitive SDK contracts.
 
-The current public alpha release is available from crates.io:
+The current public alpha release is available from crates.io through the split
+crates:
 
 ```toml
 [dependencies]
@@ -44,6 +45,10 @@ Checkout-based examples can use the unpublished facade for import convenience:
 clawdia-sdk = { path = "crates/clawdia-sdk", default-features = false }
 ```
 
+Use the facade when you are working inside this repository and want one import
+path for examples. Use the split crates when you are building from a published
+alpha or need tighter dependency control.
+
 Runnable checkout smoke examples:
 
 ```sh
@@ -52,11 +57,28 @@ cargo run -p clawdia-sdk-example-02-typed-tool-macro
 cargo run -p clawdia-sdk-example-03-file-store
 cargo run -p clawdia-sdk-example-04-supabase-scripted-store
 cargo run -p clawdia-sdk-example-05-reporting-and-eval
+cargo run -p clawdia-sdk-example-06-typed-output-and-events
+cargo run -p clawdia-sdk-example-07-approval-denial
+cargo run -p clawdia-sdk-example-08-checkpoint-replay
 ```
 
 The repository checkout can be ahead of the latest published alpha. Treat
 crate-level READMEs and tests as the source of truth for current local API
 surfaces, then publish only after the release-readiness gates pass.
+
+## First 30 Minutes
+
+For a local checkout, start with the facade and deterministic examples:
+
+1. Add `clawdia-sdk = { path = "crates/clawdia-sdk", default-features = false }`
+   to a workspace example or use the checked-in examples directly.
+2. Run `cargo run -p clawdia-sdk-example-01-facade-complex-agent`.
+3. Continue with examples 06, 07, and 08 for typed output, event evidence,
+   approval denial, report projection, and checkpoint/replay resume-readiness.
+
+For a published alpha, depend on the split crates directly and start from
+`agent_sdk_core::prelude::*`. Add optional crates only for the features you use:
+providers, toolkit helpers, eval reports, macros, or stores.
 
 ## Quickstarts
 
@@ -65,6 +87,9 @@ Start from a live provider and keep the canonical runtime path visible:
 1. [Live provider quickstart](docs/examples/live-provider-quickstart.md): one text run through `AgentRuntime`, `RuntimePackage`, a real `ProviderAdapter`, event bus, and journal.
 2. [Typed-output quickstart](docs/examples/typed-output-quickstart.md): ergonomic typed output helper lowering into `RunRequest` plus `OutputContract`, with provider-native schema hints when the schema is inline and safe to project.
 3. [Tool-approval quickstart](docs/examples/tool-approval-quickstart.md): tool route, policy, journal intent/result, and effect records without direct callback execution.
+4. [Runnable examples](docs/examples/README.md#runnable-checkout-examples):
+   checkout packages for facade assembly, typed output, approval denial,
+   report projection, and checkpoint/replay resume-readiness.
 
 For run triage and evals, use `agent-sdk-eval::TraceMetrics` or
 `agent_sdk_toolkit::AgentTraceEvaluation::compare_sessions` to compute local

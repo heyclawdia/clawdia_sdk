@@ -18,6 +18,21 @@ Each example names:
 
 ## Examples
 
+### Runnable Checkout Examples
+
+These packages run from the repository root without live credentials:
+
+| Command | Purpose |
+| --- | --- |
+| `cargo run -p clawdia-sdk-example-01-facade-complex-agent` | Facade assembly, typed tool approval success, event subscription, file stores, and report projection. |
+| `cargo run -p clawdia-sdk-example-02-typed-tool-macro` | Macro-authored typed tool schema and route generation. |
+| `cargo run -p clawdia-sdk-example-03-file-store` | File-backed provider-argument storage and JSON readback. |
+| `cargo run -p clawdia-sdk-example-04-supabase-scripted-store` | Supabase adapter behavior through scripted transport without live credentials. |
+| `cargo run -p clawdia-sdk-example-05-reporting-and-eval` | Post-hoc report construction over supplied traces. |
+| `cargo run -p clawdia-sdk-example-06-typed-output-and-events` | Typed output, validation evidence, live events, durable journal records, and report projection. |
+| `cargo run -p clawdia-sdk-example-07-approval-denial` | Fail-closed approval denial with journal/event evidence and no tool execution. |
+| `cargo run -p clawdia-sdk-example-08-checkpoint-replay` | Checkpoint accelerator plus replay reducer resume-readiness evidence. |
+
 ### Quickstarts
 
 | Example | Purpose |

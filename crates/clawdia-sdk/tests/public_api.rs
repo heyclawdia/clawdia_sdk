@@ -177,6 +177,144 @@ fn agent_app_runs_text_through_canonical_runtime() {
 }
 
 #[cfg(feature = "test-support")]
+#[test]
+fn agent_app_read_helpers_require_configured_stores() {
+    let agent = Agent::builder()
+        .id(AgentId::new("agent.facade.no_stores"))
+        .name("facade no stores")
+        .build()
+        .expect("agent builds");
+    let app = AgentApp::builder(agent)
+        .provider(
+            "provider.fake",
+            clawdia_sdk::testing::FakeProvider::with_responses(["unused"]),
+        )
+        .expect("provider registers")
+        .journal(clawdia_sdk::testing::FakeJournalStore::default())
+        .content(clawdia_sdk::testing::FakeContentResolver::default())
+        .policy(AllowFacadePolicy)
+        .build()
+        .expect("app builds");
+
+    let error = app
+        .journal_records_for_run(&RunId::new("run.facade.no_stores"))
+        .expect_err("missing stores must be diagnostic");
+
+    assert_eq!(
+        error.kind(),
+        clawdia_sdk::core::AgentErrorKind::HostConfigurationNeeded
+    );
+    assert!(
+        error
+            .context()
+            .message
+            .contains("AgentApp journal_records_for_run requires AgentAppStores")
+    );
+}
+
+#[cfg(all(feature = "evals", feature = "file-store", feature = "test-support"))]
+#[test]
+fn agent_app_read_helpers_keep_observation_archive_journal_report_and_checkpoint_separate() {
+    let root = temp_file_store_root("read-helpers");
+    let stores = AgentAppStores::file(&root);
+    let agent = Agent::builder()
+        .id(AgentId::new("agent.facade.evidence"))
+        .name("facade evidence")
+        .build()
+        .expect("agent builds");
+    let app = AgentApp::builder(agent)
+        .provider(
+            "provider.fake",
+            clawdia_sdk::testing::FakeProvider::with_responses(["evidence ready"]),
+        )
+        .expect("provider registers")
+        .stores(stores.clone())
+        .policy(AllowFacadePolicy)
+        .build()
+        .expect("app builds");
+
+    let run_id = RunId::new("run.facade.evidence");
+    let result = app
+        .run_text(run_id.clone(), "collect evidence")
+        .expect("run succeeds");
+    assert_eq!(result.status, RunStatus::Completed);
+
+    let live_frames = app
+        .event_frames_for_run(run_id.clone(), None)
+        .expect("live event frames");
+    assert!(!live_frames.is_empty(), "run should publish live frames");
+
+    assert!(
+        app.archived_event_frames(None)
+            .expect("archive reader is configured")
+            .is_empty(),
+        "live event frames must not imply archived event frames"
+    );
+
+    let archive = clawdia_sdk::stores::FileEventArchive::new(&root);
+    for frame in live_frames.clone() {
+        archive.append_frame(frame).expect("archive append");
+    }
+    let archived_frames = app
+        .archived_event_frames(None)
+        .expect("archived frames are read through archive reader");
+    assert_eq!(archived_frames.len(), live_frames.len());
+
+    let records = app
+        .journal_records_for_run(&run_id)
+        .expect("journal records");
+    assert!(!records.is_empty(), "run should append journal records");
+
+    let report = app
+        .run_report_from_stores(&run_id, None)
+        .expect("report from journal records");
+    assert_eq!(report.usage.record_count, records.len());
+
+    assert!(
+        app.latest_checkpoint(&run_id)
+            .expect("checkpoint store configured")
+            .is_none(),
+        "journal records do not create checkpoint accelerator entries"
+    );
+
+    let latest_journal_seq = records
+        .iter()
+        .map(|record| record.journal_seq)
+        .max()
+        .expect("records have journal seq");
+    let checkpoint = clawdia_sdk::core::RunCheckpoint {
+        checkpoint_id: "checkpoint.facade.evidence.terminal".to_string(),
+        run_id: run_id.clone(),
+        checkpoint_seq: 1,
+        covers_journal_seq: latest_journal_seq,
+        loop_state: "completed".to_string(),
+        turn_id: None,
+        attempt_id: None,
+        runtime_package_fingerprint: "runtime.package.fingerprint.facade.evidence".to_string(),
+        pending_side_effects: Vec::new(),
+        pending_approvals: Vec::new(),
+        content_ref_manifest: Vec::new(),
+        state_hash: "state.hash.facade.evidence".to_string(),
+        created_at_millis: latest_journal_seq,
+        writer_id: "writer.facade.test".to_string(),
+    };
+    stores
+        .checkpoint
+        .as_ref()
+        .expect("file stores include checkpoint")
+        .save(checkpoint.clone(), latest_journal_seq)
+        .expect("checkpoint save");
+
+    let latest_checkpoint = app
+        .latest_checkpoint(&run_id)
+        .expect("latest checkpoint")
+        .expect("checkpoint saved");
+    assert_eq!(latest_checkpoint.checkpoint_id, checkpoint.checkpoint_id);
+
+    drop(std::fs::remove_dir_all(root));
+}
+
+#[cfg(feature = "test-support")]
 struct AllowFacadePolicy;
 
 #[cfg(feature = "test-support")]
@@ -197,4 +335,12 @@ impl RuntimePolicyPort for AllowFacadePolicy {
             retention: RetentionClass::RunScoped,
         })
     }
+}
+
+#[cfg(feature = "file-store")]
+fn temp_file_store_root(slug: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "clawdia-sdk-public-api-{slug}-{}",
+        std::process::id()
+    ))
 }

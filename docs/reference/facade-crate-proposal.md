@@ -18,6 +18,11 @@ caller-supplied canonical runtime ports and lowers helper calls into
 journal-reader, event-archive, content, provider-argument, checkpoint, and
 agent-pool ports from the file and Supabase adapter crates.
 
+Phase 16 adds read-side evidence helpers on `AgentApp` for live events,
+durable journal records, archived events, checkpoints, and report projections.
+Those helpers read through the configured canonical ports and return
+host-configuration diagnostics when the required stores are missing.
+
 ## Split Crates Only Or Convenience Facade?
 
 Keep split crates and add a convenience facade.
@@ -170,6 +175,8 @@ Docs migration:
 - Add a separate facade quickstart only after the facade compiles.
 - Each facade quickstart must include an "under the hood" section naming the
   canonical core contracts it lowers into.
+- Keep live events, archived events, journals, checkpoints, and reports
+  documented as separate evidence surfaces.
 
 ## Implementation Phases
 
@@ -180,8 +187,10 @@ Docs migration:
 4. `AgentApp` builder implemented with tests proving canonical lowering.
 5. Add deterministic numbered examples for facade, macros, file store,
    Supabase scripted store, and reporting/eval.
-6. Run full workspace validation and public-release audit.
-7. Decide whether and when to publish the facade in release notes.
+6. Add deterministic numbered examples for typed output/events, approval
+   denial, and checkpoint/replay resume-readiness.
+7. Run full workspace validation and public-release audit.
+8. Decide whether and when to publish the facade in release notes.
 
 ## Required Tests For The Implementation Phase
 
