@@ -123,6 +123,7 @@ pub struct ToolBuilder {
     tool_name: String,
     executor_ref: String,
     schema_id: String,
+    description: Option<String>,
     redacted_schema: Option<serde_json::Value>,
     policy_refs: Vec<PolicyRef>,
     requires_approval: bool,
@@ -151,6 +152,7 @@ impl ToolBuilder {
             tool_name: tool_name.into(),
             executor_ref: executor_ref.into(),
             schema_id: schema_id.into(),
+            description: None,
             redacted_schema: None,
             policy_refs: vec![policy_ref],
             requires_approval: false,
@@ -213,6 +215,21 @@ impl ToolBuilder {
     /// Attaches a provider-safe JSON schema body to this tool declaration.
     pub fn redacted_schema(mut self, schema: serde_json::Value) -> Self {
         self.redacted_schema = Some(schema);
+        self
+    }
+
+    /// Attaches a bounded provider-visible description to this declaration.
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        let description = description.into();
+        if !description.trim().is_empty() {
+            self.description = Some(description);
+        }
+        self
+    }
+
+    /// Attaches a provider-visible description when one is present.
+    pub fn description_opt(mut self, description: Option<String>) -> Self {
+        self.description = description.filter(|description| !description.trim().is_empty());
         self
     }
 
@@ -307,6 +324,7 @@ impl ToolBuilder {
             capability_id,
             canonical_tool_name: CanonicalToolName::new(self.tool_name),
             namespace,
+            description: self.description,
             schema_ref: PackageSidecarRef::new(self.schema_id, "tool_schema", "v1"),
             redacted_schema: self.redacted_schema,
             executor_ref: ExecutorRef::new(self.executor_ref),

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     FileAgentPoolStore, FileCheckpointStore, FileContentStore, FileEventArchive,
-    FileProviderArgumentStore, FileRunJournal,
+    FileProviderArgumentStore, FileRunJournal, FileToolExecutionStore,
 };
 
 #[derive(Clone, Debug)]
@@ -50,5 +50,10 @@ impl FileStoreBundle {
     /// Returns an agent-pool store adapter.
     pub fn agent_pool(&self) -> FileAgentPoolStore {
         FileAgentPoolStore::new(self.root.clone())
+    }
+
+    /// Returns a rebuildable tool-execution projection store adapter.
+    pub fn tool_execution(&self) -> FileToolExecutionStore {
+        FileToolExecutionStore::new(self.root.clone())
     }
 }

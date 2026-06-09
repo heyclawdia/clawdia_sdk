@@ -43,10 +43,12 @@ let route = ToolRoute {
     capability_id: CapabilityId::new("cap.tool.read"),
     canonical_tool_name: CanonicalToolName::new("workspace_read"),
     namespace: agent_sdk_core::CapabilityNamespace::new("tool.workspace_read"),
+    description: Some("Read a file from the workspace".to_string()),
     source: SourceRef::with_kind(SourceKind::Sdk, "source.sdk.toolpack"),
     destination: DestinationRef::with_kind(DestinationKind::Tool, "destination.tool.read"),
     executor_ref: Some(ExecutorRef::new("executor.workspace_read.v1")),
     policy_refs: vec![PolicyRef::with_kind(PolicyKind::Approval, "policy.approval.read")],
+    requires_approval: true,
     sidecar_refs: vec![agent_sdk_core::PackageSidecarRef::new(
         "sidecar.schema.read",
         "tool_schema",
@@ -95,6 +97,8 @@ let outcome = coordinator.execute(
 
 - `ToolRoute` must match the executable capability frozen into the
   `RuntimePackage`.
+- Approval dispatch is explicit: an approval policy ref documents policy
+  lineage, while `requires_approval = true` gates executor release.
 - Missing policy, missing executor, or failed journal intent append denies before
   executor start.
 - The executor result is not durable until the terminal tool result record is

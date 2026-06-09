@@ -403,6 +403,9 @@ impl AgentRuntime {
                 schema_ref.clone(),
                 route.policy_refs,
             );
+            if let Some(description) = route.description {
+                spec = spec.with_description(description);
+            }
             if let Some(schema) = provider_schema_from_sidecars(package, &schema_ref) {
                 spec = spec.with_redacted_schema(schema);
             }

@@ -268,6 +268,12 @@ pub struct ProviderToolSpec {
     pub capability_id: CapabilityId,
     /// Capability namespace carried for lineage and collision debugging.
     pub namespace: CapabilityNamespace,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Bounded provider-visible tool description from the runtime package.
+    ///
+    /// This is projection metadata only. It does not affect tool execution,
+    /// approval, policy, or runtime-package identity.
+    pub description: Option<String>,
     /// Tool input schema ref. Resolving it is separate from constructing a
     /// provider request.
     pub schema_ref: PackageSidecarRef,
@@ -294,10 +300,20 @@ impl ProviderToolSpec {
             name: name.into(),
             capability_id,
             namespace,
+            description: None,
             schema_ref,
             policy_refs,
             redacted_schema: None,
         }
+    }
+
+    /// Returns this declaration with a provider-visible description attached.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        let description = description.into();
+        if !description.trim().is_empty() {
+            self.description = Some(description);
+        }
+        self
     }
 
     /// Returns this declaration with an inline redacted schema attached.
@@ -330,6 +346,7 @@ impl fmt::Debug for ProviderToolSpec {
             .field("name", &self.name)
             .field("capability_id", &self.capability_id)
             .field("namespace", &self.namespace)
+            .field("description_present", &self.description.is_some())
             .field("schema_ref", &self.schema_ref)
             .field("policy_ref_count", &self.policy_refs.len())
             .field("redacted_schema_present", &self.redacted_schema.is_some())

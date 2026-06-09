@@ -234,6 +234,7 @@ type SyncHandler<A, R> = dyn Fn(A, TypedToolContext) -> ToolResult<R> + Send + S
 pub struct TypedTool<A: ToolArgs, R: ToolOutput> {
     identity: ToolIdentity,
     schema: ToolSchemaSnapshot,
+    description: Option<String>,
     policy_ref: PolicyRef,
     required_permissions: Vec<CapabilityPermission>,
     effect_class: EffectClass,
@@ -311,6 +312,7 @@ impl<A: ToolArgs, R: ToolOutput> TypedTool<A, R> {
             self.schema.schema_ref.sidecar_id.clone(),
             self.policy_ref.clone(),
         )
+        .description_opt(self.description.clone())
         .capability_id(self.identity.capability_id.clone())
         .namespace(self.identity.namespace.clone())
         .redacted_schema(self.schema.redacted_schema.clone())
@@ -330,6 +332,8 @@ impl<A: ToolArgs, R: ToolOutput> TypedTool<A, R> {
 pub struct TypedToolBuilder<A: ToolArgs, R: ToolOutput> {
     identity: ToolIdentity,
     policy_ref: PolicyRef,
+    description: Option<String>,
+    input_schema: Option<Value>,
     required_permissions: Vec<CapabilityPermission>,
     effect_class: EffectClass,
     risk_class: RiskClass,
@@ -342,6 +346,8 @@ impl<A: ToolArgs, R: ToolOutput> TypedToolBuilder<A, R> {
         Self {
             identity,
             policy_ref: PolicyRef::with_kind(PolicyKind::RuntimePackage, "policy.tool.typed"),
+            description: None,
+            input_schema: None,
             required_permissions: Vec::new(),
             effect_class: EffectClass::Read,
             risk_class: RiskClass::Low,
@@ -353,6 +359,27 @@ impl<A: ToolArgs, R: ToolOutput> TypedToolBuilder<A, R> {
     /// Sets an explicit policy ref.
     pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
         self.policy_ref = policy_ref;
+        self
+    }
+
+    /// Sets a provider-visible description.
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        let description = description.into();
+        if !description.trim().is_empty() {
+            self.description = Some(description);
+        }
+        self
+    }
+
+    /// Sets provider-visible description metadata when present.
+    pub fn description_opt(mut self, description: Option<String>) -> Self {
+        self.description = description.filter(|description| !description.trim().is_empty());
+        self
+    }
+
+    /// Sets an explicit provider-safe input schema.
+    pub fn input_schema(mut self, schema: Value) -> Self {
+        self.input_schema = Some(schema);
         self
     }
 
@@ -413,13 +440,17 @@ impl<A: ToolArgs, R: ToolOutput> TypedToolBuilder<A, R> {
 
     /// Builds the typed tool declaration and executor adapter.
     pub fn build(self) -> Result<TypedTool<A, R>, AgentError> {
-        let schema = ToolSchemaSnapshot::new(self.identity.schema_ref.clone(), A::schema())?;
+        let schema = ToolSchemaSnapshot::new(
+            self.identity.schema_ref.clone(),
+            self.input_schema.unwrap_or_else(A::schema),
+        )?;
         let handler = self
             .handler
             .ok_or_else(|| AgentError::missing_required_field("typed_tool.handler"))?;
         Ok(TypedTool {
             identity: self.identity,
             schema,
+            description: self.description,
             policy_ref: self.policy_ref,
             required_permissions: self.required_permissions,
             effect_class: self.effect_class,
@@ -428,6 +459,190 @@ impl<A: ToolArgs, R: ToolOutput> TypedToolBuilder<A, R> {
             require_approval: false,
             handler,
         })
+    }
+}
+
+/// Builder-first function-tool authoring entry point.
+///
+/// `FunctionTool` is a namespace for a simple builder. The built value is the
+/// same `TypedTool` used by the canonical typed-tool execution path, so policy,
+/// approval, journals, events, and output content refs are unchanged.
+pub struct FunctionTool;
+
+impl FunctionTool {
+    /// Starts a builder for a typed function tool.
+    pub fn builder(name: impl Into<String>) -> FunctionToolBuilder<(), ()> {
+        FunctionToolBuilder::new(name)
+    }
+}
+
+/// Builder for `FunctionTool`.
+pub struct FunctionToolBuilder<A, R> {
+    name: String,
+    version: String,
+    description: Option<String>,
+    input_schema: Option<Value>,
+    policy_ref: PolicyRef,
+    required_permissions: Vec<CapabilityPermission>,
+    effect_class: EffectClass,
+    risk_class: RiskClass,
+    timeout_ms: u64,
+    require_approval: bool,
+    handler: Option<Arc<SyncHandler<A, R>>>,
+}
+
+impl<A, R> FunctionToolBuilder<A, R> {
+    fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            version: "v1".to_string(),
+            description: None,
+            input_schema: None,
+            policy_ref: PolicyRef::with_kind(PolicyKind::RuntimePackage, "policy.tool.function"),
+            required_permissions: Vec::new(),
+            effect_class: EffectClass::Read,
+            risk_class: RiskClass::Low,
+            timeout_ms: 10_000,
+            require_approval: false,
+            handler: None,
+        }
+    }
+
+    /// Sets an explicit semantic tool version. The default is `v1`.
+    pub fn version(mut self, version: impl Into<String>) -> Self {
+        self.version = version.into();
+        self
+    }
+
+    /// Sets a provider-visible description.
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        let description = description.into();
+        if !description.trim().is_empty() {
+            self.description = Some(description);
+        }
+        self
+    }
+
+    /// Sets an explicit provider-safe input schema.
+    pub fn input_schema(mut self, schema: Value) -> Self {
+        self.input_schema = Some(schema);
+        self
+    }
+
+    /// Sets an explicit policy ref.
+    pub fn policy_ref(mut self, policy_ref: PolicyRef) -> Self {
+        self.policy_ref = policy_ref;
+        self
+    }
+
+    /// Marks the tool read-only.
+    pub fn read_only(mut self) -> Self {
+        self.effect_class = EffectClass::Read;
+        self.risk_class = RiskClass::Low;
+        self
+    }
+
+    /// Marks the tool as write-like.
+    pub fn write_effect(mut self) -> Self {
+        self.effect_class = EffectClass::Write;
+        self.risk_class = RiskClass::High;
+        self
+    }
+
+    /// Requires host approval before core releases the executor.
+    pub fn require_approval(mut self) -> Self {
+        self.require_approval = true;
+        self.risk_class = RiskClass::High;
+        self
+    }
+
+    /// Adds a required permission.
+    pub fn required_permission(mut self, permission: CapabilityPermission) -> Self {
+        self.required_permissions.push(permission);
+        self
+    }
+
+    /// Sets execution timeout metadata.
+    pub fn timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
+    }
+}
+
+impl FunctionToolBuilder<(), ()> {
+    /// Sets a typed executor that does not need execution context.
+    pub fn executor<A, R, F>(self, handler: F) -> FunctionToolBuilder<A, R>
+    where
+        A: ToolArgs,
+        R: ToolOutput,
+        F: Fn(A) -> ToolResult<R> + Send + Sync + 'static,
+    {
+        FunctionToolBuilder {
+            name: self.name,
+            version: self.version,
+            description: self.description,
+            input_schema: self.input_schema,
+            policy_ref: self.policy_ref,
+            required_permissions: self.required_permissions,
+            effect_class: self.effect_class,
+            risk_class: self.risk_class,
+            timeout_ms: self.timeout_ms,
+            require_approval: self.require_approval,
+            handler: Some(Arc::new(move |args, _context| handler(args))),
+        }
+    }
+
+    /// Sets a typed executor that receives the core execution context.
+    pub fn executor_with_context<A, R, F>(self, handler: F) -> FunctionToolBuilder<A, R>
+    where
+        A: ToolArgs,
+        R: ToolOutput,
+        F: Fn(A, TypedToolContext) -> ToolResult<R> + Send + Sync + 'static,
+    {
+        FunctionToolBuilder {
+            name: self.name,
+            version: self.version,
+            description: self.description,
+            input_schema: self.input_schema,
+            policy_ref: self.policy_ref,
+            required_permissions: self.required_permissions,
+            effect_class: self.effect_class,
+            risk_class: self.risk_class,
+            timeout_ms: self.timeout_ms,
+            require_approval: self.require_approval,
+            handler: Some(Arc::new(handler)),
+        }
+    }
+}
+
+impl<A, R> FunctionToolBuilder<A, R>
+where
+    A: ToolArgs,
+    R: ToolOutput,
+{
+    /// Builds the typed tool declaration and executor adapter.
+    pub fn build(self) -> Result<TypedTool<A, R>, AgentError> {
+        let mut builder = TypedTool::<A, R>::builder(ToolIdentity::new(self.name, self.version)?)
+            .description_opt(self.description)
+            .policy_ref(self.policy_ref)
+            .effect(self.effect_class, self.risk_class)
+            .timeout_ms(self.timeout_ms);
+        if let Some(schema) = self.input_schema {
+            builder = builder.input_schema(schema);
+        }
+        for permission in self.required_permissions {
+            builder = builder.required_permission(permission);
+        }
+        let handler = self
+            .handler
+            .ok_or_else(|| AgentError::missing_required_field("function_tool.executor"))?;
+        let mut tool = builder
+            .sync_handler(move |args, context| handler(args, context))
+            .build()?;
+        if self.require_approval {
+            tool = tool.require_approval();
+        }
+        Ok(tool)
     }
 }
 

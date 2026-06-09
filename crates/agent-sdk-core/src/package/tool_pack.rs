@@ -331,6 +331,10 @@ pub struct ToolPackToolSnapshot {
     /// Namespace that groups this capability or identifier.
     /// Use it to avoid collisions between packages, hosts, and extensions.
     pub namespace: CapabilityNamespace,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Bounded provider-visible description for this tool.
+    /// This metadata does not execute the tool or alter policy.
+    pub description: Option<String>,
     /// Typed schema ref reference. Resolving or executing it is a separate
     /// policy-gated step.
     pub schema_ref: PackageSidecarRef,

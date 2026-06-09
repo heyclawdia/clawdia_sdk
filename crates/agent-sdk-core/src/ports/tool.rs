@@ -13,14 +13,15 @@ use crate::{
     capability::{CapabilityId, CapabilityNamespace, ExecutorRef, PackageSidecarRef},
     domain::{
         AgentError, AgentErrorKind, ContentRef, DedupeKey, DestinationRef, EffectId,
-        IdempotencyKey, PolicyRef, PrivacyClass, RetentionClass, RetryClassification, SourceRef,
-        ToolCallId,
+        IdempotencyKey, JournalCursor, PolicyRef, PrivacyClass, RetentionClass,
+        RetryClassification, RunId, SourceRef, ToolCallId,
     },
     effect::{EffectIntent, EffectResult, EffectTerminalStatus},
+    journal::{JournalRecord, JournalRecordPayload},
     package::RuntimePackage,
     policy::{EffectClass, PolicyOutcome, PolicyStage, RiskClass},
     provider::ProviderToolCall,
-    tool_records::CanonicalToolName,
+    tool_records::{CanonicalToolName, ToolCallRecord},
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -120,6 +121,11 @@ pub struct ToolRoute {
     /// Namespace that groups this capability or identifier.
     /// Use it to avoid collisions between packages, hosts, and extensions.
     pub namespace: CapabilityNamespace,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Bounded provider-visible tool description.
+    /// This is metadata only; executor identity, policy, approval, and
+    /// runtime-package authority remain in their explicit fields.
+    pub description: Option<String>,
     /// Source label or ref for this item; it is metadata and does not fetch
     /// content by itself.
     pub source: SourceRef,
@@ -178,6 +184,189 @@ impl ToolRoute {
 /// Constructing the value does not call the host; the port method that receives it documents any adapter, network, or storage effect.
 pub struct ToolRouter {
     snapshot: ToolRegistrySnapshot,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Rebuildable cache/projection row for journaled tool execution evidence.
+///
+/// This record is subordinate to `RunJournal`: it stores redacted
+/// `ToolCallRecord` evidence plus journal position metadata for lookup and
+/// diagnostics. It cannot approve, release, retry, replay, or mark recovery
+/// complete.
+pub struct ToolExecutionStoreRecord {
+    /// Run that owns the journaled tool record.
+    pub run_id: RunId,
+    /// Tool call id for lookup and dedupe diagnostics.
+    pub tool_call_id: ToolCallId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Effect id from the journaled intent or result, when available.
+    pub effect_id: Option<EffectId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Idempotency key from the journaled tool/effect evidence.
+    pub idempotency_key: Option<IdempotencyKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Dedupe key from the journaled effect intent, when available.
+    pub dedupe_key: Option<DedupeKey>,
+    /// Journal sequence for stale-cache checks.
+    pub journal_seq: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Journal cursor returned by the durable journal append/read path.
+    pub journal_cursor: Option<JournalCursor>,
+    /// Redacted journaled tool record.
+    pub record: ToolCallRecord,
+}
+
+impl ToolExecutionStoreRecord {
+    /// Builds a cache/projection row from one durable journal record.
+    ///
+    /// Returns `None` for non-tool records so callers can rebuild the cache by
+    /// filtering a run journal without parsing labels.
+    pub fn from_journal_record(
+        journal_record: &JournalRecord,
+        journal_cursor: Option<JournalCursor>,
+    ) -> Option<Self> {
+        let JournalRecordPayload::Tool(record) = &journal_record.payload else {
+            return None;
+        };
+        let effect_id = record
+            .effect_result
+            .as_ref()
+            .map(|result| result.effect_id.clone())
+            .or_else(|| {
+                record
+                    .effect_intent
+                    .as_ref()
+                    .map(|intent| intent.effect_id.clone())
+            });
+        let dedupe_key = record
+            .effect_intent
+            .as_ref()
+            .and_then(|intent| intent.dedupe_key.clone());
+        Some(Self {
+            run_id: record.run_id.clone(),
+            tool_call_id: record.tool_call_id.clone(),
+            effect_id,
+            idempotency_key: record.idempotency_key.clone(),
+            dedupe_key,
+            journal_seq: journal_record.journal_seq,
+            journal_cursor,
+            record: record.clone(),
+        })
+    }
+
+    /// Returns whether this cache row is stale relative to known journal truth.
+    pub fn is_stale_against(&self, durable_journal_seq: u64) -> bool {
+        self.journal_seq < durable_journal_seq
+    }
+
+    /// Returns the journal sequence represented by a durable journal cursor.
+    ///
+    /// Current SDK journals encode cursors as `journal.<seq>`. Stores keep the
+    /// explicit `journal_seq` as the authoritative sortable value and use this
+    /// helper only to interpret caller-supplied cursor bounds.
+    pub fn journal_sequence_for_cursor(cursor: &JournalCursor) -> Option<u64> {
+        cursor
+            .as_str()
+            .rsplit_once('.')
+            .and_then(|(_, seq)| seq.parse::<u64>().ok())
+    }
+
+    /// Returns whether this row falls inside a journal cursor range.
+    ///
+    /// `after` is exclusive and `through` is inclusive, matching journal reader
+    /// semantics for "records after cursor through cursor." If a cursor cannot
+    /// be interpreted as a sequence, the range is treated as unsatisfied rather
+    /// than guessing from lexical order.
+    pub fn is_in_journal_cursor_range(
+        &self,
+        after: Option<&JournalCursor>,
+        through: Option<&JournalCursor>,
+    ) -> bool {
+        let after_seq = match after {
+            Some(cursor) => match Self::journal_sequence_for_cursor(cursor) {
+                Some(seq) => Some(seq),
+                None => return false,
+            },
+            None => None,
+        };
+        let through_seq = match through {
+            Some(cursor) => match Self::journal_sequence_for_cursor(cursor) {
+                Some(seq) => Some(seq),
+                None => return false,
+            },
+            None => None,
+        };
+        after_seq.is_none_or(|seq| self.journal_seq > seq)
+            && through_seq.is_none_or(|seq| self.journal_seq <= seq)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Cursor for a `ToolExecutionStore` projection.
+pub struct ToolExecutionStoreCursor {
+    /// Monotonic sequence in the projection store, not journal truth.
+    pub sequence: u64,
+}
+
+impl ToolExecutionStoreCursor {
+    /// Creates a projection-store cursor.
+    pub fn new(sequence: u64) -> Self {
+        Self { sequence }
+    }
+}
+
+/// Rebuildable read/write projection cache for tool execution evidence.
+///
+/// Implementations must not approve tools, release executors, synthesize
+/// results, decide replay safety, or store raw provider arguments or raw tool
+/// output. Those remain owned by the core coordinator, journal, provider
+/// argument store, and content store.
+pub trait ToolExecutionStore: Send + Sync {
+    /// Stores one redacted tool-execution projection row.
+    fn put_tool_execution_record(
+        &self,
+        record: ToolExecutionStoreRecord,
+    ) -> Result<ToolExecutionStoreCursor, AgentError>;
+
+    /// Reads all projection rows for one run, ordered by journal sequence.
+    fn records_for_run(&self, run_id: &RunId) -> Result<Vec<ToolExecutionStoreRecord>, AgentError>;
+
+    /// Reads one projection row for a tool call.
+    fn record_for_tool_call(
+        &self,
+        run_id: &RunId,
+        tool_call_id: &ToolCallId,
+    ) -> Result<Option<ToolExecutionStoreRecord>, AgentError>;
+
+    /// Reads projection rows with the supplied idempotency key.
+    fn records_for_idempotency_key(
+        &self,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Vec<ToolExecutionStoreRecord>, AgentError>;
+
+    /// Reads projection rows with the supplied effect id.
+    fn records_for_effect_id(
+        &self,
+        effect_id: &EffectId,
+    ) -> Result<Vec<ToolExecutionStoreRecord>, AgentError>;
+
+    /// Reads projection rows for one run after a durable journal sequence.
+    fn records_after_journal_seq(
+        &self,
+        run_id: &RunId,
+        journal_seq: u64,
+    ) -> Result<Vec<ToolExecutionStoreRecord>, AgentError>;
+
+    /// Reads projection rows for one run inside a durable journal cursor range.
+    ///
+    /// `after` is exclusive and `through` is inclusive. Implementations must
+    /// preserve journal sequence ordering and must not synthesize missing rows.
+    fn records_in_journal_cursor_range(
+        &self,
+        run_id: &RunId,
+        after: Option<&JournalCursor>,
+        through: Option<&JournalCursor>,
+    ) -> Result<Vec<ToolExecutionStoreRecord>, AgentError>;
 }
 
 impl ToolRouter {

@@ -8,8 +8,8 @@ use agent_sdk_core::{
     ProviderAdapter, ProviderArgumentStore, ProviderCapabilities, ProviderRequest,
     ProviderResponse, ProviderRouteSnapshot, ProviderStreamChunk, ProviderUsage, ResolvedContent,
     RunCheckpoint, RunId, RunJournal, RunJournalReader, RunRequest, RunResult, RuntimePackage,
-    RuntimePackageId, RuntimePolicyPort, SourceKind, SourceRef, ToolExecutor, ToolPolicyPort,
-    ToolRoute, TypedOutputModel,
+    RuntimePackageId, RuntimePolicyPort, SourceKind, SourceRef, ToolExecutionStore, ToolExecutor,
+    ToolPolicyPort, ToolRoute, TypedOutputModel,
 };
 use std::sync::Arc;
 
@@ -47,6 +47,7 @@ pub struct AgentAppStores {
     pub checkpoint: Option<Arc<dyn CheckpointStore>>,
     pub event_archive: Option<Arc<dyn EventArchiveReader>>,
     pub agent_pool: Option<Arc<dyn AgentPoolStore>>,
+    pub tool_execution: Option<Arc<dyn ToolExecutionStore>>,
 }
 
 impl AgentAppStores {
@@ -62,6 +63,37 @@ impl AgentAppStores {
             checkpoint: Some(Arc::new(bundle.checkpoints())),
             event_archive: Some(Arc::new(bundle.event_archive())),
             agent_pool: Some(Arc::new(bundle.agent_pool())),
+            tool_execution: Some(Arc::new(bundle.tool_execution())),
+        }
+    }
+
+    #[cfg(feature = "sqlite-store")]
+    /// Creates facade stores backed by the SQLite adapter crate.
+    pub fn sqlite(bundle: agent_sdk_store_sqlite::SqliteStoreBundle) -> Result<Self, AgentError> {
+        Ok(Self {
+            journal: Arc::new(bundle.journal()?),
+            journal_reader: Arc::new(bundle.journal()?),
+            content: Arc::new(bundle.content()?),
+            provider_arguments: Arc::new(bundle.provider_arguments()?),
+            checkpoint: Some(Arc::new(bundle.checkpoints()?)),
+            event_archive: Some(Arc::new(bundle.event_archive()?)),
+            agent_pool: Some(Arc::new(bundle.agent_pool()?)),
+            tool_execution: Some(Arc::new(bundle.tool_execution()?)),
+        })
+    }
+
+    #[cfg(feature = "postgres-store")]
+    /// Creates facade stores backed by the Postgres-style adapter crate.
+    pub fn postgres(bundle: agent_sdk_store_postgres::PostgresStoreBundle) -> Self {
+        Self {
+            journal: Arc::new(bundle.journal()),
+            journal_reader: Arc::new(bundle.journal()),
+            content: Arc::new(bundle.content()),
+            provider_arguments: Arc::new(bundle.provider_arguments()),
+            checkpoint: Some(Arc::new(bundle.checkpoints())),
+            event_archive: Some(Arc::new(bundle.event_archive())),
+            agent_pool: Some(Arc::new(bundle.agent_pool())),
+            tool_execution: Some(Arc::new(bundle.tool_execution())),
         }
     }
 
@@ -76,6 +108,7 @@ impl AgentAppStores {
             checkpoint: Some(Arc::new(bundle.checkpoints())),
             event_archive: Some(Arc::new(bundle.event_archive())),
             agent_pool: Some(Arc::new(bundle.agent_pool())),
+            tool_execution: None,
         }
     }
 }

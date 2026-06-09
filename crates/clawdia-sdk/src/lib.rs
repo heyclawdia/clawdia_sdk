@@ -80,11 +80,26 @@ pub mod eval {
 }
 
 /// Durable store adapter namespace.
-#[cfg(any(feature = "file-store", feature = "supabase-store"))]
+#[cfg(any(
+    feature = "file-store",
+    feature = "sqlite-store",
+    feature = "postgres-store",
+    feature = "supabase-store"
+))]
 pub mod stores {
     #[cfg(feature = "file-store")]
     pub mod file {
         pub use agent_sdk_store_file::*;
+    }
+
+    #[cfg(feature = "sqlite-store")]
+    pub mod sqlite {
+        pub use agent_sdk_store_sqlite::*;
+    }
+
+    #[cfg(feature = "postgres-store")]
+    pub mod postgres {
+        pub use agent_sdk_store_postgres::*;
     }
 
     #[cfg(feature = "supabase-store")]
@@ -95,7 +110,21 @@ pub mod stores {
     #[cfg(feature = "file-store")]
     pub use file::{
         FileAgentPoolStore, FileCheckpointStore, FileContentStore, FileEventArchive,
-        FileProviderArgumentStore, FileRunJournal, FileStoreBundle,
+        FileProviderArgumentStore, FileRunJournal, FileStoreBundle, FileToolExecutionStore,
+    };
+
+    #[cfg(feature = "sqlite-store")]
+    pub use sqlite::{
+        SqliteAgentPoolStore, SqliteCheckpointStore, SqliteContentStore, SqliteEventArchive,
+        SqliteProviderArgumentStore, SqliteRunJournal, SqliteStoreBundle, SqliteToolExecutionStore,
+    };
+
+    #[cfg(feature = "postgres-store")]
+    pub use postgres::{
+        PostgresAgentPoolStore, PostgresCheckpointStore, PostgresContentStore,
+        PostgresEventArchive, PostgresProviderArgumentStore, PostgresRunJournal,
+        PostgresSqlRequest, PostgresSqlResponse, PostgresSqlTransport, PostgresStoreBundle,
+        PostgresStoreClient, PostgresStoreConfig, PostgresToolExecutionStore,
     };
 
     #[cfg(feature = "supabase-store")]

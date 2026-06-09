@@ -32,6 +32,7 @@ pub fn tool_snapshot(
         capability_id: CapabilityId::new(capability_id),
         canonical_tool_name: CanonicalToolName::new(tool_name),
         namespace: CapabilityNamespace::new(format!("tool.{tool_name}")),
+        description: None,
         schema_ref: agent_sdk_core::PackageSidecarRef::new(schema_id, "tool_schema", "v1"),
         redacted_schema: None,
         executor_ref: ExecutorRef::new(executor_ref),

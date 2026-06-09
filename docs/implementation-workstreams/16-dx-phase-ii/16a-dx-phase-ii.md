@@ -52,6 +52,7 @@ Default writable scope:
 - `docs/plans/2026-06-08-rust-sdk-dx-phase-ii-plan.md`
 - `docs/reference/dx-upgrade-risk-watchpoints.md`
 - `docs/reference/facade-crate-proposal.md`
+- `docs/reference/persistence-ownership-map.md`
 - `docs/implementation-workstreams/README.md`
 - `docs/implementation-workstreams/16-dx-phase-ii/**`
 - `crates/clawdia-sdk/**`
@@ -70,11 +71,25 @@ Escalation-only diagnostic gap scope:
 - `crates/agent-sdk-eval/tests/**`
 - `crates/agent-sdk-macros/**`
 - `crates/agent-sdk-store-file/**`
+- `crates/agent-sdk-store-sqlite/**`
+- `crates/agent-sdk-store-postgres/**`
 - `crates/agent-sdk-store-supabase/**`
+- `crates/agent-sdk-provider/**`
 
 Do not edit escalation-only paths unless the handoff names the diagnostic or
 contract gap, explains why the default facade/examples/docs scope is
 insufficient, and adds or updates a targeted test for that gap.
+
+Current addendum escalation:
+
+- Provider/tool description projection may touch `agent-sdk-core` package,
+  provider, and tool-port DTOs plus `agent-sdk-provider` request projection
+  tests because the requested `FunctionTool::builder(...).description(...)`
+  must not become cosmetic metadata that disappears before provider projection.
+- SQLite and Postgres-style store crates may be added in this launch only for
+  the explicit persistence-backend mapping requested in the Phase II plan. They
+  must use deterministic local/scripted tests, keep live provisioning
+  host-owned, and keep `ToolExecutionStore` subordinate to journal truth.
 
 ## Must Deliver
 
@@ -127,6 +142,8 @@ insufficient, and adds or updates a targeted test for that gap.
 - `cargo test -p agent-sdk-toolkit --all-features`
 - `cargo test -p agent-sdk-eval`
 - `cargo test -p agent-sdk-store-file`
+- `cargo test -p agent-sdk-store-sqlite`
+- `cargo test -p agent-sdk-store-postgres`
 - `cargo test -p agent-sdk-store-supabase --all-features`
 - `cargo test --workspace --all-features`
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`

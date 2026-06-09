@@ -23,6 +23,7 @@ fn openai_compatible_responses_request_projects_provider_tools() {
     assert_eq!(wire.tools.len(), 1);
     assert_eq!(wire.tools[0].kind, "function");
     assert_eq!(wire.tools[0].name, "workspace_read");
+    assert_eq!(wire.tools[0].description, "Read a file from the workspace");
     assert_eq!(
         wire.tools[0].parameters["x-agent-sdk-schema-ref"],
         "schema.workspace_read"
@@ -73,6 +74,10 @@ fn openai_live_adapter_projects_provider_tools() {
     assert_eq!(requests[0].body["tools"][0]["type"], "function");
     assert_eq!(requests[0].body["tools"][0]["name"], "workspace_read");
     assert_eq!(
+        requests[0].body["tools"][0]["description"],
+        "Read a file from the workspace"
+    );
+    assert_eq!(
         requests[0].body["tools"][0]["parameters"]["x-agent-sdk-schema-ref"],
         "schema.workspace_read"
     );
@@ -97,6 +102,10 @@ fn anthropic_adapter_projects_provider_tools() {
 
     let requests = transport.requests();
     assert_eq!(requests[0].body["tools"][0]["name"], "workspace_read");
+    assert_eq!(
+        requests[0].body["tools"][0]["description"],
+        "Read a file from the workspace"
+    );
     assert_eq!(
         requests[0].body["tools"][0]["input_schema"]["x-agent-sdk-schema-ref"],
         "schema.workspace_read"
@@ -125,6 +134,10 @@ fn gemini_adapter_projects_provider_tools() {
     assert_eq!(
         requests[0].body["tools"][0]["functionDeclarations"][0]["name"],
         "workspace_read"
+    );
+    assert_eq!(
+        requests[0].body["tools"][0]["functionDeclarations"][0]["description"],
+        "Read a file from the workspace"
     );
     assert_eq!(
         requests[0].body["tools"][0]["functionDeclarations"][0]["parameters"]["x-agent-sdk-schema-ref"],
@@ -197,4 +210,5 @@ fn workspace_read_tool_spec() -> ProviderToolSpec {
             "policy.approval.workspace_read",
         )],
     )
+    .with_description("Read a file from the workspace")
 }

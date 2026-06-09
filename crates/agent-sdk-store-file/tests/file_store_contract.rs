@@ -6,13 +6,15 @@ use std::{
 
 use agent_sdk_core::{
     AdapterRef, AgentError, AgentId, AgentPoolMember, AgentPoolMessagePolicy, AgentPoolStore,
-    AgentPoolStoreConfig, CanonicalToolName, CheckpointStore, ContentId, ContentKind,
-    ContentResolutionPolicy, ContentResolveRequest, ContentResolver, ContentScope, ContentStore,
-    ContentVersion, DestinationKind, DestinationRef, EffectId, EffectIntent, EffectKind,
-    EntityKind, EntityRef, EventArchive, EventEnvelope, EventFamily, EventFrame, EventId,
-    EventKind, IdempotencyKey, JournalRecord, JournalRecordBase, MessageId, MessageReceipt,
-    MessageStatus, PolicyKind, PolicyRef, PrivacyClass, ProviderArgumentStore, RunAddress,
-    RunCheckpoint, RunId, RunJournal, RunJournalReader, RunMessage, SourceKind, SourceRef, TraceId,
+    AgentPoolStoreConfig, CanonicalToolName, CapabilityId, CapabilityNamespace, CheckpointStore,
+    ContentId, ContentKind, ContentResolutionPolicy, ContentResolveRequest, ContentResolver,
+    ContentScope, ContentStore, ContentVersion, DestinationKind, DestinationRef, EffectId,
+    EffectIntent, EffectKind, EntityKind, EntityRef, EventArchive, EventEnvelope, EventFamily,
+    EventFrame, EventId, EventKind, ExecutorRef, IdempotencyKey, JournalCursor, JournalRecord,
+    JournalRecordBase, MessageId, MessageReceipt, MessageStatus, PackageSidecarRef, PolicyKind,
+    PolicyRef, PrivacyClass, ProviderArgumentStore, RetentionClass, RunAddress, RunCheckpoint,
+    RunId, RunJournal, RunJournalReader, RunMessage, SourceKind, SourceRef, ToolCallId,
+    ToolExecutionStore, ToolExecutionStoreRecord, TraceId,
     agent_pool::AgentPoolWakePolicy,
     content::ContentRef as StoredContentRef,
     event::{
@@ -20,10 +22,12 @@ use agent_sdk_core::{
         EventDeliverySemantics, EventStreamScope, EventTag,
     },
     ids::SpanId,
+    policy::{EffectClass, RiskClass},
+    tool_records::{ToolCallRecord, ToolCallRecordParams, tool_call_journal_record},
 };
 use agent_sdk_store_file::{
     FileAgentPoolStore, FileCheckpointStore, FileContentStore, FileEventArchive,
-    FileProviderArgumentStore, FileRunJournal, FileStoreBundle,
+    FileProviderArgumentStore, FileRunJournal, FileStoreBundle, FileToolExecutionStore,
 };
 
 #[test]
@@ -211,6 +215,78 @@ fn file_agent_pool_store_rehydrates_snapshot_and_watch_records() -> Result<(), A
 }
 
 #[test]
+fn file_tool_execution_store_projects_journaled_tool_records() -> Result<(), AgentError> {
+    let root = temp_root("tool-execution");
+    let store = FileToolExecutionStore::new(&root);
+    let journal_record = tool_journal_record(2, "journal.tool.file.2");
+    let projection = ToolExecutionStoreRecord::from_journal_record(
+        &journal_record,
+        Some(JournalCursor::new("journal.2")),
+    )
+    .expect("tool projection");
+
+    let cursor = store.put_tool_execution_record(projection.clone())?;
+    assert_eq!(cursor.sequence, 1);
+
+    let run_records = store.records_for_run(&RunId::new("run.file.store"))?;
+    assert_eq!(run_records, vec![projection.clone()]);
+    assert_eq!(
+        store
+            .record_for_tool_call(
+                &RunId::new("run.file.store"),
+                &ToolCallId::new("tool.call.file.store")
+            )?
+            .expect("tool call record"),
+        projection.clone()
+    );
+    assert_eq!(
+        store
+            .records_for_idempotency_key(&IdempotencyKey::new("idem.file.store.tool"))?
+            .len(),
+        1
+    );
+    assert_eq!(
+        store
+            .records_for_effect_id(&EffectId::new("effect.file.store.tool"))?
+            .len(),
+        1
+    );
+    assert_eq!(
+        store
+            .records_after_journal_seq(&RunId::new("run.file.store"), 1)?
+            .len(),
+        1
+    );
+    assert!(
+        store
+            .records_after_journal_seq(&RunId::new("run.file.store"), 2)?
+            .is_empty()
+    );
+    assert_eq!(
+        store
+            .records_in_journal_cursor_range(
+                &RunId::new("run.file.store"),
+                Some(&JournalCursor::new("journal.1")),
+                Some(&JournalCursor::new("journal.2")),
+            )?
+            .len(),
+        1
+    );
+    assert!(
+        store
+            .records_in_journal_cursor_range(
+                &RunId::new("run.file.store"),
+                Some(&JournalCursor::new("journal.2")),
+                None,
+            )?
+            .is_empty()
+    );
+
+    drop(fs::remove_dir_all(root));
+    Ok(())
+}
+
+#[test]
 fn file_store_bundle_uses_one_root_for_all_adapters() {
     let root = temp_root("bundle");
     let bundle = FileStoreBundle::new(&root);
@@ -221,6 +297,7 @@ fn file_store_bundle_uses_one_root_for_all_adapters() {
     let _archive = bundle.event_archive();
     let _provider_arguments = bundle.provider_arguments();
     let _agent_pool = bundle.agent_pool();
+    let _tool_execution = bundle.tool_execution();
     drop(fs::remove_dir_all(root));
 }
 
@@ -247,6 +324,63 @@ fn journal_record(journal_seq: u64, record_id: &str) -> JournalRecord {
     );
     base.timestamp_millis = 1_780_000_000_000 + journal_seq;
     JournalRecord::effect_intent(base, intent)
+}
+
+fn tool_journal_record(journal_seq: u64, record_id: &str) -> JournalRecord {
+    let effect_id = EffectId::new("effect.file.store.tool");
+    let mut intent = EffectIntent::new(
+        effect_id,
+        EffectKind::ToolExecution,
+        EntityRef::new(EntityKind::ToolCall, "tool.call.file.store"),
+        SourceRef::with_kind(SourceKind::Sdk, "source.file.store"),
+        "execute file store test tool",
+    );
+    intent.destination = Some(DestinationRef::with_kind(
+        DestinationKind::Tool,
+        "destination.file.store.tool",
+    ));
+    intent.idempotency_key = Some(IdempotencyKey::new("idem.file.store.tool"));
+
+    let record = ToolCallRecord::requested(ToolCallRecordParams {
+        tool_call_id: ToolCallId::new("tool.call.file.store"),
+        run_id: RunId::new("run.file.store"),
+        turn_id: None,
+        capability_id: CapabilityId::new("cap.file.store.workspace_read"),
+        canonical_tool_name: CanonicalToolName::new("workspace_read"),
+        namespace: CapabilityNamespace::new("tool.workspace_read"),
+        source: SourceRef::with_kind(SourceKind::Sdk, "source.file.store"),
+        destination: DestinationRef::with_kind(
+            DestinationKind::Tool,
+            "destination.file.store.tool",
+        ),
+        executor_ref: Some(ExecutorRef::new("executor.workspace_read.v1")),
+        policy_refs: vec![policy_ref()],
+        sidecar_refs: vec![PackageSidecarRef::new(
+            "schema.workspace_read.v1",
+            "json_schema",
+            "v1",
+        )],
+        effect_class: EffectClass::Read,
+        risk_class: RiskClass::Low,
+        privacy: PrivacyClass::ContentRefsOnly,
+        retention: RetentionClass::Durable,
+        requested_args_refs: vec![agent_sdk_core::domain::ContentRef::new(
+            "content.args.file.store",
+        )],
+        redacted_args_summary: "read README".to_string(),
+        idempotency_key: Some(IdempotencyKey::new("idem.file.store.tool")),
+    })
+    .with_intent(intent);
+
+    let mut base = JournalRecordBase::new(
+        journal_seq,
+        record_id,
+        RunId::new("run.file.store"),
+        AgentId::new("agent.file.store"),
+        SourceRef::with_kind(SourceKind::Sdk, "source.file.store"),
+    );
+    base.timestamp_millis = 1_780_000_000_000 + journal_seq;
+    tool_call_journal_record(base, record, "tool_intent_recorded")
 }
 
 fn stored_content_ref() -> StoredContentRef {

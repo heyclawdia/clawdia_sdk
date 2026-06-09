@@ -425,6 +425,86 @@ fn agent_app_read_helpers_keep_observation_archive_journal_report_and_checkpoint
     drop(std::fs::remove_dir_all(root));
 }
 
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+#[test]
+fn agent_app_builder_lowers_function_tool_into_canonical_runtime_path() {
+    let root = temp_file_store_root("function-tool-builder");
+    let stores = AgentAppStores::file(&root);
+    let args_ref = stores
+        .provider_arguments
+        .store_provider_arguments(
+            "provider.facade.builder",
+            "tool.call.facade.builder",
+            &clawdia_sdk::core::CanonicalToolName::new("workspace_read"),
+            r#"{"path":"README.md"}"#,
+        )
+        .expect("provider args store")
+        .expect("provider args ref");
+    let tool = clawdia_sdk::tools::FunctionTool::builder("workspace_read")
+        .description("Read a file from the workspace")
+        .input_schema(<BuilderReadInput as clawdia_sdk::tools::ToolArgs>::schema())
+        .executor(builder_read_file)
+        .build()
+        .expect("function tool builds");
+    let agent = Agent::builder()
+        .id(AgentId::new("agent.facade.builder"))
+        .name("facade builder")
+        .build()
+        .expect("agent builds");
+    let event_bus = clawdia_sdk::core::InMemoryAgentEventBus::default();
+    let app = AgentApp::builder(agent)
+        .provider("provider.fake", BuilderToolLoopProvider::new(args_ref))
+        .expect("provider registers")
+        .stores(stores.clone())
+        .event_bus(event_bus.clone())
+        .policy(AllowFacadePolicy)
+        .tool_policy(clawdia_sdk::core::AllowToolPolicy)
+        .typed_tool(tool)
+        .expect("typed tool registers")
+        .build()
+        .expect("app builds");
+
+    let run_id = RunId::new("run.facade.builder");
+    let result = app
+        .run_typed::<BuilderSummary>(run_id.clone(), "read README and summarize")
+        .expect("typed run succeeds");
+
+    assert_eq!(result.status, RunStatus::Completed);
+    assert!(result.structured_output.is_some());
+    assert_eq!(result.output, r#"{"status":"done"}"#);
+    let evidence = app.run_evidence(&run_id).expect("run evidence");
+    assert!(evidence.live_event_frames.len() >= 2);
+    assert!(
+        event_bus
+            .subscribe_run(run_id.clone(), None)
+            .expect("event bus")
+            .next()
+            .is_some()
+    );
+    assert!(evidence.journal_records.iter().any(|record| matches!(
+        record.payload,
+        clawdia_sdk::core::JournalRecordPayload::Tool(_)
+    )));
+    let report = app
+        .run_report_from_evidence(
+            &evidence,
+            Some(&clawdia_sdk::eval::StaticRateTable::new(
+                "USD", 1_000_000, 2_000_000, 100,
+            )),
+        )
+        .expect("report from evidence");
+    assert_eq!(report.usage.tool_call_count, 1);
+    assert!(report.usage.provider_call_count >= 1);
+    assert!(report.cost.expect("cost report").total_cost_micros > 0);
+
+    drop(std::fs::remove_dir_all(root));
+}
+
 #[cfg(feature = "test-support")]
 struct AllowFacadePolicy;
 
@@ -454,4 +534,188 @@ fn temp_file_store_root(slug: &str) -> std::path::PathBuf {
         "clawdia-sdk-public-api-{slug}-{}",
         std::process::id()
     ))
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+struct BuilderReadInput {
+    path: String,
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+impl clawdia_sdk::tools::ToolArgs for BuilderReadInput {
+    const SCHEMA_ID: &'static str = "schema.facade.builder.read_input";
+    const SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 0, 0);
+
+    fn schema() -> clawdia_sdk::tools::serde_json::Value {
+        clawdia_sdk::tools::serde_json::json!({
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+                "path": { "type": "string" }
+            },
+            "additionalProperties": false
+        })
+    }
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+#[derive(Clone, serde::Serialize)]
+struct BuilderReadOutput {
+    text: String,
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+impl clawdia_sdk::tools::ToolOutput for BuilderReadOutput {
+    fn redacted_summary(&self) -> String {
+        format!("read {} bytes", self.text.len())
+    }
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+fn builder_read_file(input: BuilderReadInput) -> clawdia_sdk::tools::ToolResult<BuilderReadOutput> {
+    Ok(BuilderReadOutput {
+        text: format!("fake content for {}", input.path),
+    })
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+struct BuilderSummary {
+    status: String,
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+impl TypedOutputModel for BuilderSummary {
+    const SCHEMA_ID: &'static str = "schema.facade.builder.summary";
+    const SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 0, 0);
+
+    fn schema_ref() -> OutputSchemaRef {
+        OutputContract::inline_json_schema(
+            OutputSchemaId::new(Self::SCHEMA_ID),
+            Self::SCHEMA_VERSION,
+            clawdia_sdk::tools::serde_json::json!({
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                    "status": { "type": "string" }
+                },
+                "additionalProperties": false
+            }),
+        )
+        .schema
+    }
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+#[derive(Clone)]
+struct BuilderToolLoopProvider {
+    responses: std::sync::Arc<std::sync::Mutex<Vec<clawdia_sdk::core::ProviderResponse>>>,
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+impl BuilderToolLoopProvider {
+    fn new(args_ref: clawdia_sdk::core::domain::ContentRef) -> Self {
+        let tool_call = clawdia_sdk::core::ProviderToolCall::new(
+            clawdia_sdk::core::ToolCallId::new("tool.call.facade.builder"),
+            clawdia_sdk::core::CanonicalToolName::new("workspace_read"),
+            "read README",
+        )
+        .with_args_ref(args_ref);
+        Self {
+            responses: std::sync::Arc::new(std::sync::Mutex::new(vec![
+                clawdia_sdk::core::ProviderResponse::text(r#"{"status":"done"}"#).with_usage(
+                    clawdia_sdk::core::ProviderUsage {
+                        input_tokens: Some(8),
+                        output_tokens: Some(4),
+                        total_tokens: Some(12),
+                    },
+                ),
+                clawdia_sdk::core::ProviderResponse::tool_use([tool_call]).with_usage(
+                    clawdia_sdk::core::ProviderUsage {
+                        input_tokens: Some(5),
+                        output_tokens: Some(2),
+                        total_tokens: Some(7),
+                    },
+                ),
+            ])),
+        }
+    }
+}
+
+#[cfg(all(
+    feature = "evals",
+    feature = "file-store",
+    feature = "test-support",
+    feature = "workspace-tools"
+))]
+impl ProviderAdapter for BuilderToolLoopProvider {
+    fn capabilities(&self) -> clawdia_sdk::core::ProviderCapabilities {
+        clawdia_sdk::core::ProviderCapabilities::text_only("provider.facade.builder")
+    }
+
+    fn complete(
+        &self,
+        _request: &clawdia_sdk::core::ProviderRequest,
+    ) -> Result<clawdia_sdk::core::ProviderResponse, AgentError> {
+        self.responses
+            .lock()
+            .expect("scripted provider lock")
+            .pop()
+            .ok_or_else(|| AgentError::contract_violation("scripted provider exhausted"))
+    }
+
+    fn stream(
+        &self,
+        _request: &clawdia_sdk::core::ProviderRequest,
+    ) -> Result<Vec<clawdia_sdk::core::ProviderStreamChunk>, AgentError> {
+        Err(AgentError::host_configuration_needed(
+            "facade builder test provider is sync-only",
+        ))
+    }
 }

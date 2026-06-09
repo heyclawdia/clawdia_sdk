@@ -275,7 +275,9 @@ fn anthropic_output_config(request: &ProviderRequest) -> Option<Value> {
 fn anthropic_tool_declaration(tool: &ProviderToolSpec) -> Value {
     json!({
         "name": tool.name,
-        "description": format!("SDK tool {} governed by package policy refs", tool.name),
+        "description": tool.description.clone().unwrap_or_else(|| {
+            format!("SDK tool {} governed by package policy refs", tool.name)
+        }),
         "input_schema": tool.provider_schema(),
     })
 }

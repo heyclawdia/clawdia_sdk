@@ -11,6 +11,7 @@ pub mod content;
 pub mod event_archive;
 pub mod journal;
 pub mod provider_arguments;
+pub mod tool_execution;
 mod util;
 
 pub use agent_pool::FileAgentPoolStore;
@@ -20,3 +21,4 @@ pub use content::FileContentStore;
 pub use event_archive::FileEventArchive;
 pub use journal::FileRunJournal;
 pub use provider_arguments::FileProviderArgumentStore;
+pub use tool_execution::FileToolExecutionStore;

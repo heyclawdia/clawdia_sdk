@@ -871,8 +871,9 @@ pub use tool_pack_records::{
 };
 pub use tool_ports::{
     AllowToolPolicy, ResolvedToolCall, ToolCallRequest, ToolExecutionOutput, ToolExecutionRequest,
-    ToolExecutionStrategy, ToolExecutor, ToolExecutorRegistry, ToolPolicyPort,
-    ToolRegistrySnapshot, ToolRoute, ToolRouter, allowed_tool_policy_outcome,
+    ToolExecutionStore, ToolExecutionStoreCursor, ToolExecutionStoreRecord, ToolExecutionStrategy,
+    ToolExecutor, ToolExecutorRegistry, ToolPolicyPort, ToolRegistrySnapshot, ToolRoute,
+    ToolRouter, allowed_tool_policy_outcome,
 };
 pub use tool_records::{
     CanonicalToolName, ToolCallRecord, ToolCallRecordParams, ToolCallRecordStatus, ToolResultRef,

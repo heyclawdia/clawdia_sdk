@@ -20,9 +20,9 @@ they must be documented before release handoff.
   says so explicitly.
 - Current facade features are limited to real re-export groups and optional
   helper crates: `providers`, `workspace-tools`, `evals`, `reports`, `macros`,
-  `file-store`, `supabase-store`, `stores`, `test-support`, and `all-stable`.
-  Do not add an advertised feature for a future area until a concrete crate,
-  namespace, and test matrix exist.
+  `file-store`, `sqlite-store`, `postgres-store`, `supabase-store`, `stores`,
+  `test-support`, and `all-stable`. Do not add an advertised feature for a
+  future area until a concrete crate, namespace, and test matrix exist.
 - If the facade is published later, release notes must state that direct split
   crates remain supported and that `agent_sdk_core::prelude` is core-only.
 - `AgentAppStores` exposes separate journal write and journal read ports. Keep
@@ -48,6 +48,9 @@ they must be documented before release handoff.
   policy refs must be stable enough for runtime package fingerprints.
 - Macro-generated execution must still go through `ToolExecutionCoordinator`,
   policy, approval, effect intent/result records, journals, and events.
+- `FunctionTool::builder(...)` is now the first typed-tool authoring path. Keep
+  it proving schema, description, executor, package, provider projection,
+  journal, and output-content behavior before expanding `#[agent_tool]`.
 - Typed tools that call `require_approval()` now lower into routes with
   `requires_approval = true`. Do not infer approval dispatch from high risk or
   an approval policy ref alone; older toolkit routes may carry approval policy
@@ -77,9 +80,15 @@ they must be documented before release handoff.
 - Durable store examples need crash/replay, missing-content, redaction, cursor,
   and interrupted-effect fixtures before they are advertised as production
   ready.
-- File and Supabase stores now exist as optional crates. Keep raw provider
-  arguments out of journals/events/debug output and return content refs. Keep
-  Supabase byte storage binary-safe via base64 and schema-profile headers.
+- File, SQLite, Postgres-style, and Supabase stores now exist as optional
+  crates. Each backend must explicitly map `RunJournal`, `CheckpointStore`,
+  `ContentStore`, `EventArchive`, `AgentPoolStore`, `ToolExecutionStore`, and
+  `ProviderArgumentStore`. Keep raw provider arguments out of journals/events/
+  debug output and return content refs. Keep binary storage byte-safe via
+  base64 or native binary columns.
+- `ToolExecutionStore` is a rebuildable projection/cache over journaled tool
+  records. It must not approve tools, release executors, synthesize results, or
+  become replay truth.
 - Provider argument stores must support by-ref JSON readback for typed tool
   execution. Adding a store backend that can only write provider arguments is
   incomplete for `AgentApp::typed_tool`.
@@ -101,6 +110,9 @@ they must be documented before release handoff.
   events.
 - `AgentAppStores` now includes `journal_reader` alongside the write journal so
   facade reports can read durable evidence through a typed port.
+- `ToolRoute`, `ProviderToolSpec`, and tool-pack snapshots now carry optional
+  provider-visible descriptions. Update fixtures and provider projections when
+  public tool metadata changes.
 
 ## Phase 16 Alpha Breaking Changes
 
@@ -116,6 +128,9 @@ they must be documented before release handoff.
   truth is required.
 - Checkpoint examples now claim resume-readiness evidence only. They do not
   claim run continuation or a facade resume API.
+- `AgentAppStores` now includes optional `tool_execution` projection storage.
+  Hosts that build custom store bundles should set it when they want cached
+  tool-execution lookups, but journal records remain the source of truth.
 
 ## Example And Documentation Risks
 
@@ -130,9 +145,14 @@ they must be documented before release handoff.
   `clawdia-sdk-example-05-reporting-and-eval`.
 - The Phase 16 numbered examples now exist as workspace packages. Keep their
   commands runnable without live credentials:
+  `clawdia-sdk-example-01-live-provider-text-run`,
+  `clawdia-sdk-example-02-typed-tool-builder`,
+  `clawdia-sdk-example-06-checkpoint-resume`,
   `clawdia-sdk-example-06-typed-output-and-events`,
-  `clawdia-sdk-example-07-approval-denial`, and
-  `clawdia-sdk-example-08-checkpoint-replay`.
+  `clawdia-sdk-example-07-token-tracking-costs`,
+  `clawdia-sdk-example-07-approval-denial`,
+  `clawdia-sdk-example-08-checkpoint-replay`, and
+  `clawdia-sdk-example-10-facade-quickstart`.
 - Live-provider examples need deterministic fake or transport-injected paths for
   CI. Live credentials remain user/host-owned and must not enter runtime package
   fingerprints, journals, events, logs, or docs output.

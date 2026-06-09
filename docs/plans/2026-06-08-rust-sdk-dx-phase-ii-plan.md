@@ -50,6 +50,128 @@ Phase 15 already delivered the first DX implementation slice:
 Phase II starts from those implemented surfaces. It must not re-plan them as
 future work.
 
+## Current User-Requested Addendum
+
+This addendum scopes the next implementation pass over the Phase 16 launch
+target. The user explicitly asked for the layered SDK shape to stay intact:
+
+- `agent-sdk-core` remains the primitive kernel for runtime packages, runs,
+  journals, events, policy, checkpoints, provider ports, and output contracts.
+- Optional crates own provider, toolkit, eval, store, protocol, telemetry, and
+  workflow helpers.
+- `clawdia-sdk` remains a facade with one import path and feature-gated
+  re-exports; it must not own behavior.
+- `AgentApp` remains a first-user builder only if tests prove it lowers into
+  `Agent`, `RuntimePackage`, `AgentRuntime`, `RunRequest`, provider registry,
+  journal, event bus, policy, and output contracts.
+- Examples must be copy-paste runnable with deterministic fake paths first and
+  explicit live-provider gates where live providers are shown.
+
+The concrete requested roadmap for this pass is:
+
+- `examples/01_live_provider_text_run`
+- `examples/02_typed_tool_builder`
+- `examples/06_checkpoint_resume`
+- `examples/07_token_tracking_costs`
+- `examples/10_facade_quickstart`
+
+The pass also adds a builder-first tool authoring path before macro ergonomics:
+
+```rust
+let read_file = FunctionTool::builder("workspace_read")
+    .description("Read a file from the workspace")
+    .input_schema(ReadFileInput::schema())
+    .executor(read_file_executor)
+    .build()?;
+```
+
+That builder must lower into the existing toolkit typed-tool path, package
+sidecars, core tool routes, `ToolExecutionCoordinator`, policy, approval,
+journal records, and event frames. The existing `#[agent_tool]` macro remains a
+later convenience and must not bypass the builder-proven execution path.
+
+Exact builder contract:
+
+- `FunctionTool<A, R>` lives in `agent-sdk-toolkit::typed_tool` and is
+  re-exported through `clawdia-sdk::tools`.
+- `A` must implement `ToolArgs`; `R` must implement `ToolOutput`.
+- `.input_schema(A::schema())` accepts a provider-safe schema value and
+  normalizes it before hashing; if omitted, the builder uses `A::schema()`.
+- `.description(...)` stores provider-visible description metadata on the
+  tool-pack snapshot, tool route, and provider spec. Descriptions are metadata
+  only and do not alter executor identity, policy refs, approval behavior, or
+  package ownership.
+- `.executor(...)` accepts a typed sync executor
+  `Fn(A, TypedToolContext) -> ToolResult<R>` and lowers to the same
+  `TypedToolExecutor` used by `TypedTool::builder`.
+- `#[agent_tool]` macro tests must prove macro output lowers through
+  `FunctionTool` or through the same `TypedTool` execution path with identical
+  package, route, schema, approval, journal, and output behavior.
+
+The persistence request adds explicit backend mapping for file, SQLite, and
+Postgres-style adapters. The current repo has `agent-sdk-store-file` and
+`agent-sdk-store-supabase`; this pass should add concrete SQLite and Postgres
+adapter crates only with deterministic tests and without live provisioning.
+Each backend bundle must expose separate surfaces for:
+
+- `RunJournal`
+- `CheckpointStore`
+- `ContentStore`
+- `EventArchive`
+- `AgentPoolStore`
+- `ToolExecutionStore`
+- `ProviderArgumentStore`
+
+`ToolExecutionStore` is not a runtime truth source. It is a new optional
+projection/cache port over journaled tool records and effect lineage. The run
+journal remains durable truth for tool side effects.
+
+`ToolExecutionStore` conformance semantics:
+
+- It stores and reads `ToolCallRecord` values plus their intent/result cursors
+  for fast lookup, idempotency-key lookup, and result-cache diagnostics.
+- It is rebuildable from `RunJournalReader` records. Dropping the store cannot
+  change replay, policy, executor release, recovery, or report results.
+- It must reject attempts to store raw provider arguments or raw tool output;
+  those stay behind `ProviderArgumentStore` and `ContentStore` refs.
+- It must preserve `run_id`, `tool_call_id`, `effect_intent.effect_id`,
+  `idempotency_key`, `dedupe_key`, `policy_refs`, `requested_args_refs`,
+  `result_content_refs`, redacted summaries, terminal status, journal cursor,
+  and package/source/destination lineage.
+- It must expose stale-cache detection by comparing stored journal cursor or
+  journal sequence against the caller-supplied durable journal evidence.
+- It must not approve tools, release executors, synthesize effect results,
+  decide replay safety, or replace recovery markers.
+
+Backend conformance matrix:
+
+| Backend | Required proof | Explicit limitation |
+| --- | --- | --- |
+| File | Restart rehydrates every surface; tool execution cache can be rebuilt from journal records; missing content/provider args stay typed errors. | Local filesystem durability only; no backup/retention policy. |
+| SQLite | Local in-process migration fixtures for all seven surfaces; transaction ordering, cursor reads, idempotency lookup, and stale-cache detection. | SQLite is an optional local adapter, not a product session store. |
+| Postgres-style | Scripted SQL/transport tests for generated statements, bound parameters, row decoding, cursor reads, idempotency lookup, and stale-cache detection. | Scripted tests prove adapter contract and SQL shape only; live database provisioning, migrations, RLS, backups, and durability remain host-owned. |
+| Supabase | Existing scripted PostgREST/RPC adapter keeps coverage for the currently implemented hosted-store crate; update docs to map it as a hosted Postgres-family adapter, not as the generic `agent-sdk-store-postgres` crate. | Supabase project provisioning and RLS remain host-owned. |
+
+Requested first-developer sequence:
+
+1. `examples/10_facade_quickstart`: first documented command for the local
+   checkout path; deterministic fake provider and facade `AgentApp`.
+2. `examples/01_live_provider_text_run`: deterministic provider-injected text
+   run by default, with an explicitly gated live-provider path.
+3. `examples/02_typed_tool_builder`: builder-first typed tool authoring with
+   `FunctionTool::builder`.
+4. `examples/02_typed_tool_macro`: existing macro example, documented after
+   the builder to show macro sugar only after the execution path is proven.
+5. `examples/06_checkpoint_resume`: checkpoint/replay resume-readiness
+   evidence, not continuation.
+6. `examples/07_token_tracking_costs`: usage/cost/run report projections from
+   journal evidence and host-supplied rate policy.
+
+Existing Phase 15/16 examples with overlapping numeric prefixes remain
+regression smoke examples unless this implementation later renames them in a
+single documented pass. They must not be presented as the first-developer
+ordering when they conflict with the requested roadmap above.
+
 ## Relevant Existing Context
 
 - `AGENTS.md`: keep the SDK packet product-neutral, choose the Phase 16 launch
@@ -135,6 +257,24 @@ New behavior:
 - Phase 16 risk/watchpoints document the new evidence-helper and example
   boundaries, including what must stay true when future examples or store
   helpers are added.
+- `FunctionTool` becomes the builder-first public typed-tool authoring path in
+  `agent-sdk-toolkit` and through the `clawdia-sdk::tools` facade. It accepts
+  an explicit name, description, input schema, and typed executor, then lowers
+  into `TypedTool`, `ToolPackBundle`, `ToolRoute`, provider-visible tool specs,
+  `ToolExecutionCoordinator`, policy, journal records, and output content refs.
+- Provider-visible tool descriptions become package/provider metadata, not
+  executor behavior. Descriptions travel through tool-pack snapshots, routes,
+  provider specs, and provider adapter request projection where the provider
+  request shape supports descriptions.
+- Store backend bundles explicitly expose the seven persistence surfaces named
+  in the addendum. File-store coverage is updated for the new
+  `ToolExecutionStore`. SQLite and Postgres-style adapter crates are added only
+  with deterministic local or scripted transport tests.
+- New roadmap examples with the requested names become runnable workspace
+  packages. They may share implementation patterns with existing examples, but
+  their package names, READMEs, expected outputs, SDK-owned boundaries,
+  host-owned boundaries, and under-the-hood sections must match the requested
+  roadmap.
 
 Preserved behavior:
 
@@ -147,12 +287,18 @@ Preserved behavior:
   approval dispatch when required, effect intent/result, journals, and events.
 - Run reports remain post-hoc projections over durable records and host-owned
   cost policy.
+- Tool execution remains journal-first. Any new `ToolExecutionStore` adapter is
+  a subordinate projection/cache and cannot release executors, approve tools,
+  replace effect intent/result records, or decide replay safety.
 - Checkpoints remain accelerators; journals remain durable truth.
 - Event frames returned from live subscriptions remain live/buffered
   observation; archived frames are read through the archive reader and still do
   not replace journal truth.
 - Live credentials, store provisioning, approval UI, retention policy, backup
   policy, and product routing remain host-owned.
+- Live provider examples remain deterministic by default. Real credentials,
+  model selection, rate tables, and provider enablement remain host-owned and
+  must be gated by environment variables or explicit Cargo features.
 
 Removed behavior:
 
@@ -171,6 +317,16 @@ Tests proving behavior:
 - Deterministic example `cargo run` commands for every new example.
 - Existing core replay, event, approval, typed-output, and report tests remain
   the lower-level contract proof.
+- Toolkit tests proving `FunctionTool::builder` builds deterministic schemas,
+  carries description metadata, lowers to package sidecars and provider specs,
+  executes through `ToolExecutionCoordinator`, and stores output by content ref.
+- Core/package/provider tests proving provider-visible tool descriptions flow
+  from tool-pack snapshots to provider request bodies without changing executor
+  identity, policy refs, or runtime-package truth.
+- Store tests proving file, SQLite, and Postgres-style bundles map to
+  `RunJournal`, `CheckpointStore`, `ContentStore`, `EventArchive`,
+  `AgentPoolStore`, `ToolExecutionStore`, and `ProviderArgumentStore` without a
+  global state-store umbrella.
 
 ## Phase II Workstreams
 
@@ -186,7 +342,37 @@ Tests proving behavior:
      event subscription, report derivation, and checkpoint read behavior;
    - use deterministic fake providers, file stores, and scripted approval
      dispatchers.
-3. Example expansion:
+3. Builder-first tool authoring:
+   - add `FunctionTool` as a typed builder-first helper in
+     `agent-sdk-toolkit` and expose it through `clawdia-sdk::tools`;
+   - add description metadata to the package/provider projection path with
+     targeted core, provider, and toolkit tests;
+   - keep `#[agent_tool]` macro output lowering through the same typed-tool
+     execution path.
+4. Store backend mapping:
+   - add `ToolExecutionStore` as an optional subordinate port over tool records
+     and effect lineage, not as a runtime truth source;
+   - update `agent-sdk-store-file` to expose the seven requested surfaces;
+   - add `agent-sdk-store-sqlite` with deterministic local SQLite tests for
+     all seven surfaces;
+   - add `agent-sdk-store-postgres` as a scripted SQL/transport adapter with
+     deterministic request/response tests for all seven surfaces and no live
+     database requirement.
+5. Requested example roadmap:
+   - add `examples/10_facade_quickstart` as the first documented deterministic
+     local checkout command;
+   - add `examples/01_live_provider_text_run` for a deterministic text run
+     with an explicitly gated live-provider path;
+   - add `examples/02_typed_tool_builder` for `FunctionTool::builder` before
+     the macro;
+   - add `examples/06_checkpoint_resume` for checkpoint/replay
+     resume-readiness evidence without claiming continuation;
+   - add `examples/07_token_tracking_costs` for
+     `UsageReport`/`StaticRateTable`/`RunReport` projections from journal
+     evidence;
+   - include per-example README files with command, expected output, failure
+     modes, SDK-owned boundaries, host-owned boundaries, and "under the hood".
+6. Existing Phase 16 example expansion:
    - add `examples/06_typed_output_and_events` for `run_typed`, event frames,
      and report evidence;
    - add `examples/07_approval_denial` for fail-closed approval behavior and
@@ -196,7 +382,7 @@ Tests proving behavior:
     and checkpoint record validation;
    - include per-example README files with command, expected output, failure
      modes, SDK-owned boundaries, host-owned boundaries, and "under the hood".
-4. Feature-selection and install docs:
+7. Feature-selection and install docs:
    - add a first-30-minute section with two explicit paths:
      checkout facade path and published split-crate path;
    - add a facade feature matrix covering `default = []`,
@@ -205,21 +391,26 @@ Tests proving behavior:
      `stores`, `all-stable`, and the exact feature sets used by every example;
    - add validation for recommended feature combinations through existing
      `cargo test -p clawdia-sdk ...` gates and example `Cargo.toml` manifests.
-5. Onboarding docs:
+8. Onboarding docs:
    - update root README, `docs/start-here.md`, `crates/clawdia-sdk/README.md`,
      and `docs/examples/**` index docs so the first-developer path is one
      sequence rather than a list of disconnected examples.
-6. Narrow write scope:
+9. Narrow write scope:
    - default implementation scope is `crates/clawdia-sdk`, `examples`,
      `README.md`, `docs/start-here.md`, `docs/examples/**`,
      `docs/reference/dx-upgrade-risk-watchpoints.md`, and Phase 16 docs;
    - touch core, toolkit, eval, macros, or store crates only for a named
-     diagnostic or contract gap with a targeted test.
-7. Risk/watchpoints and phase evidence:
+     diagnostic or contract gap with a targeted test;
+   - this addendum names `crates/agent-sdk-core/**`,
+     `crates/agent-sdk-toolkit/**`, `crates/agent-sdk-store-file/**`,
+     `crates/agent-sdk-store-sqlite/**`, `crates/agent-sdk-store-postgres/**`,
+     `crates/agent-sdk-provider/**`, and `crates/clawdia-sdk/**` as the
+     current escalation/write surfaces.
+10. Risk/watchpoints and phase evidence:
    - update `docs/reference/dx-upgrade-risk-watchpoints.md` with Phase 16
      evidence-helper and example risks;
    - create the Phase 16 exit report after implementation and validation.
-8. Independent review and developer simulation:
+11. Independent review and developer simulation:
    - plan must receive explicit PASS from architecture, testability/
      observability, and developer-perspective planning agents before code
      starts;
@@ -231,8 +422,9 @@ Tests proving behavior:
 - Do not reference outside SDKs or use comparison tables.
 - Do not add product-specific host adapters, UI behavior, store provisioning,
   credential management, or live infrastructure ownership.
-- Do not add new adapter families unless a later launch doc owns the crate,
-  feature, tests, and risk notes explicitly.
+- Do not add new adapter families beyond the named file, SQLite, and
+  Postgres-style persistence scope in this addendum unless a later launch doc
+  owns the crate, feature, tests, and risk notes explicitly.
 - Do not move optional provider, toolkit, macro, store, report, or test-support
   dependencies into `agent-sdk-core`.
 - Do not create a second runtime, package registry, event stream, journal,
@@ -269,10 +461,17 @@ Tests proving behavior:
 - `cargo test -p agent-sdk-toolkit --all-features`
 - `cargo test -p agent-sdk-eval`
 - `cargo test -p agent-sdk-store-file`
+- `cargo test -p agent-sdk-store-sqlite`
+- `cargo test -p agent-sdk-store-postgres`
 - `cargo test -p agent-sdk-store-supabase --all-features`
 - `cargo test --workspace --all-features`
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - `cargo doc --workspace --all-features --no-deps`
+- `cargo run -p clawdia-sdk-example-10-facade-quickstart`
+- `cargo run -p clawdia-sdk-example-01-live-provider-text-run`
+- `cargo run -p clawdia-sdk-example-02-typed-tool-builder`
+- `cargo run -p clawdia-sdk-example-06-checkpoint-resume`
+- `cargo run -p clawdia-sdk-example-07-token-tracking-costs`
 - `cargo run -p clawdia-sdk-example-01-facade-complex-agent`
 - `cargo run -p clawdia-sdk-example-02-typed-tool-macro`
 - `cargo run -p clawdia-sdk-example-03-file-store`
@@ -320,3 +519,11 @@ The final Phase II handoff must include:
 - If future docs mention optional adapter areas, require concrete crates, tests,
   feature flags, and risk notes before advertising them in the first-developer
   path.
+- If future store backends add convenience bundles, keep every persistence
+  surface explicit. Do not merge journals, checkpoints, content, events, agent
+  pools, tool execution cache records, and provider arguments into one global
+  state store.
+- If future tool builders add more ergonomic shortcuts, preserve description
+  projection, explicit schema metadata, typed executor errors, content-ref
+  output storage, and core tool-coordinator execution tests before exposing a
+  macro-first path.

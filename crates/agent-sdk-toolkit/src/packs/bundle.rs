@@ -40,6 +40,7 @@ impl ToolkitPackBundle {
                 capability_id: tool.capability_id.clone(),
                 canonical_tool_name: tool.canonical_tool_name.clone(),
                 namespace: tool.namespace.clone(),
+                description: tool.description.clone(),
                 source: snapshot.source.clone(),
                 destination: DestinationRef::with_kind(
                     DestinationKind::Tool,

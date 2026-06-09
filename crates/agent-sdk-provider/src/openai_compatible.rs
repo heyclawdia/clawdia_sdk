@@ -346,7 +346,9 @@ impl OpenAiToolDeclaration {
         Self {
             kind: "function".to_string(),
             name: tool.name.clone(),
-            description: format!("SDK tool {} governed by package policy refs", tool.name),
+            description: tool.description.clone().unwrap_or_else(|| {
+                format!("SDK tool {} governed by package policy refs", tool.name)
+            }),
             parameters: tool.provider_schema(),
         }
     }

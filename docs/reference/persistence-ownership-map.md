@@ -15,7 +15,7 @@ otherwise.
 | Content refs | `ContentRef`, `ContentResolver`, content privacy/retention records | deterministic fake/toolkit in-memory stores for tests and examples | Optional content store adapters with redaction, retention, and hash checks | Provider-visible raw content by default or ambient filesystem access |
 | Event cursors | `AgentEventBus`, `EventCursor`, `EventArchive`, archive cursors | in-memory live bus and archive-oriented contracts | Optional event archive adapter for replay, reconnect, and UI fanout | Journal truth, telemetry truth store, or product display state |
 | Agent pool | `AgentPoolStore`, `AgentPoolStoreCursor`, pool records | `InMemoryAgentPoolStore` in core and `SqliteAgentPoolStore` in toolkit | Keep SQLite/file/network pool stores outside core | Workflow engine, scheduler, cross-pool broker, or global event archive |
-| Tool execution | `ToolExecutionCoordinator`, `ToolExecutionRequest`, `ToolExecutionOutput`, `ToolRecord`, `EffectIntent`, `EffectResult` | coordinator and deterministic executors; no separate execution store | Optional idempotency/result cache only when it replays journaled intent/result | Direct callback log, executor-owned approvals, or bypass around journal/effect records |
+| Tool execution | `ToolExecutionCoordinator`, `ToolExecutionRequest`, `ToolExecutionOutput`, `ToolRecord`, `EffectIntent`, `EffectResult` | coordinator and deterministic executors; no authoritative execution store | Optional `ToolExecutionStore` projection/cache that is rebuildable from journaled intent/result records | Direct callback log, executor-owned approvals, executor release, replay authority, or bypass around journal/effect records |
 | Provider tool arguments | `ProviderToolCall`, `ContentRef` argument refs, provider adapter contracts | `agent-sdk-provider` exposes `OpenAiToolArgumentSink` for host-owned raw argument storage | Content-store adapter or host policy layer, never provider adapter internals | Raw argument leakage into summaries, events, package fingerprints, or logs |
 
 ## Decisions
@@ -39,10 +39,39 @@ new core primitive:
 2. `agent-sdk-store-sqlite`: the same surfaces with explicit tables and
    migration fixtures, plus reuse of the existing toolkit SQLite agent-pool
    adapter if the dependency boundary stays clean.
-3. `agent-sdk-session`: a projection layer over stores, not an alternate source
+3. `agent-sdk-store-postgres`: scripted SQL/transport adapter over the same
+   surfaces. Live database provisioning, migrations, RLS, backup, and retention
+   policy remain host-owned.
+4. `agent-sdk-session`: a projection layer over stores, not an alternate source
    of truth. It should repair conversation windows and model-facing histories by
    reading journals and content refs.
 
 Each adapter needs deterministic fixtures for append ordering, cursor replay,
 checkpoint restore, missing content refs, redaction, interrupted effects, and
 crash recovery before it is advertised as durable.
+
+## Backend Surface Matrix
+
+Every durable backend bundle that is advertised for first-user or facade use
+must map surfaces explicitly instead of exposing a state-store umbrella.
+
+| Surface | File | SQLite | Postgres-style | Hosted Postgres/Supabase |
+| --- | --- | --- | --- | --- |
+| `RunJournal` | append/read journal files | append/read journal rows | scripted SQL append/read | PostgREST/RPC append/read |
+| `CheckpointStore` | checkpoint snapshots | checkpoint rows | scripted SQL checkpoint rows | PostgREST checkpoint rows |
+| `ContentStore` | content blobs by ref/hash | content rows/blobs | scripted SQL content rows | PostgREST content rows/base64 blobs |
+| `EventArchive` | event frame archive files | event frame rows/cursors | scripted SQL event rows/cursors | PostgREST event rows/cursors |
+| `AgentPoolStore` | pool state and records | pool state and records | scripted SQL pool state/records | PostgREST/RPC pool state/records |
+| `ToolExecutionStore` | rebuildable tool-record cache | rebuildable tool-record cache | scripted SQL cache rows | hosted cache rows when implemented |
+| `ProviderArgumentStore` | raw provider args behind content refs | raw provider args behind content refs | scripted SQL arg rows behind refs | PostgREST arg rows behind refs |
+
+`ToolExecutionStore` conformance is stricter than "can store a row." It must:
+
+- store redacted `ToolCallRecord` evidence plus intent/result journal cursors;
+- support lookup by run, tool call id, effect id, idempotency key, and journal
+  cursor range;
+- expose stale-cache detection against caller-supplied journal sequence or
+  cursor evidence;
+- be rebuildable from `RunJournalReader` records;
+- avoid raw provider arguments and raw tool outputs;
+- never approve, release, retry, replay, or mark recovery complete.

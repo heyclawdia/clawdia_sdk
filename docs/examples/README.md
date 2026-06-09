@@ -24,6 +24,11 @@ These packages run from the repository root without live credentials:
 
 | Command | Purpose |
 | --- | --- |
+| `cargo run -p clawdia-sdk-example-10-facade-quickstart` | Lowest-friction deterministic `AgentApp` quickstart with file stores, fake provider, run evidence, and usage report. |
+| `cargo run -p clawdia-sdk-example-02-typed-tool-builder` | Builder-first typed tool authoring with provider argument refs, core tool execution, journals, and report projection. |
+| `cargo run -p clawdia-sdk-example-01-live-provider-text-run` | Text run through `AgentApp` with OpenAI live-provider opt-in and deterministic fake fallback. |
+| `cargo run -p clawdia-sdk-example-06-checkpoint-resume` | Checkpoint accelerator plus replay reducer resume-readiness evidence. |
+| `cargo run -p clawdia-sdk-example-07-token-tracking-costs` | Journal-derived usage and cost projection with `UsageReport`, `StaticRateTable`, and `RunReport`. |
 | `cargo run -p clawdia-sdk-example-01-facade-complex-agent` | Facade assembly, typed tool approval success, event subscription, file stores, and report projection. |
 | `cargo run -p clawdia-sdk-example-02-typed-tool-macro` | Macro-authored typed tool schema and route generation. |
 | `cargo run -p clawdia-sdk-example-03-file-store` | File-backed provider-argument storage and JSON readback. |

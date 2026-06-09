@@ -277,7 +277,9 @@ fn gemini_generation_config(request: &ProviderRequest) -> Option<Value> {
 fn gemini_function_declaration(tool: &ProviderToolSpec) -> Value {
     json!({
         "name": tool.name,
-        "description": format!("SDK tool {} governed by package policy refs", tool.name),
+        "description": tool.description.clone().unwrap_or_else(|| {
+            format!("SDK tool {} governed by package policy refs", tool.name)
+        }),
         "parameters": tool.provider_schema(),
     })
 }

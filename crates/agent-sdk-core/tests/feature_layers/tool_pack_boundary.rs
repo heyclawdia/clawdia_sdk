@@ -178,6 +178,7 @@ fn external_workspace_read_pack(sidecar_id: &str) -> ToolPackSnapshot {
         capability_id: CapabilityId::new("cap.external.workspace_read"),
         canonical_tool_name: CanonicalToolName::new("workspace_read"),
         namespace: agent_sdk_core::CapabilityNamespace::new("tool.workspace_read"),
+        description: None,
         schema_ref: PackageSidecarRef::new("schema.workspace_read.v1", "tool_schema", "v1"),
         redacted_schema: None,
         executor_ref: ExecutorRef::new("executor.external.read.v1"),

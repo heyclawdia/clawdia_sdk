@@ -71,9 +71,9 @@ pub use resources::{InMemoryResourceResolver, ResourceReaderExecutor, ResourceRe
 pub use shell::{ShellExecutionPolicy, ShellExecutor, ShellRequest, ShellResult};
 pub use testing::{InMemoryJsonArgumentStore, InMemoryToolkitContentStore};
 pub use typed_tool::{
-    AsyncToolRunner, JsonToolArgumentStore, JsonToolContentStore, ToolArgs, ToolError,
-    ToolErrorKind, ToolIdentity, ToolOutput, ToolResult, ToolSchemaSnapshot, TypedTool,
-    TypedToolBuilder, TypedToolContext,
+    AsyncToolRunner, FunctionTool, FunctionToolBuilder, JsonToolArgumentStore,
+    JsonToolContentStore, ToolArgs, ToolError, ToolErrorKind, ToolIdentity, ToolOutput, ToolResult,
+    ToolSchemaSnapshot, TypedTool, TypedToolBuilder, TypedToolContext,
 };
 pub use workspace::{
     BoundedWorkspace, HashLineAnchor, SearchMatch, WorkspaceApplePhotosMetadata,

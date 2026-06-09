@@ -7,7 +7,7 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 ## Current Packet
 
 - The authoritative Agent SDK packet lives in `<repo-root>`.
-- The current checkout includes Rust crates under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, `crates/agent-sdk-provider`, `crates/agent-sdk-macros`, `crates/agent-sdk-store-file`, `crates/agent-sdk-store-supabase`, and the unpublished convenience facade `crates/clawdia-sdk`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
+- The current checkout includes Rust crates under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, `crates/agent-sdk-provider`, `crates/agent-sdk-macros`, `crates/agent-sdk-store-file`, `crates/agent-sdk-store-sqlite`, `crates/agent-sdk-store-postgres`, `crates/agent-sdk-store-supabase`, and the unpublished convenience facade `crates/clawdia-sdk`; older docs-only workstream reports are historical contract evidence, not a statement that no code exists today.
 - Product-specific host-adapter material is not part of the active SDK handoff; active examples use generic host scenarios only.
 - Normative implementation contracts live in [contracts](contracts/README.md).
 - Completed contract-packet ownership lives in [workstreams](workstreams/README.md).
@@ -18,13 +18,18 @@ It is intentionally standalone and product-neutral. The SDK should support deman
 Use the local facade path when you are inside this repository:
 
 1. Read `../crates/clawdia-sdk/README.md` for the facade feature matrix.
-2. Run `cargo run -p clawdia-sdk-example-01-facade-complex-agent`.
-3. Run `cargo run -p clawdia-sdk-example-06-typed-output-and-events` for typed
-   output, live event frames, journal evidence, and report projection.
-4. Run `cargo run -p clawdia-sdk-example-07-approval-denial` for fail-closed
-   approval evidence.
-5. Run `cargo run -p clawdia-sdk-example-08-checkpoint-replay` for checkpoint
-   accelerator and replay reducer resume-readiness evidence.
+2. Run `cargo run -p clawdia-sdk-example-10-facade-quickstart`.
+3. Run `cargo run -p clawdia-sdk-example-02-typed-tool-builder` to see the
+   builder-first tool path before the macro path.
+4. Run `cargo run -p clawdia-sdk-example-01-live-provider-text-run` for the
+   live-provider adapter shape with deterministic fake fallback.
+5. Continue with `clawdia-sdk-example-06-checkpoint-resume`,
+   `clawdia-sdk-example-07-token-tracking-costs`,
+   `clawdia-sdk-example-06-typed-output-and-events`,
+   `clawdia-sdk-example-07-approval-denial`, and
+   `clawdia-sdk-example-08-checkpoint-replay` for checkpoint accelerators,
+   journal-derived usage/cost projections, typed output, event evidence,
+   approval evidence, and replay reducer resume-readiness.
 
 Use the published split-crate path when you are outside this checkout. Start
 from `agent_sdk_core::prelude::*`, then add optional crates only for provider

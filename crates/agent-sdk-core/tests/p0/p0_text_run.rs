@@ -1301,6 +1301,7 @@ fn p0_read_tool_route() -> ToolRoute {
         capability_id: CapabilityId::new("cap.tool.read"),
         canonical_tool_name: CanonicalToolName::new("workspace_read"),
         namespace: CapabilityNamespace::new("tool.workspace_read"),
+        description: None,
         source: SourceRef::with_kind(SourceKind::Sdk, "source.sdk.toolpack"),
         destination: DestinationRef::with_kind(DestinationKind::Tool, "destination.tool.read"),
         executor_ref: Some(ExecutorRef::new("executor.workspace_read.v1")),

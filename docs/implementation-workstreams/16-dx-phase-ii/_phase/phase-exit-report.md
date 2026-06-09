@@ -2,18 +2,22 @@
 
 ## Phase Objective
 
-Phase 16 turned the Phase 15 DX surfaces into a clearer first-developer path
-without adding a second runtime or moving optional dependencies into core:
+Phase 16 keeps the SDK's primitive kernel intact while making the first
+developer path substantially shorter:
 
-- read-side `AgentApp` helpers for live events, durable journal records,
-  archived events, checkpoints, and report projection;
-- deterministic examples for typed output/events, approval denial, and
-  checkpoint/replay resume-readiness;
-- README, Start Here, facade README, and example index updates for local
-  checkout facade usage versus published split-crate usage;
-- risk/watchpoint updates for evidence-helper boundaries and checkpoint wording;
-- review and validation evidence for developer-friendliness, testability, and
-  observability.
+- `clawdia-sdk` remains a thin facade with feature-gated re-exports and no
+  behavior fork.
+- `AgentApp` wires canonical `Agent`, `RuntimePackage`, `AgentRuntime`,
+  `RunRequest`, provider registry, journal, event bus, policy, output, and
+  optional store ports.
+- `FunctionTool::builder(...)` proves typed tool execution before any macro
+  convenience path.
+- File, SQLite, and Postgres-style store crates explicitly map the durable
+  truth surfaces: `RunJournal`, `CheckpointStore`, `ContentStore`,
+  `EventArchive`, `AgentPoolStore`, `ToolExecutionStore`, and
+  `ProviderArgumentStore`.
+- Usage and cost examples derive from journal-backed trace evidence instead of
+  introducing a second telemetry source of truth.
 
 ## Dependency Status
 
@@ -23,26 +27,34 @@ without adding a second runtime or moving optional dependencies into core:
 - Phase 16 implementation followed
   `docs/plans/2026-06-08-rust-sdk-dx-phase-ii-plan.md` and
   `docs/implementation-workstreams/16-dx-phase-ii/16a-dx-phase-ii.md`.
+- The addendum implementation used the approved escalation scope for core
+  tool metadata, provider tool projection, toolkit typed-tool authoring, and
+  store-file/sqlite/postgres adapter contracts.
 
 ## Goal Status
 
 PASS.
 
-- Facade evidence helpers are read-only projections over configured ports.
-- `AgentAppRunEvidence` now gives developers one compact run evidence snapshot
-  while keeping live events, archived events, journal records, and checkpoints
-  in separate fields.
-- Missing durable-evidence stores return typed
-  `HostConfigurationNeeded` diagnostics instead of panics or silent success.
-- Missing optional archive/checkpoint ports return empty archive frames or no
-  checkpoint in `run_evidence`; missing `AgentAppStores` still fails with a
-  typed host-configuration diagnostic.
-- New examples run without live credentials and use fake providers, file
-  stores, scripted approval dispatch, and replay reducer validation.
-- Docs now present one first-developer path and an explicit facade feature
-  matrix.
-- Checkpoint language is limited to resume-readiness evidence; no run
-  continuation API is claimed.
+- `FunctionTool::builder("workspace_read")` lowers into `TypedTool`, package
+  sidecars, `ToolRoute`, provider tool specs, policy, journal, event, and
+  content-ref contracts.
+- `ToolExecutionStore` is a rebuildable projection over journaled
+  `ToolCallRecord` evidence, with run, tool-call, effect-id, idempotency-key,
+  journal-sequence, and journal-cursor-range reads.
+- `agent-sdk-store-file`, `agent-sdk-store-sqlite`, and
+  `agent-sdk-store-postgres` implement every requested durable surface.
+- `agent-sdk-store-sqlite` owns its SQLite `AgentPoolStore` adapter directly;
+  the `clawdia-sdk/sqlite-store` feature does not pull toolkit/provider/eval/
+  macro dependencies.
+- The requested examples are workspace packages and run without credentials by
+  default:
+  `examples/10_facade_quickstart`,
+  `examples/01_live_provider_text_run`,
+  `examples/02_typed_tool_builder`,
+  `examples/06_checkpoint_resume`, and
+  `examples/07_token_tracking_costs`.
+- Example READMEs include expected output, common failures, and explicit
+  "Under The Hood" contract sections.
 
 ## Validation Evidence
 
@@ -50,167 +62,149 @@ All commands passed:
 
 ```text
 cargo fmt --check
-cargo test -p clawdia-sdk --no-default-features
-cargo test -p clawdia-sdk --all-features
-cargo test -p agent-sdk-core
-cargo test -p agent-sdk-toolkit --all-features
-cargo test -p agent-sdk-eval
 cargo test -p agent-sdk-store-file
-cargo test -p agent-sdk-store-supabase --all-features
+cargo test -p agent-sdk-store-sqlite
+cargo test -p agent-sdk-store-postgres
+cargo test -p clawdia-sdk --all-features --test public_api
 cargo test --workspace --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo doc --workspace --all-features --no-deps
-cargo tree -p agent-sdk-core
-cargo tree -p clawdia-sdk --no-default-features
-cargo tree -p clawdia-sdk --all-features
 git diff --check
 scripts/public-release-audit.sh
 ```
 
-Example outputs:
+Feature-boundary evidence:
 
 ```text
-cargo run -p clawdia-sdk-example-01-facade-complex-agent
-facade example completed; records=18; events=13; usage_total_tokens=7
+sqlite-store boundary OK: no toolkit/provider/eval/macro dependencies
+```
 
-cargo run -p clawdia-sdk-example-02-typed-tool-macro
-lookup_docs:1
+Requested example outputs:
 
-cargo run -p clawdia-sdk-example-03-file-store
-content.provider_arguments.7d6441497d2a000b8143602a "README.md"
+```text
+cargo run -p clawdia-sdk-example-10-facade-quickstart
+output=quickstart complete; status=Completed; records=10; events=8; provider_calls=1
 
-cargo run -p clawdia-sdk-example-04-supabase-scripted-store
-content.provider_arguments.7d6441497d2a000b8143602a "README.md" https://example.supabase.co/rest/v1/agent_sdk_provider_arguments
+cargo run -p clawdia-sdk-example-01-live-provider-text-run
+output=fake provider text run; status=Completed; records=10
 
-cargo run -p clawdia-sdk-example-05-reporting-and-eval
-run.example.report cost report has no provider or tool usage; scope elapsed time is unavailable from durable timestamps; usage report has no journal records
+cargo run -p clawdia-sdk-example-02-typed-tool-builder
+output=typed tool builder complete; records=16; tool_calls=1; provider_calls=2
 
-cargo run -p clawdia-sdk-example-06-typed-output-and-events
-typed_title=Review Phase 16; priority=high; validation_reports=1; events=11; records=16; report_records=16
+cargo run -p clawdia-sdk-example-06-checkpoint-resume
+output=checkpoint ready; records=11; resume_allowed=true; next_state=terminal:completed; checkpoint=checkpoint.example.resume.ready
 
-cargo run -p clawdia-sdk-example-07-approval-denial
-outcome=closed:PolicyDenial; message=tool call tool.call.example.denied_write did not complete before provider continuation; approval_denials=1; tool_records=0; events=8; report_records=12
-
-cargo run -p clawdia-sdk-example-08-checkpoint-replay
-output=checkpoint evidence ready; records=11; resume_allowed=true; replay_seq=11; next_loop_state=terminal:completed; checkpoint=checkpoint.example.ready
+cargo run -p clawdia-sdk-example-07-token-tracking-costs
+output=cost evidence ready; records=10; provider_tokens=6; input_tokens=3; output_tokens=3; cost_micros=9
 ```
 
 ## Source Audit
 
 Mandatory layout audit passed.
 
-- `crates/agent-sdk-core/src` has no stray top-level implementation files
-  beyond `lib.rs` and existing responsibility folders.
-- Root `crates/agent-sdk-core/tests/*.rs` files remain two-line Cargo shims;
-  full test bodies live under responsibility folders.
-- Optional crate `src/lib.rs` files remain narrow facades relative to their
-  responsibility modules.
-- Public fakes and scripted helpers remain under `agent_sdk_core::testing`.
-- `crates/agent-sdk-core/src/records` contains no adapter, resolver, fake, or
-  scripted behavior.
-- `cargo tree -p agent-sdk-core` remains limited to serde, serde_json, sha2,
-  and thiserror families. `clawdia-sdk --no-default-features` pulls only core
-  plus dev-only serde.
+- `agent-sdk-core` stays dependency-light; no provider, toolkit, macro, store,
+  report, UI, live infrastructure, or product-adapter dependency moved into
+  core.
+- Core tool-port changes are DTO/trait contract changes only; they do not add
+  built-in tool behavior.
+- Optional store crates keep behavior in responsibility modules. `mod.rs` /
+  `lib.rs` surfaces remain facades with declarations and re-exports.
+- The Postgres-style store crate is a scripted host-owned SQL transport
+  adapter, not a live database client.
+- Raw provider arguments and raw content remain behind `ProviderArgumentStore`
+  and `ContentStore`; `ToolExecutionStore` stores redacted tool evidence only.
 
 ## Primitive-Lowering Evidence
 
-- `AgentApp::run_text` and `run_typed` still lower into `RunRequest` and the
-  canonical `AgentRuntime` path.
-- `event_frames_for_run` collects the runtime event bus stream through
-  `subscribe_run`; it does not read or mutate durable stores.
-- `journal_records_for_run` reads through `RunJournalReader`.
-- `archived_event_frames` reads through `EventArchiveReader` when configured.
-- `latest_checkpoint` reads through `CheckpointStore`.
-- `run_report_from_stores` derives `RunReport` from durable journal records.
-- `run_evidence` collects live frames through `subscribe_run`, durable records
-  through `RunJournalReader`, run-filtered archive frames through the optional
-  `EventArchiveReader`, and optional checkpoints through `CheckpointStore`.
-- `run_report_from_evidence` derives `RunReport` from the evidence snapshot's
-  durable journal records only.
-- Approval denial in example 07 goes through the toolkit typed tool route,
-  approval dispatcher, core approval records, journal/event evidence, and
-  fail-closed policy behavior before executor release.
-- Checkpoint example 08 uses the run journal sequence as evidence, writes the
-  checkpoint accelerator through `CheckpointStore`, appends a checkpoint
-  journal record, reads that record back through `RunJournalReader`, and
-  validates the durable checkpoint record through `ReplayReducer`.
+- `AgentApp::run_text` and typed-tool examples still call the canonical
+  `AgentRuntime` path.
+- `AgentApp` stores are optional read/write ports. Missing required evidence
+  ports return typed host-configuration diagnostics.
+- `FunctionTool` has no private executor path. It builds `TypedTool`, which
+  registers through the same toolkit package and core coordinator path used by
+  existing typed tools.
+- Tool descriptions are projected from toolkit builder metadata through core
+  `ToolRoute` and provider `ProviderToolSpec` into OpenAI-compatible,
+  Anthropic, and Gemini request tests.
+- Checkpoint example 06 writes checkpoint evidence, appends a checkpoint
+  journal record, rereads the durable record through `RunJournalReader`, and
+  feeds that durable record into `ReplayReducer`.
+- Token/cost example 07 derives `UsageReport` and `RunReport` from a
+  journal-backed `RunTrace`; the rate table remains host-owned.
 
 ## Host-Owned Boundaries
 
-- Provider credentials, live provider routing, schema authoring policy, prompt
-  copy, approval UI, actor identity, workspace authorization, store
-  provisioning, retention/backups, and real resume execution remain host-owned.
-- Examples use deterministic fake providers, file stores, and scripted
-  approval dispatch; no live credentials or hosted provisioning are required.
-- Reports remain post-hoc projections over supplied evidence and optional
-  host-owned cost policy.
+- Provider credentials, live provider routing, endpoint/network access,
+  billing, prompt copy, approval UI, actor identity, workspace authorization,
+  migrations, hosted database provisioning, retention, backups, dashboards, and
+  production retry policy remain host-owned.
+- Live provider example 01 has a deterministic fake default path. The OpenAI
+  path is explicitly gated by `OPENAI_API_KEY`.
+- Postgres store tests use a scripted SQL transport and prove statement/param
+  shape without claiming database provisioning.
+- SQLite/file stores are local adapter implementations, not product session
+  stores or global runtime state.
 
 ## Review Results
 
-- Planning review before implementation: architecture PASS, testability/
-  observability PASS, and developer-perspective PASS.
-- Implementation review agent `019ea586-09f8-71a0-9dd2-b0ac2f29fe01`:
-  initial BLOCK on checkpoint durable replay evidence and pending report
-  status; fixed by appending, rereading, and replaying the durable checkpoint
-  record plus updating this report; focused re-review PASS.
-- First-developer simulation agent `019ea586-504d-7872-b3e8-7d12e2f975e7`:
-  initial BLOCK on the same checkpoint durable replay evidence; fixed and
-  focused re-review PASS.
-- Second-pass DX E2E follow-up plan review:
-  developer-experience initial BLOCK on a validation-command typo, fixed and
-  re-reviewed PASS; architecture/testability initial BLOCK on shortened
-  validation scope, missing optional-port tests, and broad docs scope, fixed and
-  re-reviewed PASS.
-- Second-pass implementation review:
-  developer-experience reviewer `019ea667-db9d-7a61-b851-7164ce89d619`
-  returned PASS with no blocking findings; architecture/testability reviewer
-  `019ea667-bd32-7a90-9915-3e0c02eef5d2` returned PASS with no blocking
-  findings. The non-blocking public API note was addressed by marking
-  `AgentAppRunEvidence` `#[non_exhaustive]`.
+- Planning review before implementation: Socrates returned PASS after plan
+  fixes; Galileo returned PASS after plan fixes.
+- First implementation/DX review: Averroes returned BLOCK on tool approval
+  docs, checkpoint replay evidence, README under-the-hood guidance, and example
+  ordering. The issues were fixed.
+- Architecture/testability review: Dewey returned BLOCK on missing
+  `ToolExecutionStore` effect-id and cursor-range reads, the SQLite store
+  crate's toolkit dependency, and missing explicit README "Under The Hood"
+  headings. The issues were fixed.
+- Final architecture/testability re-review: Dewey returned BLOCK on invalid
+  Postgres `on conflict do update` SQL shape in the new scripted store
+  adapter. The upserts were fixed with explicit conflict targets and `SET`
+  clauses, regression assertions were added, and Dewey returned PASS.
+- Final developer-experience re-review: Averroes returned PASS and
+  independently reran all five requested examples with deterministic outputs.
 
 ## Accepted Proposals
 
-- Add read-side facade helpers over existing evidence ports.
-- Add `AgentAppRunEvidence` and `run_report_from_evidence` so examples and e2e
-  tests can collect common evidence without hand-stitching every read helper.
-- Add credential-free examples 06-08 with per-example README evidence.
-- Document local checkout facade usage separately from published split-crate
-  usage.
-- Add a feature matrix for the current real facade features.
-- Tighten risk docs around live events, event archives, journals, checkpoints,
-  and reports as separate evidence surfaces.
+- Add the local checkout `clawdia-sdk` facade quickstart as the fastest entry
+  point while keeping split crates authoritative.
+- Add `FunctionTool::builder(...)` before macro ergonomics.
+- Add `ToolExecutionStore` as a rebuildable subordinate projection over
+  journaled tool records.
+- Add SQLite and Postgres-style store crates with the explicit durable-surface
+  map requested by the user.
+- Add deterministic fake-first examples with optional live-provider gates.
 
 ## Rejected Proposals
 
 - Adding a facade-owned runtime, package registry, event stream, journal,
   policy path, tool executor, telemetry truth store, session store, or approval
   UI.
-- Moving provider, toolkit, macro, store, report, UI, live infrastructure, or
-  product-adapter dependencies into `agent-sdk-core`.
-- Claiming checkpoint/replay examples provide run continuation.
-- Adding external SDK comparisons or unrelated package-family guidance.
+- Moving optional provider, toolkit, macro, store, report, UI, live
+  infrastructure, or product-adapter dependencies into `agent-sdk-core`.
+- Making `ToolExecutionStore` authoritative for replay, approvals, executor
+  release, retries, or recovery completion.
+- Claiming hosted Postgres provisioning or live credentials are SDK-owned.
 
 ## Deferred Work
 
-- Actual run-continuation resume API and tests.
+- Attribute macro sugar beyond the existing `#[agent_tool]` path.
+- Actual run-continuation resume API.
 - Published facade release decision.
-- Live-provider or live-store examples behind explicit live gates.
-- Additional adapter families beyond the current implemented crates.
+- Additional live-store examples behind explicit live gates.
 
 ## Shared Contract Changes
 
-- `AgentApp` now stores its optional `AgentAppStores` bundle so read-side
-  helpers can access configured evidence ports and return host-configuration
-  diagnostics when missing.
-- `AgentAppRunEvidence` is now re-exported from `clawdia_sdk` and the prelude
-  as a `#[non_exhaustive]` facade DTO. It is a read-side convenience type, not
-  a new primitive or durable trace store.
-- The first-developer docs now treat `clawdia-sdk` as a local checkout facade
-  while split crates remain the published-alpha install path.
+- `ToolRoute`, `ProviderToolSpec`, provider adapters, and toolkit builders now
+  preserve tool descriptions across the projection path.
+- `ToolExecutionStore` gained effect-id and journal-cursor-range reads.
+- `agent-sdk-store-sqlite` now owns its SQLite `AgentPoolStore` implementation
+  instead of re-exporting toolkit.
+- `AgentAppStores` carries optional `tool_execution` as a rebuildable
+  projection port.
 
 These alpha changes are documented in
 `docs/reference/dx-upgrade-risk-watchpoints.md`.
 
 ## Unresolved Risks
 
-No unresolved Phase 16 implementation blockers.
+No unresolved implementation blockers.

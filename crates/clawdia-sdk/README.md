@@ -11,6 +11,8 @@ The facade is intentionally thin:
 - `clawdia_sdk::providers` is available with the `providers` feature.
 - `clawdia_sdk::tools` is available with the `workspace-tools` feature.
 - `clawdia_sdk::eval` is available with the `evals` feature.
+- `clawdia_sdk::stores` exposes optional file, SQLite, Postgres-style, and
+  Supabase store adapters behind their feature flags.
 - `clawdia_sdk::testing` is available with the `test-support` feature.
 
 It does not own provider credentials, runtime policy, package resolution,
@@ -50,9 +52,11 @@ clawdia-sdk = {
 | `macros` | You want derive/attribute helpers for typed tools. | `workspace-tools`, `agent-sdk-macros` |
 | `evals` | You need post-hoc trace, usage, cost, or run reports. | `agent-sdk-eval` |
 | `reports` | Alias for report-focused users. | `evals` |
-| `file-store` | You need local file-backed journal/content/provider-argument/checkpoint/event store adapters. | `agent-sdk-store-file` |
+| `file-store` | You need local file-backed journal/content/provider-argument/checkpoint/event/agent-pool/tool-execution adapters. | `agent-sdk-store-file` |
+| `sqlite-store` | You need SQLite-backed durable store adapters. | `agent-sdk-store-sqlite` |
+| `postgres-store` | You need Postgres-style durable store adapters over host-owned SQL transport. | `agent-sdk-store-postgres` |
 | `supabase-store` | You need the Supabase store adapter types. | `agent-sdk-store-supabase` |
-| `stores` | You need both current store adapter families. | `file-store`, `supabase-store` |
+| `stores` | You need all current store adapter families. | `file-store`, `sqlite-store`, `postgres-store`, `supabase-store` |
 | `test-support` | You need deterministic fakes or scripted dispatchers in examples/tests. | `agent-sdk-core/test-support` |
 | `all-stable` | You are testing every current facade surface. | Current provider, toolkit, eval, macro, and store features |
 
@@ -74,17 +78,24 @@ clawdia-sdk = { path = "crates/clawdia-sdk", features = ["macros"] }
 From the repository root:
 
 ```sh
-cargo run -p clawdia-sdk-example-01-facade-complex-agent
+cargo run -p clawdia-sdk-example-10-facade-quickstart
+cargo run -p clawdia-sdk-example-02-typed-tool-builder
+cargo run -p clawdia-sdk-example-01-live-provider-text-run
+cargo run -p clawdia-sdk-example-06-checkpoint-resume
+cargo run -p clawdia-sdk-example-07-token-tracking-costs
 cargo run -p clawdia-sdk-example-06-typed-output-and-events
 cargo run -p clawdia-sdk-example-07-approval-denial
 cargo run -p clawdia-sdk-example-08-checkpoint-replay
+cargo run -p clawdia-sdk-example-01-facade-complex-agent
 ```
 
 These commands require no live credentials. They use fake providers, local file
 stores, and scripted approval dispatchers so tests and examples stay
 deterministic.
 
-## Canonical Lowering
+## Under The Hood
+
+### Canonical Lowering
 
 The facade adds import convenience only. Calls still go through the same
 canonical core types:
@@ -125,3 +136,5 @@ fn main() -> Result<(), AgentError> {
   is enabled.
 - `run_report_from_evidence` derives reports from the snapshot's journal
   records when `evals` is enabled.
+- `AgentAppStores` carries `tool_execution` as an optional rebuildable
+  projection port. It does not replace the run journal as durable truth.

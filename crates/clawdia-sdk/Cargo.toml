@@ -18,8 +18,10 @@ evals = ["dep:agent-sdk-eval"]
 reports = ["evals"]
 macros = ["dep:agent-sdk-macros", "workspace-tools"]
 file-store = ["dep:agent-sdk-store-file"]
+sqlite-store = ["dep:agent-sdk-store-sqlite"]
+postgres-store = ["dep:agent-sdk-store-postgres"]
 supabase-store = ["dep:agent-sdk-store-supabase"]
-stores = ["file-store", "supabase-store"]
+stores = ["file-store", "sqlite-store", "postgres-store", "supabase-store"]
 test-support = ["agent-sdk-core/test-support"]
 all-stable = [
     "providers",
@@ -27,6 +29,8 @@ all-stable = [
     "evals",
     "macros",
     "file-store",
+    "sqlite-store",
+    "postgres-store",
     "supabase-store",
 ]
 
@@ -36,6 +40,8 @@ agent-sdk-eval = { path = "../agent-sdk-eval", version = "=0.1.0-alpha.3", optio
 agent-sdk-macros = { path = "../agent-sdk-macros", version = "=0.1.0-alpha.3", optional = true }
 agent-sdk-provider = { path = "../agent-sdk-provider", version = "=0.1.0-alpha.3", optional = true, default-features = false }
 agent-sdk-store-file = { path = "../agent-sdk-store-file", version = "=0.1.0-alpha.3", optional = true, default-features = false }
+agent-sdk-store-postgres = { path = "../agent-sdk-store-postgres", version = "=0.1.0-alpha.3", optional = true, default-features = false }
+agent-sdk-store-sqlite = { path = "../agent-sdk-store-sqlite", version = "=0.1.0-alpha.3", optional = true, default-features = false }
 agent-sdk-store-supabase = { path = "../agent-sdk-store-supabase", version = "=0.1.0-alpha.3", optional = true, default-features = false }
 agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.3", optional = true, default-features = false }
 

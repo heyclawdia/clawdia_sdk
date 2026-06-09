@@ -13,6 +13,8 @@ This is a monorepo with separable Rust crates:
 - `crates/clawdia-sdk`: an unpublished local convenience facade that re-exports the split crates through one import path for checkout-based examples and onboarding.
 - `crates/agent-sdk-macros`: optional proc macros for typed tool schemas and builder helpers.
 - `crates/agent-sdk-store-file`: optional file-backed durable store adapters.
+- `crates/agent-sdk-store-sqlite`: optional SQLite-backed durable store adapters for journals, checkpoints, content, event archives, agent pools, tool-execution projections, and provider arguments.
+- `crates/agent-sdk-store-postgres`: optional Postgres-style store adapter contracts over host-owned SQL transport.
 - `crates/agent-sdk-store-supabase`: optional Supabase REST-backed durable store adapters with injectable transport tests.
 
 Keep this package boundary deliberate. New capabilities with heavy parser/runtime/provider dependencies should live in optional crates layered over `agent-sdk-core`, not as default core dependencies. Core must remain usable by hosts that only need the primitive SDK contracts.
@@ -52,6 +54,11 @@ alpha or need tighter dependency control.
 Runnable checkout smoke examples:
 
 ```sh
+cargo run -p clawdia-sdk-example-10-facade-quickstart
+cargo run -p clawdia-sdk-example-02-typed-tool-builder
+cargo run -p clawdia-sdk-example-01-live-provider-text-run
+cargo run -p clawdia-sdk-example-06-checkpoint-resume
+cargo run -p clawdia-sdk-example-07-token-tracking-costs
 cargo run -p clawdia-sdk-example-01-facade-complex-agent
 cargo run -p clawdia-sdk-example-02-typed-tool-macro
 cargo run -p clawdia-sdk-example-03-file-store
@@ -72,9 +79,14 @@ For a local checkout, start with the facade and deterministic examples:
 
 1. Add `clawdia-sdk = { path = "crates/clawdia-sdk", default-features = false }`
    to a workspace example or use the checked-in examples directly.
-2. Run `cargo run -p clawdia-sdk-example-01-facade-complex-agent`.
-3. Continue with examples 06, 07, and 08 for typed output, event evidence,
-   approval denial, report projection, and checkpoint/replay resume-readiness.
+2. Run `cargo run -p clawdia-sdk-example-10-facade-quickstart`.
+3. Run `cargo run -p clawdia-sdk-example-02-typed-tool-builder` before using
+   the macro example.
+4. Run `cargo run -p clawdia-sdk-example-01-live-provider-text-run` for the
+   live-provider adapter shape with deterministic fake fallback.
+5. Continue with examples 06, 07, and 08 for checkpoint/replay
+   resume-readiness, usage/cost projection, typed output, event evidence,
+   approval denial, and report projection.
 
 For a published alpha, depend on the split crates directly and start from
 `agent_sdk_core::prelude::*`. Add optional crates only for the features you use:
@@ -88,8 +100,9 @@ Start from a live provider and keep the canonical runtime path visible:
 2. [Typed-output quickstart](docs/examples/typed-output-quickstart.md): ergonomic typed output helper lowering into `RunRequest` plus `OutputContract`, with provider-native schema hints when the schema is inline and safe to project.
 3. [Tool-approval quickstart](docs/examples/tool-approval-quickstart.md): tool route, policy, journal intent/result, and effect records without direct callback execution.
 4. [Runnable examples](docs/examples/README.md#runnable-checkout-examples):
-   checkout packages for facade assembly, typed output, approval denial,
-   report projection, and checkpoint/replay resume-readiness.
+   checkout packages for facade quickstart, builder-first typed tools, live
+   provider fallback, typed output, approval denial, report projection, and
+   checkpoint/replay resume-readiness.
 
 For run triage and evals, use `agent-sdk-eval::TraceMetrics` or
 `agent_sdk_toolkit::AgentTraceEvaluation::compare_sessions` to compute local
@@ -185,9 +198,9 @@ For contract-packet review, use [docs/workstreams](docs/workstreams/README.md). 
 The documentation contract packet has exited final review, and the first Rust implementation handoff now lives under `crates/agent-sdk-core`, `crates/agent-sdk-eval`, `crates/agent-sdk-toolkit`, `crates/agent-sdk-provider`, and the unpublished `crates/clawdia-sdk` facade. The implementation history and release-readiness evidence live in [docs/implementation-workstreams](docs/implementation-workstreams/README.md).
 
 This checkout includes deterministic fake/test-kit support, optional toolkit
-helpers, typed tool macros, file and Supabase store adapters, eval usage/cost
-reports, and live provider adapters for OpenAI Responses, Anthropic Messages,
-and Gemini generateContent in the aggregate `agent-sdk-provider` crate. It does
-not claim concrete container/runtime, product UI, remote channel, network
-telemetry exporter, marketplace, workflow-engine, or product-specific
-host-adapter support.
+helpers, builder-first typed tools, typed tool macros, file/SQLite/Postgres-style
+and Supabase store adapters, eval usage/cost reports, and live provider adapters
+for OpenAI Responses, Anthropic Messages, and Gemini generateContent in the
+aggregate `agent-sdk-provider` crate. It does not claim concrete
+container/runtime, product UI, remote channel, network telemetry exporter,
+marketplace, workflow-engine, or product-specific host-adapter support.

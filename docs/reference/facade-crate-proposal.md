@@ -23,6 +23,12 @@ durable journal records, archived events, checkpoints, and report projections.
 Those helpers read through the configured canonical ports and return
 host-configuration diagnostics when the required stores are missing.
 
+Phase 16 also adds builder-first typed tool authoring through
+`FunctionTool::builder(...)`, store features for SQLite and Postgres-style
+adapters, and deterministic examples for facade quickstart, live-provider
+fallback, typed tool builder, checkpoint resume evidence, and journal-derived
+usage/cost reporting.
+
 ## Split Crates Only Or Convenience Facade?
 
 Keep split crates and add a convenience facade.
@@ -62,7 +68,7 @@ The facade should re-export stable, user-facing surfaces from existing crates:
 | `providers` | All current provider adapter exports when the `providers` feature is enabled. |
 | `tools` | Toolkit crate-root exports when the `workspace-tools` feature is enabled. |
 | `eval` | Evaluation crate-root exports when the `evals` feature is enabled. |
-| `stores` | File and Supabase store adapter exports when their store features are enabled. |
+| `stores` | File, SQLite, Postgres-style, and Supabase store adapter exports when their store features are enabled. |
 | `testing` | Deterministic test helpers behind an explicit `test-support` feature. |
 
 The facade should not re-export deep implementation modules as stable import
@@ -89,10 +95,12 @@ evals = ["dep:agent-sdk-eval"]
 reports = ["evals"]
 macros = ["dep:agent-sdk-macros", "workspace-tools"]
 file-store = ["dep:agent-sdk-store-file"]
+sqlite-store = ["dep:agent-sdk-store-sqlite"]
+postgres-store = ["dep:agent-sdk-store-postgres"]
 supabase-store = ["dep:agent-sdk-store-supabase"]
-stores = ["file-store", "supabase-store"]
+stores = ["file-store", "sqlite-store", "postgres-store", "supabase-store"]
 test-support = ["agent-sdk-core/test-support"]
-all-stable = ["providers", "workspace-tools", "evals", "macros", "file-store", "supabase-store"]
+all-stable = ["providers", "workspace-tools", "evals", "macros", "file-store", "sqlite-store", "postgres-store", "supabase-store"]
 ```
 
 Future features should only be added when their crates exist and have tests:
@@ -160,8 +168,10 @@ New users:
 - Use explicit current features for providers, workspace tools, evals, and
   deterministic test support.
 - Use `workspace-tools`/`macros` for typed tool helpers, `stores` for file and
-  Supabase adapters, and `reports`/`evals` for usage, cost, and run reports.
-- Use `AgentAppStores::file` or `AgentAppStores::supabase` when a facade app
+  SQLite/Postgres/Supabase adapters, and `reports`/`evals` for usage, cost,
+  and run reports.
+- Use `AgentAppStores::file`, `AgentAppStores::sqlite`,
+  `AgentAppStores::postgres`, or `AgentAppStores::supabase` when a facade app
   needs typed tools to read provider argument refs or reports to read durable
   journal evidence.
 - Treat live credentials, Supabase project provisioning, RLS policy, approval
@@ -188,7 +198,9 @@ Docs migration:
 5. Add deterministic numbered examples for facade, macros, file store,
    Supabase scripted store, and reporting/eval.
 6. Add deterministic numbered examples for typed output/events, approval
-   denial, and checkpoint/replay resume-readiness.
+   denial, checkpoint/replay resume-readiness, builder-first typed tools,
+   live-provider fallback, facade quickstart, and journal-derived usage/cost
+   projection.
 7. Run full workspace validation and public-release audit.
 8. Decide whether and when to publish the facade in release notes.
 
