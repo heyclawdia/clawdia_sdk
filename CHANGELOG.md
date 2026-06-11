@@ -4,6 +4,42 @@
 
 No unreleased changes yet.
 
+## 0.1.0-alpha.4
+
+Status: fourth public alpha crates.io release.
+
+### Added
+
+- Added deterministic facade quickstart and first-developer examples for
+  `AgentApp`, live-provider fake fallback, builder-first typed tools,
+  checkpoint resume-readiness, and journal-derived token/cost reporting.
+- Added `FunctionTool::builder(...)` in the toolkit so typed tool authoring is
+  proven through builders before macro sugar.
+- Added `agent-sdk-store-file`, `agent-sdk-store-sqlite`,
+  `agent-sdk-store-postgres`, and `agent-sdk-store-supabase` release coverage
+  for durable store adapters over `RunJournal`, `CheckpointStore`,
+  `ContentStore`, `EventArchive`, `AgentPoolStore`, `ToolExecutionStore`, and
+  `ProviderArgumentStore`.
+- Added SQLite and Postgres-style store crates to the publishable split-crate
+  family. The Postgres crate remains a scripted SQL transport contract; live
+  connection pools, migrations, RLS, backups, and provisioning are host-owned.
+
+### Changed
+
+- `ToolExecutionStore` is now an explicit rebuildable projection over
+  journaled tool records with run, tool-call, effect-id, idempotency-key,
+  journal-sequence, and journal-cursor-range reads.
+- `clawdia-sdk` remains unpublished and checkout-only. It can assemble the
+  local facade path, but crates.io users should depend on the split crates.
+- The local `agent-sdk-macros` crate remains checkout-only for this release
+  because the `agent-sdk-macros` package name is already occupied on crates.io
+  by an unrelated project.
+
+### Breaking
+
+- `ToolExecutionStore` implementers must add effect-id and journal-cursor-range
+  lookup methods.
+
 ## 0.1.0-alpha.3
 
 Status: third public alpha crates.io release.

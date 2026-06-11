@@ -32,6 +32,9 @@ Published-alpha consumers should use the split crates directly. The facade is
 for checkout-based onboarding and examples until a release decision changes
 `publish = false`.
 
+The `macros` feature is also checkout-only in this repository because the
+`agent-sdk-macros` crates.io package name is occupied by an unrelated project.
+
 Optional groups map only to crates that exist today:
 
 ```toml
@@ -49,7 +52,7 @@ clawdia-sdk = {
 | `default = []` | You want only the core facade imports and `AgentApp`. | `agent-sdk-core` |
 | `providers` | You need live provider adapter types. | `agent-sdk-provider` |
 | `workspace-tools` | You need typed tools or workspace/toolkit helpers. | `agent-sdk-toolkit` |
-| `macros` | You want derive/attribute helpers for typed tools. | `workspace-tools`, `agent-sdk-macros` |
+| `macros` | You want checkout-only derive/attribute helpers for typed tools. | `workspace-tools`, `agent-sdk-macros` |
 | `evals` | You need post-hoc trace, usage, cost, or run reports. | `agent-sdk-eval` |
 | `reports` | Alias for report-focused users. | `evals` |
 | `file-store` | You need local file-backed journal/content/provider-argument/checkpoint/event/agent-pool/tool-execution adapters. | `agent-sdk-store-file` |

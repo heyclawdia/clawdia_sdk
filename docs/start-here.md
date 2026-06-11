@@ -33,8 +33,9 @@ Use the local facade path when you are inside this repository:
 
 Use the published split-crate path when you are outside this checkout. Start
 from `agent_sdk_core::prelude::*`, then add optional crates only for provider
-adapters, toolkit helpers, eval reports, macros, or stores that your host
-actually needs.
+adapters, toolkit helpers, eval reports, or stores that your host actually
+needs. The local `agent-sdk-macros` crate is checkout-only because that
+crates.io package name is occupied by an unrelated project.
 
 ## Agent Crawl Order
 

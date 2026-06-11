@@ -74,6 +74,10 @@ jobs:
           core_version="$(crate_version agent-sdk-core)"
           eval_version="$(crate_version agent-sdk-eval)"
           provider_version="$(crate_version agent-sdk-provider)"
+          store_file_version="$(crate_version agent-sdk-store-file)"
+          store_supabase_version="$(crate_version agent-sdk-store-supabase)"
+          store_sqlite_version="$(crate_version agent-sdk-store-sqlite)"
+          store_postgres_version="$(crate_version agent-sdk-store-postgres)"
           toolkit_version="$(crate_version agent-sdk-toolkit)"
 
           if ! crate_exists agent-sdk-core "$core_version"; then
@@ -81,17 +85,23 @@ jobs:
             exit 0
           fi
 
-          if crate_exists agent-sdk-eval "$eval_version"; then
-            echo "agent-sdk-eval ${eval_version} is already on crates.io; skipping dry run."
-          else
-            cargo publish -p agent-sdk-eval --dry-run
-          fi
+          dry_run_if_missing() {
+            local name="$1"
+            local version="$2"
 
-          if crate_exists agent-sdk-provider "$provider_version"; then
-            echo "agent-sdk-provider ${provider_version} is already on crates.io; skipping dry run."
-          else
-            cargo publish -p agent-sdk-provider --dry-run
-          fi
+            if crate_exists "$name" "$version"; then
+              echo "${name} ${version} is already on crates.io; skipping dry run."
+            else
+              cargo publish -p "$name" --dry-run
+            fi
+          }
+
+          dry_run_if_missing agent-sdk-eval "$eval_version"
+          dry_run_if_missing agent-sdk-provider "$provider_version"
+          dry_run_if_missing agent-sdk-store-file "$store_file_version"
+          dry_run_if_missing agent-sdk-store-supabase "$store_supabase_version"
+          dry_run_if_missing agent-sdk-store-sqlite "$store_sqlite_version"
+          dry_run_if_missing agent-sdk-store-postgres "$store_postgres_version"
 
           if ! crate_exists agent-sdk-eval "$eval_version"; then
             echo "agent-sdk-eval ${eval_version} is not on crates.io yet; toolkit dry run happens during publish."
@@ -172,6 +182,10 @@ jobs:
           core_version="$(crate_version agent-sdk-core)"
           eval_version="$(crate_version agent-sdk-eval)"
           provider_version="$(crate_version agent-sdk-provider)"
+          store_file_version="$(crate_version agent-sdk-store-file)"
+          store_supabase_version="$(crate_version agent-sdk-store-supabase)"
+          store_sqlite_version="$(crate_version agent-sdk-store-sqlite)"
+          store_postgres_version="$(crate_version agent-sdk-store-postgres)"
           toolkit_version="$(crate_version agent-sdk-toolkit)"
 
           publish_if_missing agent-sdk-core "$core_version"
@@ -179,6 +193,10 @@ jobs:
 
           publish_if_missing agent-sdk-eval "$eval_version"
           publish_if_missing agent-sdk-provider "$provider_version"
+          publish_if_missing agent-sdk-store-file "$store_file_version"
+          publish_if_missing agent-sdk-store-supabase "$store_supabase_version"
+          publish_if_missing agent-sdk-store-sqlite "$store_sqlite_version"
+          publish_if_missing agent-sdk-store-postgres "$store_postgres_version"
           wait_for_crate agent-sdk-eval "$eval_version"
 
           for attempt in {1..24}; do
@@ -196,6 +214,10 @@ jobs:
           done
 
           wait_for_crate agent-sdk-provider "$provider_version"
+          wait_for_crate agent-sdk-store-file "$store_file_version"
+          wait_for_crate agent-sdk-store-supabase "$store_supabase_version"
+          wait_for_crate agent-sdk-store-sqlite "$store_sqlite_version"
+          wait_for_crate agent-sdk-store-postgres "$store_postgres_version"
           wait_for_crate agent-sdk-toolkit "$toolkit_version"
 
       - name: Create GitHub release for tag

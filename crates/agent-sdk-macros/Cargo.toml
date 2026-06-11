@@ -1,13 +1,14 @@
 [package]
 name = "agent-sdk-macros"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 description = "Optional proc macros for typed Agent SDK toolkit helpers."
-documentation = "https://docs.rs/agent-sdk-macros"
+documentation = "https://github.com/heyclawdia/clawdia_sdk/tree/main/crates/agent-sdk-macros"
 readme = "README.md"
+publish = false
 
 [lib]
 proc-macro = true
@@ -19,8 +20,8 @@ quote = "1"
 syn = { version = "2", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
-agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3" }
-agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.3" }
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.4" }
+agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.4" }
 serde.workspace = true
 serde_json.workspace = true
 trybuild = "1"

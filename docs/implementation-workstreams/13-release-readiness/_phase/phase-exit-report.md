@@ -4,7 +4,7 @@
 
 PASS.
 
-Post-handoff update: the first explicit publish request moved the package metadata from handoff-only to `0.1.0-alpha.1` crates.io release readiness. A later API-hygiene release updated the local crate manifests and changelog to `0.1.0-alpha.2`. The Strands gap follow-up added an optional `agent-sdk-provider` crate, and the live-provider onboarding follow-up added OpenAI, Anthropic, and Gemini adapters over `ProviderAdapter`; the current checkout is now a `0.1.0-alpha.3` release candidate for that source-breaking provider hint/API work. The release execution adds `.github/workflows/publish-crates.yml` plus `scripts/public-release-audit.sh` so GitHub releases validate formatting, tests, public-repo sensitive-content criteria, and package metadata before publishing.
+Post-handoff update: the first explicit publish request moved the package metadata from handoff-only to `0.1.0-alpha.1` crates.io release readiness. A later API-hygiene release updated the local crate manifests and changelog to `0.1.0-alpha.2`. The Strands gap follow-up added an optional `agent-sdk-provider` crate, and the live-provider onboarding follow-up added OpenAI, Anthropic, and Gemini adapters over `ProviderAdapter`. The current checkout is now a `0.1.0-alpha.4` release candidate for the DX quickstart, builder-first typed-tool, and durable store adapter work. The release execution uses `.github/workflows/publish-crates.yml` plus `scripts/public-release-audit.sh` so GitHub releases validate formatting, tests, public-repo sensitive-content criteria, and package metadata before publishing.
 
 ## Scope Completed
 
@@ -29,6 +29,12 @@ Changed release-readiness surfaces:
 - Current crates now have crate-level READMEs and descriptions.
 - The original core/toolkit crates used `publish = false` for the original handoff because no publish/tag release had been requested and no live/provider/container/product-host support was included. The explicit alpha publish request removes that block while preserving the unsupported-path release notes.
 - `agent-sdk-provider` is an optional aggregate adapter crate. Its current surface includes live OpenAI Responses, Anthropic Messages, and Gemini generateContent adapters, plus deterministic transport-injected harnesses. It does not claim Bedrock, local model, MCP, browser, web, journal, event, approval, or tool-executor ownership.
+- `agent-sdk-store-file`, `agent-sdk-store-sqlite`, `agent-sdk-store-postgres`,
+  and `agent-sdk-store-supabase` are optional durable store adapter crates.
+  They map explicit SDK store ports and keep retention, backup, hosted
+  provisioning, and product session state host-owned.
+- `agent-sdk-macros` remains checkout-only in this repository because the
+  crates.io package name is already occupied by an unrelated project.
 - The invalid placeholder repository metadata was removed from the workspace package metadata.
 
 ## Feature Flag Matrix
@@ -66,6 +72,21 @@ The handoff notes explicitly state that concrete container runtimes, product UI/
 - Release notes and crate READMEs document that provider adapters are optional and concrete runtimes/product adapters remain unsupported. The provider crate README also documents that credentials remain host-resolved and do not enter runtime packages, journals, events, or content refs.
 
 ## Validation Evidence
+
+Current `0.1.0-alpha.4` release-candidate validation on 2026-06-11:
+
+- `cargo fmt --check` PASS.
+- `git diff --check` PASS.
+- `scripts/public-release-audit.sh` PASS.
+- `cargo test --workspace --all-features` PASS, including core, provider,
+  toolkit, eval, macros, file/SQLite/Postgres/Supabase store crates, facade,
+  checkout examples, and doctests.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` PASS.
+- `cargo doc --workspace --all-features --no-deps` PASS.
+- `cargo publish -p agent-sdk-core --dry-run --allow-dirty` PASS through
+  package verification and dry-run upload abort.
+
+Historical release-readiness validation from the first published crate family:
 
 - `cargo fmt --check` PASS.
 - `cargo test --workspace` PASS, including `agent-sdk-core`, `agent-sdk-provider`, `agent-sdk-toolkit`, and doc tests.

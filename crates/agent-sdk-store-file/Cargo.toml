@@ -1,6 +1,6 @@
 [package]
 name = "agent-sdk-store-file"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/agent-sdk-store-file"
 readme = "README.md"
 
 [dependencies]
-agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3" }
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.4" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

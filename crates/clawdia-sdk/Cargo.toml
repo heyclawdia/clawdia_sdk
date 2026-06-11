@@ -1,12 +1,12 @@
 [package]
 name = "clawdia-sdk"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 description = "Convenience facade over the split Rust-first Agent SDK crates."
-documentation = "https://docs.rs/clawdia-sdk"
+documentation = "https://github.com/heyclawdia/clawdia_sdk/tree/main/crates/clawdia-sdk"
 readme = "README.md"
 publish = false
 
@@ -35,15 +35,15 @@ all-stable = [
 ]
 
 [dependencies]
-agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3", default-features = false }
-agent-sdk-eval = { path = "../agent-sdk-eval", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-macros = { path = "../agent-sdk-macros", version = "=0.1.0-alpha.3", optional = true }
-agent-sdk-provider = { path = "../agent-sdk-provider", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-store-file = { path = "../agent-sdk-store-file", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-store-postgres = { path = "../agent-sdk-store-postgres", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-store-sqlite = { path = "../agent-sdk-store-sqlite", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-store-supabase = { path = "../agent-sdk-store-supabase", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.3", optional = true, default-features = false }
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.4", default-features = false }
+agent-sdk-eval = { path = "../agent-sdk-eval", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-macros = { path = "../agent-sdk-macros", version = "=0.1.0-alpha.4", optional = true }
+agent-sdk-provider = { path = "../agent-sdk-provider", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-store-file = { path = "../agent-sdk-store-file", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-store-postgres = { path = "../agent-sdk-store-postgres", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-store-sqlite = { path = "../agent-sdk-store-sqlite", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-store-supabase = { path = "../agent-sdk-store-supabase", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.4", optional = true, default-features = false }
 
 [dev-dependencies]
 serde.workspace = true

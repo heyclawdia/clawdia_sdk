@@ -82,10 +82,10 @@ Current first manifest posture:
 
 ```toml
 [dependencies]
-agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.3", default-features = false }
-agent-sdk-provider = { path = "../agent-sdk-provider", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.3", optional = true, default-features = false }
-agent-sdk-eval = { path = "../agent-sdk-eval", version = "=0.1.0-alpha.3", optional = true, default-features = false }
+agent-sdk-core = { path = "../agent-sdk-core", version = "=0.1.0-alpha.4", default-features = false }
+agent-sdk-provider = { path = "../agent-sdk-provider", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-toolkit = { path = "../agent-sdk-toolkit", version = "=0.1.0-alpha.4", optional = true, default-features = false }
+agent-sdk-eval = { path = "../agent-sdk-eval", version = "=0.1.0-alpha.4", optional = true, default-features = false }
 
 [features]
 default = []
